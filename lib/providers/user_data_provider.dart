@@ -344,4 +344,16 @@ class UserDataProvider with ChangeNotifier {
   String getSongStreamCount(String songId) {
     return _songService.getFormattedStreamCount(songId);
   }
+  
+  // Refresh data to update prices in real-time
+  Future<void> refreshData() async {
+    // Trigger a manual update of song prices
+    _songService.triggerPriceUpdate();
+    
+    // Notify listeners to update the UI
+    notifyListeners();
+    
+    // Return a Future that completes immediately for async compatibility
+    return Future.value();
+  }
 }

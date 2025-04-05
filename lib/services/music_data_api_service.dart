@@ -69,11 +69,9 @@ class MusicDataApiService {
     
     // Create a new timer that fires every 5 seconds
     _updateTimer = Timer.periodic(const Duration(seconds: 5), (_) {
-      // Only update if discover tab is active
-      if (_isDiscoverTabActive) {
-        _updateStreamCounts();
-        _updatePrices();
-      }
+      // Always update prices regardless of which tab is active
+      _updateStreamCounts();
+      _updatePrices();
     });
   }
   
@@ -207,6 +205,15 @@ class MusicDataApiService {
     } else {
       return count.toString();
     }
+  }
+  
+  // Trigger a manual update of prices immediately
+  void triggerPriceUpdate() {
+    // Update stream counts
+    _updateStreamCounts();
+    
+    // Update prices based on new stream counts
+    _updatePrices();
   }
   
   // Dispose resources

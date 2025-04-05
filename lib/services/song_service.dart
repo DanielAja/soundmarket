@@ -89,6 +89,12 @@ class SongService {
     return _musicDataApi.getFormattedStreamCount(songId);
   }
   
+  // Trigger a manual update of song prices
+  void triggerPriceUpdate() {
+    // Request the music data API to update prices immediately
+    _musicDataApi.triggerPriceUpdate();
+  }
+  
   // Dispose resources
   void dispose() {
     _priceUpdateSubscription?.cancel();

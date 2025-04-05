@@ -5,6 +5,7 @@ import 'dart:math';
 import '../providers/user_data_provider.dart';
 import '../models/portfolio_item.dart';
 import '../models/song.dart';
+import '../models/transaction.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -25,7 +26,10 @@ class _HomeScreenState extends State<HomeScreen> {
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () {
-              // Refresh data (for demo purposes)
+              // Trigger a manual refresh of the song service
+              final userDataProvider = Provider.of<UserDataProvider>(context, listen: false);
+              userDataProvider.refreshData();
+              
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Refreshed market data')),
               );
@@ -40,7 +44,9 @@ class _HomeScreenState extends State<HomeScreen> {
           
           return RefreshIndicator(
             onRefresh: () async {
-              // Pull to refresh functionality
+              // Pull to refresh functionality - actually refresh the data
+              await userDataProvider.refreshData();
+              
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Refreshed market data')),
               );
@@ -248,98 +254,145 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // Generate chart data based on the selected time filter
+  // Generate chart data based on the selected time filter and user transactions
   List<FlSpot> _generateChartData(
     String timeFilter, 
-    double baseValue, 
-    double currentValue, 
-    double variance
+    UserDataProvider userDataProvider
   ) {
-    // Reduce variance to make prices more stable
-    variance = variance * 0.3; // Reduce variance by 70%
-    
-    final random = Random();
     final spots = <FlSpot>[];
+    final now = DateTime.now();
+    final transactions = userDataProvider.transactions;
+    final currentPortfolioValue = userDataProvider.totalPortfolioValue;
+    final currentCashBalance = userDataProvider.userProfile?.cashBalance ?? 0.0;
+    final currentTotalBalance = userDataProvider.totalBalance;
     
-    // Number of data points based on time filter
+    // Determine start date based on time filter
+    DateTime startDate;
     int numPoints;
+    
     switch (timeFilter) {
       case '1D':
+        startDate = DateTime(now.year, now.month, now.day).subtract(const Duration(days: 1));
         numPoints = 24; // Hourly data for 1 day
         break;
       case '1W':
+        startDate = now.subtract(const Duration(days: 7));
         numPoints = 7; // Daily data for 1 week
         break;
       case '1M':
+        startDate = DateTime(now.year, now.month - 1, now.day);
         numPoints = 30; // Daily data for 1 month
         break;
       case '3M':
+        startDate = DateTime(now.year, now.month - 3, now.day);
         numPoints = 12; // Weekly data for 3 months
         break;
       case '1Y':
+        startDate = DateTime(now.year - 1, now.month, now.day);
         numPoints = 12; // Monthly data for 1 year
         break;
       case 'All':
-        numPoints = 24; // Monthly data for 2 years
+        // Use the earliest transaction date or 2 years ago, whichever is earlier
+        startDate = transactions.isNotEmpty 
+            ? transactions.map((t) => t.timestamp).reduce((a, b) => a.isBefore(b) ? a : b)
+            : DateTime(now.year - 2, now.month, now.day);
+        numPoints = 24; // Monthly data for all time
         break;
       default:
+        startDate = now.subtract(const Duration(days: 7));
         numPoints = 7; // Default to 1 week
     }
     
-    // Generate different patterns based on time filter
+    // Filter transactions that occurred after the start date
+    final relevantTransactions = transactions
+        .where((t) => t.timestamp.isAfter(startDate))
+        .toList();
+    
+    // If there are no transactions in the selected time period, use a simple linear progression
+    if (relevantTransactions.isEmpty) {
+      // Start with 80% of current value as a baseline
+      final baseValue = currentTotalBalance * 0.8;
+      
+      for (int i = 0; i < numPoints; i++) {
+        final progress = i / (numPoints - 1);
+        final value = baseValue + (currentTotalBalance - baseValue) * progress;
+        spots.add(FlSpot(i.toDouble(), value));
+      }
+      
+      return spots;
+    }
+    
+    // Sort transactions by timestamp (oldest first)
+    relevantTransactions.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+    
+    // Calculate time intervals for data points
+    final timeRange = now.difference(startDate).inMilliseconds;
+    final intervalMs = timeRange / (numPoints - 1);
+    
+    // Initialize with starting balance (assume 80% of current if no transactions)
+    double runningBalance = currentTotalBalance * 0.8;
+    
+    // If we have transactions, calculate a more accurate starting balance
+    if (relevantTransactions.isNotEmpty) {
+      // Start with current balance and work backwards through transactions
+      runningBalance = currentTotalBalance;
+      
+      for (final transaction in transactions.reversed) {
+        if (transaction.timestamp.isBefore(startDate)) {
+          // Stop once we reach transactions before our start date
+          break;
+        }
+        
+        // Reverse the transaction effect
+        if (transaction.type == TransactionType.buy) {
+          // For buy: add the cost back to balance, remove the shares value
+          runningBalance += transaction.totalValue;
+          // We don't have historical prices, so use purchase price as an approximation
+          runningBalance -= transaction.price * transaction.quantity;
+        } else {
+          // For sell: remove the proceeds, add the shares value
+          runningBalance -= transaction.totalValue;
+          // We don't have historical prices, so use sale price as an approximation
+          runningBalance += transaction.price * transaction.quantity;
+        }
+      }
+      
+      // Ensure we don't go negative or too low
+      runningBalance = runningBalance.clamp(currentTotalBalance * 0.5, double.infinity);
+    }
+    
+    // Generate data points at regular intervals
     for (int i = 0; i < numPoints; i++) {
-      double value;
+      final pointTime = startDate.add(Duration(milliseconds: (intervalMs * i).round()));
+      double balance = runningBalance;
       
-      // Calculate progress (0 to 1)
-      final progress = i / (numPoints - 1);
-      
-      // Base linear interpolation from start to end value
-      value = baseValue + (currentValue - baseValue) * progress;
-      
-      // Add smaller, more stable fluctuations
-      switch (timeFilter) {
-        case '1D':
-          // Less volatile intraday pattern
-          value += (random.nextDouble() * 2 - 1) * variance * 0.2;
-          break;
-        case '1W':
-          // Gradual increase with minimal fluctuation
-          value += (random.nextDouble() * 2 - 1) * variance * 0.3;
-          break;
-        case '1M':
-          // Gentle ups and downs
-          // Add a smaller sine wave pattern
-          value += sin(progress * 2 * pi) * variance * 0.5;
-          // Add minimal randomness
-          value += (random.nextDouble() * 2 - 1) * variance * 0.2;
-          break;
-        case '3M':
-          // Smoother trend
-          value += sin(progress * 1.5 * pi) * variance * 0.7;
-          value += (random.nextDouble() * 2 - 1) * variance * 0.3;
-          break;
-        case '1Y':
-          // Gentle seasonal effects
-          value += sin(progress * pi) * variance;
-          value += (random.nextDouble() * 2 - 1) * variance * 0.4;
-          break;
-        case 'All':
-          // Smoother long-term growth
-          value = baseValue * pow(1.08, progress); // Reduced compound growth
-          value += sin(progress * 2 * pi) * variance;
-          value += (random.nextDouble() * 2 - 1) * variance * 0.5;
-          break;
-        default:
-          // Default pattern (1W) - very stable
-          value += (random.nextDouble() * 2 - 1) * variance * 0.3;
+      // Apply all transactions that happened before this point
+      for (final transaction in relevantTransactions) {
+        if (transaction.timestamp.isAfter(pointTime)) {
+          // Skip transactions that haven't happened yet at this point
+          continue;
+        }
+        
+        // Apply transaction effect
+        if (transaction.type == TransactionType.buy) {
+          // For buy: subtract the cost, add the shares value
+          balance -= transaction.totalValue;
+          // We don't have historical prices, so use purchase price as an approximation
+          balance += transaction.price * transaction.quantity;
+        } else {
+          // For sell: add the proceeds, remove the shares value
+          balance += transaction.totalValue;
+          // We don't have historical prices, so use sale price as an approximation
+          balance -= transaction.price * transaction.quantity;
+        }
       }
       
-      // Ensure the last point matches the current value
+      // Ensure the last point matches the current total balance
       if (i == numPoints - 1) {
-        value = currentValue;
+        balance = currentTotalBalance;
       }
       
-      spots.add(FlSpot(i.toDouble(), value));
+      spots.add(FlSpot(i.toDouble(), balance));
     }
     
     return spots;
@@ -348,22 +401,15 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildPortfolioChart(BuildContext context) {
     return Consumer<UserDataProvider>(
       builder: (context, userDataProvider, child) {
-        // Generate chart data based on portfolio value
+        // Get portfolio data
         final portfolioValue = userDataProvider.totalPortfolioValue;
         final cashBalance = userDataProvider.userProfile?.cashBalance ?? 0.0;
         final totalBalance = userDataProvider.totalBalance;
         
-        // Create a more realistic chart with some variation
-        // This simulates historical data for the portfolio
-        final baseValue = totalBalance * 0.8; // Starting at 80% of current value
-        final variance = totalBalance * 0.05; // 5% variance for fluctuations
-        
-        // Generate chart data based on selected time filter
+        // Generate chart data based on user transactions and selected time filter
         final spots = _generateChartData(
-          _selectedTimeFilter, 
-          baseValue, 
-          totalBalance, 
-          variance
+          _selectedTimeFilter,
+          userDataProvider
         );
         
         // Calculate min and max values for the chart
@@ -1092,207 +1138,217 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildPortfolioList(BuildContext context, List<PortfolioItem> portfolio, UserDataProvider userDataProvider) {
-    if (portfolio.isEmpty) {
-      return Card(
-        elevation: 4.0,
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Your Portfolio',
-                style: TextStyle(
-                  fontSize: 18.0,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 16.0),
-              Center(
-                child: Column(
-                  children: [
-                    Icon(
-                      Icons.music_note,
-                      size: 48.0,
-                      color: Colors.grey[600],
-                    ),
-                    const SizedBox(height: 16.0),
-                    const Text(
-                      'Your portfolio is empty',
-                      style: TextStyle(
-                        fontSize: 16.0,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8.0),
-                    const Text(
-                      'Start investing in songs to build your portfolio',
-                      style: TextStyle(
-                        color: Colors.grey,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 16.0),
-                    ElevatedButton(
-                      onPressed: () {
-                        // Navigate to Discover tab
-                        DefaultTabController.of(context)?.animateTo(1);
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Theme.of(context).colorScheme.primary,
-                      ),
-                      child: const Text('Discover Songs'),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-    
-    return Card(
-      elevation: 4.0,
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Your Portfolio',
-                  style: TextStyle(
-                    fontSize: 18.0,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                Text(
-                  '${portfolio.length} ${portfolio.length == 1 ? 'Song' : 'Songs'}',
-                  style: TextStyle(
-                    color: Colors.grey[400],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16.0),
-            ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: portfolio.length,
-              separatorBuilder: (context, index) => const Divider(),
-              itemBuilder: (context, index) {
-                final item = portfolio[index];
-                final song = userDataProvider.allSongs.firstWhere(
-                  (s) => s.id == item.songId,
-                  orElse: () => Song(
-                    id: item.songId,
-                    name: item.songName,
-                    artist: item.artistName,
-                    genre: 'Unknown',
-                    currentPrice: item.purchasePrice,
-                  ),
-                );
-                
-                final currentValue = song.currentPrice * item.quantity;
-                final purchaseValue = item.purchasePrice * item.quantity;
-                final profitLoss = currentValue - purchaseValue;
-                final profitLossPercent = (profitLoss / purchaseValue) * 100;
-                final isProfit = profitLoss >= 0;
-                
-                return ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: CircleAvatar(
-                    backgroundColor: Colors.grey[800],
-                    backgroundImage: item.albumArtUrl != null ? NetworkImage(item.albumArtUrl!) : null,
-                    child: item.albumArtUrl == null ? const Icon(Icons.music_note) : null,
-                  ),
-                  title: Text(
-                    item.songName,
-                    style: const TextStyle(
+    // Use Consumer to ensure real-time updates
+    return Consumer<UserDataProvider>(
+      builder: (context, provider, child) {
+        // Get the latest portfolio data
+        final latestPortfolio = provider.portfolio;
+        
+        if (latestPortfolio.isEmpty) {
+          return Card(
+            elevation: 4.0,
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Your Portfolio',
+                    style: TextStyle(
+                      fontSize: 18.0,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('${item.artistName}'),
-                      Row(
-                        children: [
-                          Text('${item.quantity} ${item.quantity == 1 ? 'share' : 'shares'}'),
-                          const SizedBox(width: 8),
-                          Icon(Icons.headphones, size: 14, color: Colors.grey[400]),
-                          const SizedBox(width: 2),
-                          Text(
-                            userDataProvider.getSongStreamCount(item.songId),
-                            style: TextStyle(color: Colors.grey[400], fontSize: 12),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  trailing: Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 500),
-                        transitionBuilder: (Widget child, Animation<double> animation) {
-                          return FadeTransition(
-                            opacity: animation,
-                            child: SlideTransition(
-                              position: Tween<Offset>(
-                                begin: const Offset(0.0, 0.5),
-                                end: Offset.zero,
-                              ).animate(animation),
-                              child: child,
-                            ),
-                          );
-                        },
-                        child: Text(
-                          '\$${currentValue.toStringAsFixed(2)}',
-                          key: ValueKey<String>(currentValue.toStringAsFixed(2)),
-                          style: const TextStyle(
+                  const SizedBox(height: 16.0),
+                  Center(
+                    child: Column(
+                      children: [
+                        Icon(
+                          Icons.music_note,
+                          size: 48.0,
+                          color: Colors.grey[600],
+                        ),
+                        const SizedBox(height: 16.0),
+                        const Text(
+                          'Your portfolio is empty',
+                          style: TextStyle(
+                            fontSize: 16.0,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                      ),
-                      AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 500),
-                        transitionBuilder: (Widget child, Animation<double> animation) {
-                          return FadeTransition(
-                            opacity: animation,
-                            child: SlideTransition(
-                              position: Tween<Offset>(
-                                begin: const Offset(0.0, 0.5),
-                                end: Offset.zero,
-                              ).animate(animation),
-                              child: child,
-                            ),
-                          );
-                        },
-                        child: Text(
-                          '${isProfit ? '+' : ''}${profitLoss.toStringAsFixed(2)} (${isProfit ? '+' : ''}${profitLossPercent.toStringAsFixed(2)}%)',
-                          key: ValueKey<String>(profitLoss.toStringAsFixed(2)),
+                        const SizedBox(height: 8.0),
+                        const Text(
+                          'Start investing in songs to build your portfolio',
                           style: TextStyle(
-                            color: isProfit ? Colors.green : Colors.red,
-                            fontSize: 12.0,
+                            color: Colors.grey,
                           ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 16.0),
+                        ElevatedButton(
+                          onPressed: () {
+                            // Navigate to Discover tab
+                            DefaultTabController.of(context)?.animateTo(1);
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Theme.of(context).colorScheme.primary,
+                          ),
+                          child: const Text('Discover Songs'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+        
+        return Card(
+          elevation: 4.0,
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Your Portfolio',
+                      style: TextStyle(
+                        fontSize: 18.0,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      '${latestPortfolio.length} ${latestPortfolio.length == 1 ? 'Song' : 'Songs'}',
+                      style: TextStyle(
+                        color: Colors.grey[400],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16.0),
+                ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: latestPortfolio.length,
+                  separatorBuilder: (context, index) => const Divider(),
+                  itemBuilder: (context, index) {
+                    final item = latestPortfolio[index];
+                    // Get the latest song data to ensure current prices
+                    final song = provider.allSongs.firstWhere(
+                      (s) => s.id == item.songId,
+                      orElse: () => Song(
+                        id: item.songId,
+                        name: item.songName,
+                        artist: item.artistName,
+                        genre: 'Unknown',
+                        currentPrice: item.purchasePrice,
+                      ),
+                    );
+                    
+                    // Calculate values based on latest data
+                    final currentValue = song.currentPrice * item.quantity;
+                    final purchaseValue = item.purchasePrice * item.quantity;
+                    final profitLoss = currentValue - purchaseValue;
+                    final profitLossPercent = (profitLoss / purchaseValue) * 100;
+                    final isProfit = profitLoss >= 0;
+              
+                    return ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: CircleAvatar(
+                        backgroundColor: Colors.grey[800],
+                        backgroundImage: item.albumArtUrl != null ? NetworkImage(item.albumArtUrl!) : null,
+                        child: item.albumArtUrl == null ? const Icon(Icons.music_note) : null,
+                      ),
+                      title: Text(
+                        item.songName,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
-                    ],
-                  ),
-                  onTap: () {
-                    _showPortfolioItemDetails(context, item, song);
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('${item.artistName}'),
+                          Row(
+                            children: [
+                              Text('${item.quantity} ${item.quantity == 1 ? 'share' : 'shares'}'),
+                              const SizedBox(width: 8),
+                              Icon(Icons.headphones, size: 14, color: Colors.grey[400]),
+                              const SizedBox(width: 2),
+                              Text(
+                                provider.getSongStreamCount(item.songId),
+                                style: TextStyle(color: Colors.grey[400], fontSize: 12),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      trailing: Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 500),
+                            transitionBuilder: (Widget child, Animation<double> animation) {
+                              return FadeTransition(
+                                opacity: animation,
+                                child: SlideTransition(
+                                  position: Tween<Offset>(
+                                    begin: const Offset(0.0, 0.5),
+                                    end: Offset.zero,
+                                  ).animate(animation),
+                                  child: child,
+                                ),
+                              );
+                            },
+                            child: Text(
+                              '\$${currentValue.toStringAsFixed(2)}',
+                              key: ValueKey<String>(currentValue.toStringAsFixed(2)),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 500),
+                            transitionBuilder: (Widget child, Animation<double> animation) {
+                              return FadeTransition(
+                                opacity: animation,
+                                child: SlideTransition(
+                                  position: Tween<Offset>(
+                                    begin: const Offset(0.0, 0.5),
+                                    end: Offset.zero,
+                                  ).animate(animation),
+                                  child: child,
+                                ),
+                              );
+                            },
+                            child: Text(
+                              '${isProfit ? '+' : ''}${profitLoss.toStringAsFixed(2)} (${isProfit ? '+' : ''}${profitLossPercent.toStringAsFixed(2)}%)',
+                              key: ValueKey<String>(profitLoss.toStringAsFixed(2)),
+                              style: TextStyle(
+                                color: isProfit ? Colors.green : Colors.red,
+                                fontSize: 12.0,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      onTap: () {
+                        _showPortfolioItemDetails(context, item, song);
+                      },
+                    );
                   },
-                );
-              },
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }
