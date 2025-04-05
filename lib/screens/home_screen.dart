@@ -647,6 +647,450 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // Show portfolio item details in a bottom sheet with buy/sell options
+  void _showPortfolioItemDetails(BuildContext context, PortfolioItem item, Song song) {
+    final userDataProvider = Provider.of<UserDataProvider>(context, listen: false);
+    
+    // Calculate current value and profit/loss
+    final currentValue = song.currentPrice * item.quantity;
+    final purchaseValue = item.purchasePrice * item.quantity;
+    final profitLoss = currentValue - purchaseValue;
+    final profitLossPercent = (profitLoss / purchaseValue) * 100;
+    final isProfit = profitLoss >= 0;
+    
+    // Controller for quantity input
+    final TextEditingController quantityController = TextEditingController(text: '1');
+    
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            // Parse quantity from controller
+            int quantity = int.tryParse(quantityController.text) ?? 1;
+            if (quantity < 1) quantity = 1;
+            
+            // Calculate transaction values
+            final transactionValue = song.currentPrice * quantity;
+            final cashBalance = userDataProvider.userProfile?.cashBalance ?? 0.0;
+            final canBuy = cashBalance >= transactionValue;
+            final canSell = item.quantity >= quantity;
+            
+            return Container(
+              height: MediaQuery.of(context).size.height * 0.85,
+              decoration: BoxDecoration(
+                color: Theme.of(context).scaffoldBackgroundColor,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(20),
+                  topRight: Radius.circular(20),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Handle bar
+                  Center(
+                    child: Container(
+                      margin: const EdgeInsets.only(top: 12, bottom: 8),
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[600],
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  
+                  // Header with song info
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 30,
+                          backgroundColor: Colors.grey[800],
+                          backgroundImage: item.albumArtUrl != null ? NetworkImage(item.albumArtUrl!) : null,
+                          child: item.albumArtUrl == null ? const Icon(Icons.music_note, size: 30) : null,
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                item.songName,
+                                style: const TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              Text(
+                                item.artistName,
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.grey[400],
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  Icon(Icons.headphones, size: 14, color: Colors.grey[400]),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    userDataProvider.getSongStreamCount(item.songId),
+                                    style: TextStyle(color: Colors.grey[400], fontSize: 12),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Icon(Icons.category, size: 14, color: Colors.grey[400]),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    song.genre,
+                                    style: TextStyle(color: Colors.grey[400], fontSize: 12),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  
+                  const Divider(),
+                  
+                  // Current price and performance
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Current Price',
+                              style: TextStyle(
+                                color: Colors.grey[400],
+                                fontSize: 14,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '\$${song.currentPrice.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                Icon(
+                                  song.isPriceUp ? Icons.arrow_upward : Icons.arrow_downward,
+                                  color: song.isPriceUp ? Colors.green : Colors.red,
+                                  size: 14,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '${song.isPriceUp ? "+" : ""}${song.priceChangePercent.toStringAsFixed(2)}%',
+                                  style: TextStyle(
+                                    color: song.isPriceUp ? Colors.green : Colors.red,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              'Your Position',
+                              style: TextStyle(
+                                color: Colors.grey[400],
+                                fontSize: 14,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${item.quantity} ${item.quantity == 1 ? 'share' : 'shares'}',
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Avg. Price: \$${item.purchasePrice.toStringAsFixed(2)}',
+                              style: TextStyle(
+                                color: Colors.grey[400],
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  
+                  // Portfolio value and profit/loss
+                  Container(
+                    color: Colors.grey[900],
+                    padding: const EdgeInsets.all(16.0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Current Value',
+                              style: TextStyle(
+                                color: Colors.grey[400],
+                                fontSize: 14,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '\$${currentValue.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              'Profit/Loss',
+                              style: TextStyle(
+                                color: Colors.grey[400],
+                                fontSize: 14,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                Icon(
+                                  isProfit ? Icons.arrow_upward : Icons.arrow_downward,
+                                  color: isProfit ? Colors.green : Colors.red,
+                                  size: 14,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '${isProfit ? "+" : ""}${profitLoss.toStringAsFixed(2)} (${isProfit ? "+" : ""}${profitLossPercent.toStringAsFixed(2)}%)',
+                                  style: TextStyle(
+                                    color: isProfit ? Colors.green : Colors.red,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  
+                  const SizedBox(height: 16),
+                  
+                  // Transaction section
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Trade',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        
+                        // Quantity input
+                        Row(
+                          children: [
+                            const Text(
+                              'Quantity:',
+                              style: TextStyle(fontSize: 16),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: TextField(
+                                controller: quantityController,
+                                keyboardType: TextInputType.number,
+                                decoration: const InputDecoration(
+                                  border: OutlineInputBorder(),
+                                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                ),
+                                onChanged: (value) {
+                                  setState(() {
+                                    // Update UI when quantity changes
+                                  });
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                        
+                        const SizedBox(height: 16),
+                        
+                        // Transaction value
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Transaction Value:',
+                              style: TextStyle(fontSize: 16),
+                            ),
+                            Text(
+                              '\$${transactionValue.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                        
+                        const SizedBox(height: 8),
+                        
+                        // Cash balance
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Cash Balance:',
+                              style: TextStyle(fontSize: 16),
+                            ),
+                            Text(
+                              '\$${cashBalance.toStringAsFixed(2)}',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: canBuy ? Colors.white : Colors.red,
+                              ),
+                            ),
+                          ],
+                        ),
+                        
+                        const SizedBox(height: 24),
+                        
+                        // Buy and sell buttons
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: canBuy ? () async {
+                                  // Buy the song
+                                  final success = await userDataProvider.buySong(song.id, quantity);
+                                  
+                                  if (success) {
+                                    Navigator.pop(context);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('Successfully bought $quantity ${quantity == 1 ? 'share' : 'shares'} of ${song.name}'),
+                                        backgroundColor: Colors.green,
+                                      ),
+                                    );
+                                  } else {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Failed to buy shares. Insufficient funds.'),
+                                        backgroundColor: Colors.red,
+                                      ),
+                                    );
+                                  }
+                                } : null,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.green,
+                                  padding: const EdgeInsets.symmetric(vertical: 16),
+                                ),
+                                child: const Text(
+                                  'BUY',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: canSell ? () async {
+                                  // Sell the song
+                                  final success = await userDataProvider.sellSong(song.id, quantity);
+                                  
+                                  if (success) {
+                                    Navigator.pop(context);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('Successfully sold $quantity ${quantity == 1 ? 'share' : 'shares'} of ${song.name}'),
+                                        backgroundColor: Colors.blue,
+                                      ),
+                                    );
+                                  } else {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Failed to sell shares. Insufficient shares.'),
+                                        backgroundColor: Colors.red,
+                                      ),
+                                    );
+                                  }
+                                } : null,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.red,
+                                  padding: const EdgeInsets.symmetric(vertical: 16),
+                                ),
+                                child: const Text(
+                                  'SELL',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  
+                  const Spacer(),
+                  
+                  // Close button
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.grey[800],
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                      child: const Text('CLOSE'),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   Widget _buildPortfolioList(BuildContext context, List<PortfolioItem> portfolio, UserDataProvider userDataProvider) {
     if (portfolio.isEmpty) {
       return Card(
@@ -841,13 +1285,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ],
                   ),
                   onTap: () {
-                    // For now, just show a snackbar
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Viewing details for ${song.name}'),
-                        duration: const Duration(seconds: 1),
-                      ),
-                    );
+                    _showPortfolioItemDetails(context, item, song);
                   },
                 );
               },

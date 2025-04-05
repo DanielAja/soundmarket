@@ -48,8 +48,14 @@ class UserDataProvider with ChangeNotifier {
   // Get top songs
   List<Song> get topSongs => _songService.getTopSongs();
   
+  // Get top songs with custom limit
+  List<Song> getTopSongs({int limit = 10}) => _songService.getTopSongs(limit: limit);
+  
   // Get top movers
   List<Song> get topMovers => _songService.getTopMovers();
+  
+  // Get top movers with custom limit
+  List<Song> getTopMovers({int limit = 10}) => _songService.getTopMovers(limit: limit);
   
   // Get rising artists
   List<String> get risingArtists => _songService.getRisingArtists();

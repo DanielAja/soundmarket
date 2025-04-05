@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 import '../models/song.dart';
 import 'music_data_api_service.dart';
 
@@ -10,19 +11,28 @@ class SongService {
   // Cached lists to maintain consistent order
   List<Song>? _cachedTopSongs;
   List<Song>? _cachedTopMovers;
+  List<String>? _cachedRisingArtists;
   
   SongService._internal() {
+    // Generate more songs for the initial lists (up to 50)
+    if (_songs.length < 50) {
+      _generateMoreSongs(50 - _songs.length);
+    }
+    
     // Initialize the music data API service
     _initializeMusicDataApi();
     
     // Initialize the cached lists
     final topSongs = List<Song>.from(_songs);
     topSongs.sort((a, b) => b.currentPrice.compareTo(a.currentPrice));
-    _cachedTopSongs = topSongs.take(10).toList();
+    _cachedTopSongs = topSongs.take(50).toList();
     
     final topMovers = List<Song>.from(_songs);
     topMovers.sort((a, b) => b.priceChangePercent.abs().compareTo(a.priceChangePercent.abs()));
-    _cachedTopMovers = topMovers.take(10).toList();
+    _cachedTopMovers = topMovers.take(50).toList();
+    
+    // Initialize rising artists list
+    _cachedRisingArtists = _calculateRisingArtists();
   }
   
   // Music data API service
@@ -241,30 +251,121 @@ class SongService {
   
   // Get top songs (by price)
   List<Song> getTopSongs({int limit = 10}) {
-    // If we already have a cached list, return it
+    // If we already have a cached list and it's large enough, return a subset
     if (_cachedTopSongs != null) {
-      return _cachedTopSongs!;
+      // If requested limit is larger than our cached list, we need to create a new sorted list
+      if (limit > _cachedTopSongs!.length) {
+        // Generate more songs if needed for the top 100 view
+        if (limit > _songs.length) {
+          _generateMoreSongs(limit - _songs.length);
+        }
+        
+        final sortedSongs = List<Song>.from(_songs);
+        sortedSongs.sort((a, b) => b.currentPrice.compareTo(a.currentPrice));
+        _cachedTopSongs = sortedSongs; // Cache all sorted songs
+        return sortedSongs.take(limit).toList();
+      }
+      
+      // Return the requested number of songs from the cache
+      return _cachedTopSongs!.take(limit).toList();
     }
     
-    // Otherwise, create and cache a new sorted list
+    // Generate more songs if needed for the top 100 view
+    if (limit > _songs.length) {
+      _generateMoreSongs(limit - _songs.length);
+    }
+    
+    // Otherwise, create and cache a new sorted list (all songs)
     final sortedSongs = List<Song>.from(_songs);
     sortedSongs.sort((a, b) => b.currentPrice.compareTo(a.currentPrice));
-    _cachedTopSongs = sortedSongs.take(limit).toList();
-    return _cachedTopSongs!;
+    _cachedTopSongs = sortedSongs; // Cache all sorted songs
+    return sortedSongs.take(limit).toList();
   }
   
   // Get top movers (by percentage change)
   List<Song> getTopMovers({int limit = 10}) {
-    // If we already have a cached list, return it
+    // If we already have a cached list and it's large enough, return a subset
     if (_cachedTopMovers != null) {
-      return _cachedTopMovers!;
+      // If requested limit is larger than our cached list, we need to create a new sorted list
+      if (limit > _cachedTopMovers!.length) {
+        // Generate more songs if needed for the top 100 view
+        if (limit > _songs.length) {
+          _generateMoreSongs(limit - _songs.length);
+        }
+        
+        final sortedSongs = List<Song>.from(_songs);
+        sortedSongs.sort((a, b) => b.priceChangePercent.abs().compareTo(a.priceChangePercent.abs()));
+        _cachedTopMovers = sortedSongs; // Cache all sorted songs
+        return sortedSongs.take(limit).toList();
+      }
+      
+      // Return the requested number of songs from the cache
+      return _cachedTopMovers!.take(limit).toList();
     }
     
-    // Otherwise, create and cache a new sorted list
+    // Generate more songs if needed for the top 100 view
+    if (limit > _songs.length) {
+      _generateMoreSongs(limit - _songs.length);
+    }
+    
+    // Otherwise, create and cache a new sorted list (all songs)
     final sortedSongs = List<Song>.from(_songs);
     sortedSongs.sort((a, b) => b.priceChangePercent.abs().compareTo(a.priceChangePercent.abs()));
-    _cachedTopMovers = sortedSongs.take(limit).toList();
-    return _cachedTopMovers!;
+    _cachedTopMovers = sortedSongs; // Cache all sorted songs
+    return sortedSongs.take(limit).toList();
+  }
+  
+  // Generate additional songs for the top 100 view
+  void _generateMoreSongs(int count) {
+    final random = Random();
+    final existingIds = _songs.map((s) => s.id).toSet();
+    final genres = [
+      'Pop', 'Hip-Hop', 'R&B', 'Rock', 'Electronic', 'Country', 
+      'Jazz', 'Classical', 'K-Pop', 'Latin', 'Indie', 'Folk',
+      'Metal', 'Blues', 'Reggae', 'Punk', 'Soul', 'Funk'
+    ];
+    final artists = [
+      'Taylor Swift', 'Drake', 'Beyoncé', 'Ed Sheeran', 'Ariana Grande',
+      'The Weeknd', 'Billie Eilish', 'Post Malone', 'Dua Lipa', 'Bad Bunny',
+      'Justin Bieber', 'Kendrick Lamar', 'Rihanna', 'Harry Styles', 'BTS',
+      'Lady Gaga', 'Travis Scott', 'Adele', 'Kanye West', 'Olivia Rodrigo',
+      'Bruno Mars', 'Coldplay', 'SZA', 'J Balvin', 'Cardi B',
+      'Imagine Dragons', 'Doja Cat', 'Shawn Mendes', 'Maroon 5', 'Lil Nas X'
+    ];
+    final songNames = [
+      'Midnight Dreams', 'Summer Vibes', 'Electric Heart', 'Ocean Eyes', 'Dancing in the Dark',
+      'Neon Lights', 'Golden Hour', 'Starlight', 'Wildest Dreams', 'Euphoria',
+      'Lost in Translation', 'Moonlight Sonata', 'Sunset Boulevard', 'City Lights', 'Paradise',
+      'Daydreamer', 'Wanderlust', 'Nostalgia', 'Serendipity', 'Bittersweet Symphony',
+      'Velvet Sky', 'Cosmic Love', 'Eternal Flame', 'Whispers in the Wind', 'Echoes',
+      'Silhouette', 'Kaleidoscope', 'Stardust', 'Mirage', 'Dreamscape',
+      'Fireflies', 'Aurora', 'Cascade', 'Reverie', 'Labyrinth',
+      'Illusion', 'Serenade', 'Lullaby', 'Rhapsody', 'Harmony',
+      'Enigma', 'Utopia', 'Dystopia', 'Nirvana', 'Elysium',
+      'Solitude', 'Infinity', 'Nebula', 'Zenith', 'Eclipse'
+    ];
+    
+    for (int i = 0; i < count; i++) {
+      final id = (existingIds.length + i + 1).toString();
+      final genre = genres[random.nextInt(genres.length)];
+      final artist = artists[random.nextInt(artists.length)];
+      final name = songNames[random.nextInt(songNames.length)] + ' ' + (i + 1).toString();
+      final currentPrice = 10.0 + random.nextDouble() * 90.0; // Random price between $10 and $100
+      final priceChange = currentPrice * (0.2 * (random.nextDouble() * 2 - 1)); // Random change ±20%
+      final previousPrice = max(0.01, currentPrice - priceChange);
+      
+      _songs.add(Song(
+        id: id,
+        name: name,
+        artist: artist,
+        genre: genre,
+        currentPrice: double.parse(currentPrice.toStringAsFixed(2)),
+        previousPrice: double.parse(previousPrice.toStringAsFixed(2)),
+        albumArtUrl: null,
+      ));
+      
+      existingIds.add(id);
+    }
   }
   
   // Get songs by genre
@@ -288,8 +389,8 @@ class SongService {
     return artists;
   }
   
-  // Get rising artists (artists with highest average price increase)
-  List<String> getRisingArtists({int limit = 5}) {
+  // Calculate rising artists (helper method)
+  List<String> _calculateRisingArtists() {
     final artistMap = <String, List<Song>>{};
     
     // Group songs by artist
@@ -314,6 +415,19 @@ class SongService {
     final sortedArtists = artistChanges.keys.toList();
     sortedArtists.sort((a, b) => artistChanges[b]!.compareTo(artistChanges[a]!));
     
-    return sortedArtists.take(limit).toList();
+    return sortedArtists;
+  }
+  
+  // Get rising artists (artists with highest average price increase)
+  List<String> getRisingArtists({int limit = 5}) {
+    // If we already have a cached list, return it
+    if (_cachedRisingArtists != null) {
+      return _cachedRisingArtists!.take(limit).toList();
+    }
+    
+    // Calculate and cache the result
+    _cachedRisingArtists = _calculateRisingArtists();
+    
+    return _cachedRisingArtists!.take(limit).toList();
   }
 }

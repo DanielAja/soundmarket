@@ -1,10 +1,12 @@
 import 'dart:math';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/user_data_provider.dart';
 import '../models/song.dart';
 import '../services/song_service.dart';
 import '../services/music_data_api_service.dart';
+import '../screens/top_songs_list_screen.dart';
 
 class DiscoverScreen extends StatefulWidget {
   const DiscoverScreen({super.key});
@@ -45,8 +47,8 @@ class _DiscoverScreenState extends State<DiscoverScreen> with TickerProviderStat
       ),
       body: Consumer<UserDataProvider>(
         builder: (context, userDataProvider, child) {
-          final topSongs = userDataProvider.topSongs;
-          final topMovers = userDataProvider.topMovers;
+          final topSongs = userDataProvider.getTopSongs(limit: 50);
+          final topMovers = userDataProvider.getTopMovers(limit: 50);
           final risingArtists = userDataProvider.risingArtists;
           
           // Get songs by genre if a genre is selected
@@ -177,12 +179,31 @@ class _DiscoverScreenState extends State<DiscoverScreen> with TickerProviderStat
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Top Songs',
-          style: TextStyle(
-            fontSize: 20.0,
-            fontWeight: FontWeight.bold,
-          ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Top Songs',
+              style: TextStyle(
+                fontSize: 20.0,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const TopSongsListScreen(
+                      listType: ListType.topSongs,
+                      title: 'Top 100 Songs',
+                    ),
+                  ),
+                );
+              },
+              child: const Text('View Top 100'),
+            ),
+          ],
         ),
         const SizedBox(height: 12.0),
         SizedBox(
@@ -204,12 +225,31 @@ class _DiscoverScreenState extends State<DiscoverScreen> with TickerProviderStat
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Top Movers',
-          style: TextStyle(
-            fontSize: 20.0,
-            fontWeight: FontWeight.bold,
-          ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Top Movers',
+              style: TextStyle(
+                fontSize: 20.0,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const TopSongsListScreen(
+                      listType: ListType.topMovers,
+                      title: 'Top 100 Movers',
+                    ),
+                  ),
+                );
+              },
+              child: const Text('View Top 100'),
+            ),
+          ],
         ),
         const SizedBox(height: 12.0),
         SizedBox(
@@ -335,6 +375,15 @@ class _DiscoverScreenState extends State<DiscoverScreen> with TickerProviderStat
     
     // Set discover tab as active to enable price updates
     _musicDataApi.setDiscoverTabActive(true);
+    
+    // Start a timer to refresh the UI every second to show real-time price changes
+    Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) {
+        setState(() {
+          // This will trigger a rebuild to show updated prices
+        });
+      }
+    });
   }
 
   @override
