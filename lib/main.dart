@@ -6,6 +6,7 @@ import 'screens/home_screen.dart';
 import 'screens/discover_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/transaction_history_screen.dart';
+import 'services/music_data_api_service.dart';
 
 void main() {
   // Ensure Flutter bindings are initialized for services like shared_preferences
@@ -113,6 +114,7 @@ class MainNavigationWrapper extends StatefulWidget {
 
 class _MainNavigationWrapperState extends State<MainNavigationWrapper> {
   int _selectedIndex = 0; // Start on the Home tab
+  final MusicDataApiService _musicDataApiService = MusicDataApiService();
 
   // List of screens for the bottom navigation
   static final List<Widget> _widgetOptions = <Widget>[
@@ -121,9 +123,19 @@ class _MainNavigationWrapperState extends State<MainNavigationWrapper> {
     const ProfileScreen(),
   ];
 
+  @override
+  void initState() {
+    super.initState();
+    // Initially the discover tab is not active
+    _musicDataApiService.setDiscoverTabActive(false);
+  }
+
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
+      
+      // Update the discover tab active state
+      _musicDataApiService.setDiscoverTabActive(index == 1); // 1 is the index of the Discover tab
     });
   }
 
