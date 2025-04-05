@@ -6,9 +6,23 @@ class SongService {
   // Singleton pattern
   static final SongService _instance = SongService._internal();
   factory SongService() => _instance;
+  
+  // Cached lists to maintain consistent order
+  List<Song>? _cachedTopSongs;
+  List<Song>? _cachedTopMovers;
+  
   SongService._internal() {
     // Initialize the music data API service
     _initializeMusicDataApi();
+    
+    // Initialize the cached lists
+    final topSongs = List<Song>.from(_songs);
+    topSongs.sort((a, b) => b.currentPrice.compareTo(a.currentPrice));
+    _cachedTopSongs = topSongs.take(10).toList();
+    
+    final topMovers = List<Song>.from(_songs);
+    topMovers.sort((a, b) => b.priceChangePercent.abs().compareTo(a.priceChangePercent.abs()));
+    _cachedTopMovers = topMovers.take(10).toList();
   }
   
   // Music data API service
@@ -49,6 +63,8 @@ class SongService {
     
     // Notify listeners if there were updates
     if (hasUpdates) {
+      // Don't clear the cached lists - we want to maintain the same order
+      // even when prices change
       _songUpdateController.add(List.from(_songs));
     }
   }
@@ -224,17 +240,41 @@ class SongService {
   }
   
   // Get top songs (by price)
-  List<Song> getTopSongs({int limit = 5}) {
+  List<Song> getTopSongs({int limit = 10}) {
+    // If we already have a cached list, return it
+    if (_cachedTopSongs != null) {
+      return _cachedTopSongs!;
+    }
+    
+    // Otherwise, create and cache a new sorted list
     final sortedSongs = List<Song>.from(_songs);
     sortedSongs.sort((a, b) => b.currentPrice.compareTo(a.currentPrice));
-    return sortedSongs.take(limit).toList();
+    _cachedTopSongs = sortedSongs.take(limit).toList();
+    return _cachedTopSongs!;
   }
   
   // Get top movers (by percentage change)
-  List<Song> getTopMovers({int limit = 5}) {
+  List<Song> getTopMovers({int limit = 10}) {
+    // If we already have a cached list, return it
+    if (_cachedTopMovers != null) {
+      return _cachedTopMovers!;
+    }
+    
+    // Otherwise, create and cache a new sorted list
     final sortedSongs = List<Song>.from(_songs);
     sortedSongs.sort((a, b) => b.priceChangePercent.abs().compareTo(a.priceChangePercent.abs()));
-    return sortedSongs.take(limit).toList();
+    _cachedTopMovers = sortedSongs.take(limit).toList();
+    return _cachedTopMovers!;
+  }
+  
+  // Get songs by genre
+  List<Song> getSongsByGenre(String genre) {
+    return _songs.where((song) => song.genre.toLowerCase() == genre.toLowerCase()).toList();
+  }
+  
+  // Get all genres
+  List<String> getAllGenres() {
+    return _songs.map((song) => song.genre).toSet().toList();
   }
   
   // Get songs by artist

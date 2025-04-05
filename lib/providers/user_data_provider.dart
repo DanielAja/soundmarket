@@ -53,6 +53,15 @@ class UserDataProvider with ChangeNotifier {
   
   // Get rising artists
   List<String> get risingArtists => _songService.getRisingArtists();
+  
+  // Get songs by genre
+  List<Song> getSongsByGenre(String genre) => _songService.getSongsByGenre(genre);
+  
+  // Get all genres
+  List<String> get allGenres => _songService.getAllGenres();
+  
+  // Get songs by artist
+  List<Song> getSongsByArtist(String artist) => _songService.getSongsByArtist(artist);
 
   UserDataProvider() {
     _loadData();

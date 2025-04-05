@@ -26,6 +26,9 @@ class _DiscoverScreenState extends State<DiscoverScreen> with TickerProviderStat
   // Reference to the MusicDataApiService
   late final MusicDataApiService _musicDataApi;
 
+  // Selected genre for filtering
+  String? _selectedGenre;
+  
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -35,10 +38,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> with TickerProviderStat
           IconButton(
             icon: const Icon(Icons.filter_list),
             onPressed: () {
-              // Filter functionality
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Filters coming soon!')),
-              );
+              _showGenreFilterDialog(context);
             },
           ),
         ],
@@ -49,8 +49,13 @@ class _DiscoverScreenState extends State<DiscoverScreen> with TickerProviderStat
           final topMovers = userDataProvider.topMovers;
           final risingArtists = userDataProvider.risingArtists;
           
+          // Get songs by genre if a genre is selected
+          final genreSongs = _selectedGenre != null 
+              ? userDataProvider.getSongsByGenre(_selectedGenre!)
+              : <Song>[];
+          
           // Initialize previous prices for new songs
-          for (final song in [...topSongs, ...topMovers]) {
+          for (final song in [...topSongs, ...topMovers, ...genreSongs]) {
             if (!_previousPrices.containsKey(song.id)) {
               _previousPrices[song.id] = song.currentPrice;
             }
@@ -61,7 +66,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> with TickerProviderStat
               // Simulate a refresh by triggering price updates
               // In a real app, this would fetch new data from the API
               final random = Random();
-              for (final song in [...topSongs, ...topMovers]) {
+              for (final song in [...topSongs, ...topMovers, ...genreSongs]) {
                 // Only update some songs to simulate market changes
                 if (random.nextBool()) {
                   final oldPrice = song.currentPrice;
@@ -95,11 +100,59 @@ class _DiscoverScreenState extends State<DiscoverScreen> with TickerProviderStat
                 _buildTopMoversSection(context, topMovers, userDataProvider),
                 const SizedBox(height: 24.0),
                 _buildRisingArtistsSection(context, risingArtists),
+                if (_selectedGenre != null) ...[
+                  const SizedBox(height: 24.0),
+                  _buildGenreSongsSection(context, genreSongs, userDataProvider),
+                ],
+                const SizedBox(height: 24.0),
+                _buildBrowseByGenreSection(context, userDataProvider),
               ],
             ),
           );
         },
       ),
+    );
+  }
+  
+  void _showGenreFilterDialog(BuildContext context) {
+    final userDataProvider = Provider.of<UserDataProvider>(context, listen: false);
+    final genres = userDataProvider.allGenres;
+    
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Filter by Genre'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: ListView(
+              shrinkWrap: true,
+              children: [
+                ListTile(
+                  title: const Text('All Genres'),
+                  selected: _selectedGenre == null,
+                  onTap: () {
+                    setState(() {
+                      _selectedGenre = null;
+                    });
+                    Navigator.pop(context);
+                  },
+                ),
+                ...genres.map((genre) => ListTile(
+                  title: Text(genre),
+                  selected: _selectedGenre == genre,
+                  onTap: () {
+                    setState(() {
+                      _selectedGenre = genre;
+                    });
+                    Navigator.pop(context);
+                  },
+                )),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -174,6 +227,79 @@ class _DiscoverScreenState extends State<DiscoverScreen> with TickerProviderStat
     );
   }
 
+  Widget _buildGenreSongsSection(BuildContext context, List<Song> songs, UserDataProvider userDataProvider) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Songs in $_selectedGenre',
+          style: const TextStyle(
+            fontSize: 20.0,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 12.0),
+        SizedBox(
+          height: 220.0,
+          child: songs.isEmpty
+              ? Center(
+                  child: Text(
+                    'No songs found in this genre',
+                    style: TextStyle(color: Colors.grey[400]),
+                  ),
+                )
+              : ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: songs.length,
+                  itemBuilder: (context, index) {
+                    final song = songs[index];
+                    return _buildSongCard(context, song, userDataProvider);
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+  
+  Widget _buildBrowseByGenreSection(BuildContext context, UserDataProvider userDataProvider) {
+    final genres = userDataProvider.allGenres;
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Browse by Genre',
+          style: TextStyle(
+            fontSize: 20.0,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 12.0),
+        Wrap(
+          spacing: 8.0,
+          runSpacing: 8.0,
+          children: genres.map((genre) {
+            final isSelected = _selectedGenre == genre;
+            return InkWell(
+              onTap: () {
+                setState(() {
+                  _selectedGenre = isSelected ? null : genre;
+                });
+              },
+              child: Chip(
+                label: Text(genre),
+                backgroundColor: isSelected ? Theme.of(context).colorScheme.primary : Colors.grey[800],
+                labelStyle: TextStyle(
+                  color: isSelected ? Colors.black : Colors.white,
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+  
   Widget _buildRisingArtistsSection(BuildContext context, List<String> artists) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
