@@ -20,7 +20,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Home'),
+        title: const Text('Sound Market'),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -48,9 +48,9 @@ class _HomeScreenState extends State<HomeScreen> {
             child: ListView(
               padding: const EdgeInsets.all(16.0),
               children: [
-                _buildPortfolioSummary(context, userDataProvider),
-                const SizedBox(height: 24.0),
                 _buildPortfolioChart(context),
+                const SizedBox(height: 24.0),
+                _buildPortfolioSummary(context, userDataProvider),
                 const SizedBox(height: 24.0),
                 _buildPortfolioList(context, portfolio, userDataProvider),
               ],
@@ -240,21 +240,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 8.0),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      _buildTimeFilterChip('1D', _selectedTimeFilter == '1D'),
-                      _buildTimeFilterChip('1W', _selectedTimeFilter == '1W'),
-                      _buildTimeFilterChip('1M', _selectedTimeFilter == '1M'),
-                      _buildTimeFilterChip('3M', _selectedTimeFilter == '3M'),
-                      _buildTimeFilterChip('1Y', _selectedTimeFilter == '1Y'),
-                      _buildTimeFilterChip('All', _selectedTimeFilter == 'All'),
-                    ],
-                  ),
-                ),
                 const SizedBox(height: 16.0),
                 SizedBox(
                   height: 200.0,
@@ -426,6 +411,21 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                     ),
+                  ),
+                ),
+                const SizedBox(height: 16.0),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _buildTimeFilterChip('1D', _selectedTimeFilter == '1D'),
+                      _buildTimeFilterChip('1W', _selectedTimeFilter == '1W'),
+                      _buildTimeFilterChip('1M', _selectedTimeFilter == '1M'),
+                      _buildTimeFilterChip('3M', _selectedTimeFilter == '3M'),
+                      _buildTimeFilterChip('1Y', _selectedTimeFilter == '1Y'),
+                      _buildTimeFilterChip('All', _selectedTimeFilter == 'All'),
+                    ],
                   ),
                 ),
               ],
