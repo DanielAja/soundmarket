@@ -1,10 +1,30 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/user_data_provider.dart';
 import '../models/song.dart';
+import '../services/song_service.dart';
+import '../services/music_data_api_service.dart';
 
-class DiscoverScreen extends StatelessWidget {
+class DiscoverScreen extends StatefulWidget {
   const DiscoverScreen({super.key});
+
+  @override
+  State<DiscoverScreen> createState() => _DiscoverScreenState();
+}
+
+class _DiscoverScreenState extends State<DiscoverScreen> with TickerProviderStateMixin {
+  // Map to store the previous prices for comparison
+  final Map<String, double> _previousPrices = {};
+  
+  // Map to store animation controllers for each song
+  final Map<String, AnimationController> _priceAnimationControllers = {};
+  
+  // Map to store animations for each song
+  final Map<String, Animation<double>> _priceAnimations = {};
+  
+  // Reference to the MusicDataApiService
+  late final MusicDataApiService _musicDataApi;
 
   @override
   Widget build(BuildContext context) {
@@ -29,9 +49,38 @@ class DiscoverScreen extends StatelessWidget {
           final topMovers = userDataProvider.topMovers;
           final risingArtists = userDataProvider.risingArtists;
           
+          // Initialize previous prices for new songs
+          for (final song in [...topSongs, ...topMovers]) {
+            if (!_previousPrices.containsKey(song.id)) {
+              _previousPrices[song.id] = song.currentPrice;
+            }
+          }
+          
           return RefreshIndicator(
             onRefresh: () async {
-              // Pull to refresh functionality
+              // Simulate a refresh by triggering price updates
+              // In a real app, this would fetch new data from the API
+              final random = Random();
+              for (final song in [...topSongs, ...topMovers]) {
+                // Only update some songs to simulate market changes
+                if (random.nextBool()) {
+                  final oldPrice = song.currentPrice;
+                  // Simulate a price change (±5%)
+                  final change = oldPrice * (0.05 * (random.nextDouble() * 2 - 1));
+                  final newPrice = max(0.01, oldPrice + change);
+                  
+                  // Update the song price
+                  song.previousPrice = oldPrice;
+                  song.currentPrice = double.parse(newPrice.toStringAsFixed(2));
+                  
+                  // Trigger animation if the price changed
+                  if (_previousPrices.containsKey(song.id) && _previousPrices[song.id] != song.currentPrice) {
+                    _initOrUpdatePriceAnimation(song.id, _previousPrices[song.id]!, song.currentPrice);
+                    _previousPrices[song.id] = song.currentPrice;
+                  }
+                }
+              }
+              
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Refreshed market data')),
               );
@@ -152,10 +201,75 @@ class DiscoverScreen extends StatelessWidget {
     );
   }
 
+  @override
+  void initState() {
+    super.initState();
+    // Initialize the MusicDataApiService
+    _musicDataApi = MusicDataApiService();
+    
+    // Set discover tab as active to enable price updates
+    _musicDataApi.setDiscoverTabActive(true);
+  }
+
+  @override
+  void dispose() {
+    // Dispose all animation controllers
+    for (final controller in _priceAnimationControllers.values) {
+      controller.dispose();
+    }
+    
+    // Set discover tab as inactive when leaving the screen
+    _musicDataApi.setDiscoverTabActive(false);
+        
+    super.dispose();
+  }
+
+  // Initialize or update animation for a song
+  void _initOrUpdatePriceAnimation(String songId, double oldPrice, double newPrice) {
+    // If we don't have a controller for this song yet, create one
+    if (!_priceAnimationControllers.containsKey(songId)) {
+      _priceAnimationControllers[songId] = AnimationController(
+        duration: const Duration(milliseconds: 500),
+        vsync: this,
+      );
+      
+      _priceAnimations[songId] = Tween<double>(
+        begin: oldPrice,
+        end: newPrice,
+      ).animate(CurvedAnimation(
+        parent: _priceAnimationControllers[songId]!,
+        curve: Curves.easeInOut,
+      ));
+    } else {
+      // Update the existing animation
+      _priceAnimations[songId] = Tween<double>(
+        begin: oldPrice,
+        end: newPrice,
+      ).animate(CurvedAnimation(
+        parent: _priceAnimationControllers[songId]!,
+        curve: Curves.easeInOut,
+      ));
+      
+      // Reset and start the animation
+      _priceAnimationControllers[songId]!.reset();
+    }
+    
+    // Start the animation
+    _priceAnimationControllers[songId]!.forward();
+  }
+
   Widget _buildSongCard(BuildContext context, Song song, UserDataProvider userDataProvider, {bool showPriceChange = false}) {
     final isOwned = userDataProvider.ownsSong(song.id);
     final priceChangePercent = song.priceChangePercent;
     final isPriceUp = song.isPriceUp;
+    
+    // Check if price has changed
+    if (_previousPrices.containsKey(song.id) && _previousPrices[song.id] != song.currentPrice) {
+      _initOrUpdatePriceAnimation(song.id, _previousPrices[song.id]!, song.currentPrice);
+    }
+    
+    // Store current price for next comparison
+    _previousPrices[song.id] = song.currentPrice;
     
     return GestureDetector(
       onTap: () {
@@ -257,12 +371,33 @@ class DiscoverScreen extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        '\$${song.currentPrice.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                      // Animated price display
+                      _priceAnimationControllers.containsKey(song.id) && _priceAnimationControllers[song.id]!.isAnimating
+                          ? AnimatedBuilder(
+                              animation: _priceAnimationControllers[song.id]!,
+                              builder: (context, child) {
+                                final animatedPrice = _priceAnimations[song.id]!.value;
+                                final color = _previousPrices[song.id]! < song.currentPrice
+                                    ? Colors.green
+                                    : _previousPrices[song.id]! > song.currentPrice
+                                        ? Colors.red
+                                        : null;
+                                
+                                return Text(
+                                  '\$${animatedPrice.toStringAsFixed(2)}',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: color,
+                                  ),
+                                );
+                              },
+                            )
+                          : Text(
+                              '\$${song.currentPrice.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                       if (showPriceChange)
                         Row(
                           children: [
@@ -415,12 +550,33 @@ class DiscoverScreen extends StatelessWidget {
                         const SizedBox(height: 4.0),
                         Row(
                           children: [
-                            Text(
-                              'Current Price: \$${song.currentPrice.toStringAsFixed(2)}',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
+                            // Animated price display in modal
+                            _priceAnimationControllers.containsKey(song.id) && _priceAnimationControllers[song.id]!.isAnimating
+                                ? AnimatedBuilder(
+                                    animation: _priceAnimationControllers[song.id]!,
+                                    builder: (context, child) {
+                                      final animatedPrice = _priceAnimations[song.id]!.value;
+                                      final color = _previousPrices[song.id]! < song.currentPrice
+                                          ? Colors.green
+                                          : _previousPrices[song.id]! > song.currentPrice
+                                              ? Colors.red
+                                              : null;
+                                      
+                                      return Text(
+                                        'Current Price: \$${animatedPrice.toStringAsFixed(2)}',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: color,
+                                        ),
+                                      );
+                                    },
+                                  )
+                                : Text(
+                                    'Current Price: \$${song.currentPrice.toStringAsFixed(2)}',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
                             const SizedBox(width: 8.0),
                             Icon(
                               song.isPriceUp ? Icons.arrow_upward : Icons.arrow_downward,
@@ -511,7 +667,11 @@ class DiscoverScreen extends StatelessWidget {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setState) {
-            final totalCost = song.currentPrice * quantity;
+            // Calculate total cost with animated price if available
+            final price = _priceAnimationControllers.containsKey(song.id) && 
+                         _priceAnimationControllers[song.id]!.isAnimating ? 
+                         _priceAnimations[song.id]!.value : song.currentPrice;
+            final totalCost = price * quantity;
             final canAfford = totalCost <= cashBalance;
             
             return AlertDialog(
@@ -523,7 +683,27 @@ class DiscoverScreen extends StatelessWidget {
                 children: [
                   Text('Song: ${song.name} by ${song.artist}'),
                   const SizedBox(height: 8.0),
-                  Text('Price per share: \$${song.currentPrice.toStringAsFixed(2)}'),
+                  // Animated price display in buy dialog
+                  _priceAnimationControllers.containsKey(song.id) && _priceAnimationControllers[song.id]!.isAnimating
+                      ? AnimatedBuilder(
+                          animation: _priceAnimationControllers[song.id]!,
+                          builder: (context, child) {
+                            final animatedPrice = _priceAnimations[song.id]!.value;
+                            final color = _previousPrices[song.id]! < song.currentPrice
+                                ? Colors.green
+                                : _previousPrices[song.id]! > song.currentPrice
+                                    ? Colors.red
+                                    : null;
+                            
+                            return Text(
+                              'Price per share: \$${animatedPrice.toStringAsFixed(2)}',
+                              style: TextStyle(
+                                color: color,
+                              ),
+                            );
+                          },
+                        )
+                      : Text('Price per share: \$${song.currentPrice.toStringAsFixed(2)}'),
                   const SizedBox(height: 16.0),
                   Row(
                     children: [
@@ -556,12 +736,34 @@ class DiscoverScreen extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 16.0),
-                  Text(
-                    'Total Cost: \$${totalCost.toStringAsFixed(2)}',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                  // Animated total cost
+                  _priceAnimationControllers.containsKey(song.id) && _priceAnimationControllers[song.id]!.isAnimating
+                      ? AnimatedBuilder(
+                          animation: _priceAnimationControllers[song.id]!,
+                          builder: (context, child) {
+                            final animatedPrice = _priceAnimations[song.id]!.value;
+                            final animatedTotalCost = animatedPrice * quantity;
+                            final color = _previousPrices[song.id]! < song.currentPrice
+                                ? Colors.green
+                                : _previousPrices[song.id]! > song.currentPrice
+                                    ? Colors.red
+                                    : null;
+                            
+                            return Text(
+                              'Total Cost: \$${animatedTotalCost.toStringAsFixed(2)}',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: color,
+                              ),
+                            );
+                          },
+                        )
+                      : Text(
+                          'Total Cost: \$${totalCost.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                   if (!canAfford)
                     const Text(
                       'Insufficient funds',
@@ -621,7 +823,11 @@ class DiscoverScreen extends StatelessWidget {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setState) {
-            final totalValue = song.currentPrice * quantity;
+            // Calculate total value with animated price if available
+            final price = _priceAnimationControllers.containsKey(song.id) && 
+                         _priceAnimationControllers[song.id]!.isAnimating ? 
+                         _priceAnimations[song.id]!.value : song.currentPrice;
+            final totalValue = price * quantity;
             
             return AlertDialog(
               backgroundColor: Colors.grey[900],
@@ -632,7 +838,27 @@ class DiscoverScreen extends StatelessWidget {
                 children: [
                   Text('Song: ${song.name} by ${song.artist}'),
                   const SizedBox(height: 8.0),
-                  Text('Current price per share: \$${song.currentPrice.toStringAsFixed(2)}'),
+                  // Animated price display in sell dialog
+                  _priceAnimationControllers.containsKey(song.id) && _priceAnimationControllers[song.id]!.isAnimating
+                      ? AnimatedBuilder(
+                          animation: _priceAnimationControllers[song.id]!,
+                          builder: (context, child) {
+                            final animatedPrice = _priceAnimations[song.id]!.value;
+                            final color = _previousPrices[song.id]! < song.currentPrice
+                                ? Colors.green
+                                : _previousPrices[song.id]! > song.currentPrice
+                                    ? Colors.red
+                                    : null;
+                            
+                            return Text(
+                              'Current price per share: \$${animatedPrice.toStringAsFixed(2)}',
+                              style: TextStyle(
+                                color: color,
+                              ),
+                            );
+                          },
+                        )
+                      : Text('Current price per share: \$${song.currentPrice.toStringAsFixed(2)}'),
                   const SizedBox(height: 16.0),
                   Row(
                     children: [
@@ -665,12 +891,34 @@ class DiscoverScreen extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 16.0),
-                  Text(
-                    'Total Value: \$${totalValue.toStringAsFixed(2)}',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                  // Animated total value
+                  _priceAnimationControllers.containsKey(song.id) && _priceAnimationControllers[song.id]!.isAnimating
+                      ? AnimatedBuilder(
+                          animation: _priceAnimationControllers[song.id]!,
+                          builder: (context, child) {
+                            final animatedPrice = _priceAnimations[song.id]!.value;
+                            final animatedTotalValue = animatedPrice * quantity;
+                            final color = _previousPrices[song.id]! < song.currentPrice
+                                ? Colors.green
+                                : _previousPrices[song.id]! > song.currentPrice
+                                    ? Colors.red
+                                    : null;
+                            
+                            return Text(
+                              'Total Value: \$${animatedTotalValue.toStringAsFixed(2)}',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: color,
+                              ),
+                            );
+                          },
+                        )
+                      : Text(
+                          'Total Value: \$${totalValue.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                 ],
               ),
               actions: [
