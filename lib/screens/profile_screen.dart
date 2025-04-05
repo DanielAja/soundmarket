@@ -4,6 +4,7 @@ import '../models/portfolio_item.dart';
 import '../models/song.dart';
 import '../providers/user_data_provider.dart';
 import 'transaction_history_screen.dart';
+import '../core/navigation/route_constants.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -284,7 +285,7 @@ class ProfileScreen extends StatelessWidget {
                     ElevatedButton(
                       onPressed: () {
                         // Navigate to discover screen to buy songs
-                        Navigator.pushNamed(context, '/discover');
+                        Navigator.pushNamed(context, RouteConstants.discover);
                       },
                       child: const Text('Discover Songs'),
                     ),
@@ -311,7 +312,26 @@ class ProfileScreen extends StatelessWidget {
                 fontWeight: FontWeight.bold,
               ),
             ),
-            const SizedBox(height: 16.0),
+            const SizedBox(height: 8.0),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Recent Songs',
+                  style: TextStyle(
+                    fontSize: 14.0,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                TextButton(
+                  onPressed: () {
+                    Navigator.pushNamed(context, RouteConstants.portfolioDetails);
+                  },
+                  child: const Text('View Full Portfolio'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8.0),
             ListView.separated(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
@@ -659,12 +679,7 @@ class ProfileScreen extends StatelessWidget {
           trailing: const Icon(Icons.chevron_right),
           onTap: () {
             // Navigate to transaction history screen
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const TransactionHistoryScreen(),
-              ),
-            );
+            Navigator.pushNamed(context, RouteConstants.transactions);
           },
         ),
         const Divider(),

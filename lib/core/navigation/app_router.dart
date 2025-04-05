@@ -4,6 +4,7 @@ import '../../features/portfolio/screens/home_screen.dart';
 import '../../features/market/screens/discover_screen.dart';
 import '../../features/profile/screens/profile_screen.dart';
 import '../../features/transactions/screens/transaction_history_screen.dart';
+import '../../screens/portfolio_detail_screen.dart';
 
 /// Route definitions and navigation logic
 class AppRouter {
@@ -21,6 +22,9 @@ class AppRouter {
       
       case RouteConstants.transactions:
         return MaterialPageRoute(builder: (_) => const TransactionHistoryScreen());
+      
+      case RouteConstants.portfolioDetails:
+        return MaterialPageRoute(builder: (_) => const PortfolioDetailScreen());
       
       // Add more routes as needed
       
