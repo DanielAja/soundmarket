@@ -1,12 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'dart:math';
 import '../providers/user_data_provider.dart';
 import '../models/portfolio_item.dart';
 import '../models/song.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  String _selectedTimeFilter = '1W'; // Default to 1 week
 
   @override
   Widget build(BuildContext context) {
@@ -164,79 +172,267 @@ class HomeScreen extends StatelessWidget {
   }
 
   Widget _buildPortfolioChart(BuildContext context) {
-    // Mock data for the chart
-    final spots = [
-      const FlSpot(0, 100),
-      const FlSpot(1, 105),
-      const FlSpot(2, 102),
-      const FlSpot(3, 110),
-      const FlSpot(4, 108),
-      const FlSpot(5, 115),
-      const FlSpot(6, 120),
-    ];
-    
-    return Card(
-      elevation: 4.0,
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Portfolio Performance',
-              style: TextStyle(
-                fontSize: 18.0,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8.0),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  _buildTimeFilterChip('1D', true),
-                  _buildTimeFilterChip('1W', false),
-                  _buildTimeFilterChip('1M', false),
-                  _buildTimeFilterChip('3M', false),
-                  _buildTimeFilterChip('1Y', false),
-                  _buildTimeFilterChip('All', false),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16.0),
-            SizedBox(
-              height: 200.0,
-              child: LineChart(
-                LineChartData(
-                  gridData: FlGridData(show: false),
-                  titlesData: FlTitlesData(show: false),
-                  borderData: FlBorderData(show: false),
-                  lineBarsData: [
-                    LineChartBarData(
-                      spots: spots,
-                      isCurved: true,
-                      color: Theme.of(context).colorScheme.primary,
-                      barWidth: 3,
-                      isStrokeCapRound: true,
-                      dotData: FlDotData(show: false),
-                      belowBarData: BarAreaData(
-                        show: true,
-                        color: Theme.of(context).colorScheme.primary.withOpacity(0.2),
+    return Consumer<UserDataProvider>(
+      builder: (context, userDataProvider, child) {
+        // Generate chart data based on portfolio value
+        final portfolioValue = userDataProvider.totalPortfolioValue;
+        final cashBalance = userDataProvider.userProfile?.cashBalance ?? 0.0;
+        final totalBalance = userDataProvider.totalBalance;
+        
+        // Create a more realistic chart with some variation
+        // This simulates historical data for the portfolio
+        final baseValue = totalBalance * 0.8; // Starting at 80% of current value
+        final variance = totalBalance * 0.05; // 5% variance for fluctuations
+        
+        // Generate chart data based on selected time filter
+        final spots = _generateChartData(
+          _selectedTimeFilter, 
+          baseValue, 
+          totalBalance, 
+          variance
+        );
+        
+        // Calculate min and max values for the chart
+        double minY = spots.map((spot) => spot.y).reduce(min);
+        double maxY = spots.map((spot) => spot.y).reduce(max);
+        
+        // Add some padding to min and max
+        minY = minY * 0.95;
+        maxY = maxY * 1.05;
+        
+        // Determine if the trend is positive
+        final isPositive = spots.last.y >= spots.first.y;
+        final chartColor = isPositive ? Colors.green : Colors.red;
+        
+        return Card(
+          elevation: 4.0,
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Portfolio Performance',
+                      style: TextStyle(
+                        fontSize: 18.0,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
+                    Row(
+                      children: [
+                        Icon(
+                          isPositive ? Icons.arrow_upward : Icons.arrow_downward,
+                          color: chartColor,
+                          size: 16.0,
+                        ),
+                        const SizedBox(width: 4.0),
+                        Text(
+                          '${isPositive ? "+" : ""}${((spots.last.y / spots.first.y - 1) * 100).toStringAsFixed(2)}%',
+                          style: TextStyle(
+                            color: chartColor,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
-                  lineTouchData: LineTouchData(
-                    touchTooltipData: LineTouchTooltipData(
-                      getTooltipColor: (_) => Colors.grey[800]!,
+                ),
+                const SizedBox(height: 8.0),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      _buildTimeFilterChip('1D', _selectedTimeFilter == '1D'),
+                      _buildTimeFilterChip('1W', _selectedTimeFilter == '1W'),
+                      _buildTimeFilterChip('1M', _selectedTimeFilter == '1M'),
+                      _buildTimeFilterChip('3M', _selectedTimeFilter == '3M'),
+                      _buildTimeFilterChip('1Y', _selectedTimeFilter == '1Y'),
+                      _buildTimeFilterChip('All', _selectedTimeFilter == 'All'),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16.0),
+                SizedBox(
+                  height: 200.0,
+                  child: LineChart(
+                    LineChartData(
+                      gridData: FlGridData(
+                        show: true,
+                        drawVerticalLine: false,
+                        horizontalInterval: max(1.0, (maxY - minY) / 4), // Ensure interval is not zero
+                        getDrawingHorizontalLine: (value) {
+                          return FlLine(
+                            color: Colors.grey[800]!,
+                            strokeWidth: 0.5,
+                            dashArray: [5, 5],
+                          );
+                        },
+                      ),
+                      titlesData: FlTitlesData(
+                        show: true,
+                        rightTitles: AxisTitles(
+                          sideTitles: SideTitles(showTitles: false),
+                        ),
+                        topTitles: AxisTitles(
+                          sideTitles: SideTitles(showTitles: false),
+                        ),
+                        bottomTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 30,
+                            interval: 1,
+                            getTitlesWidget: (value, meta) {
+                              final index = value.toInt();
+                              String label = '';
+                              
+                              // Get appropriate labels based on time filter
+                              switch (_selectedTimeFilter) {
+                                case '1D':
+                                  // Hours
+                                  if (index % 4 == 0 && index < 24) {
+                                    final hour = index;
+                                    label = '${hour == 0 ? 12 : (hour > 12 ? hour - 12 : hour)}${hour >= 12 ? 'pm' : 'am'}';
+                                  }
+                                  break;
+                                case '1W':
+                                  // Days of week
+                                  const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+                                  if (index >= 0 && index < days.length) {
+                                    label = days[index];
+                                  }
+                                  break;
+                                case '1M':
+                                  // Days of month
+                                  if (index % 5 == 0) {
+                                    label = '${index + 1}';
+                                  }
+                                  break;
+                                case '3M':
+                                  // Weeks
+                                  if (index < 12) {
+                                    label = 'W${index + 1}';
+                                  }
+                                  break;
+                                case '1Y':
+                                  // Months
+                                  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                                  if (index < months.length) {
+                                    label = months[index];
+                                  }
+                                  break;
+                                case 'All':
+                                  // Quarters over years
+                                  if (index % 4 == 0 && index < 24) {
+                                    final year = 2023 + (index ~/ 4);
+                                    final quarter = (index % 4) + 1;
+                                    label = 'Q$quarter\n$year';
+                                  }
+                                  break;
+                              }
+                              
+                              if (label.isEmpty) {
+                                return const SizedBox();
+                              }
+                              
+                              return Padding(
+                                padding: const EdgeInsets.only(top: 8.0),
+                                child: Text(
+                                  label,
+                                  style: TextStyle(
+                                    color: Colors.grey[400],
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        leftTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            interval: (maxY - minY) / 4,
+                            reservedSize: 40,
+                            getTitlesWidget: (value, meta) {
+                              return Padding(
+                                padding: const EdgeInsets.only(right: 8.0),
+                                child: Text(
+                                  '\$${value.toInt()}',
+                                  style: TextStyle(
+                                    color: Colors.grey[400],
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                      borderData: FlBorderData(show: false),
+                      minX: 0,
+                      maxX: spots.length - 1,
+                      minY: minY,
+                      maxY: maxY,
+                      lineBarsData: [
+                        LineChartBarData(
+                          spots: spots,
+                          isCurved: true,
+                          color: chartColor,
+                          barWidth: 3,
+                          isStrokeCapRound: true,
+                          dotData: FlDotData(
+                            show: true,
+                            getDotPainter: (spot, percent, barData, index) {
+                              return FlDotCirclePainter(
+                                radius: 3,
+                                color: chartColor,
+                                strokeWidth: 1,
+                                strokeColor: Colors.white,
+                              );
+                            },
+                          ),
+                          belowBarData: BarAreaData(
+                            show: true,
+                            color: chartColor.withOpacity(0.2),
+                            gradient: LinearGradient(
+                              colors: [
+                                chartColor.withOpacity(0.4),
+                                chartColor.withOpacity(0.1),
+                                chartColor.withOpacity(0.0),
+                              ],
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                            ),
+                          ),
+                        ),
+                      ],
+                      lineTouchData: LineTouchData(
+                        enabled: true,
+                        touchTooltipData: LineTouchTooltipData(
+                          getTooltipItems: (touchedSpots) {
+                            return touchedSpots.map((touchedSpot) {
+                              return LineTooltipItem(
+                                '\$${touchedSpot.y.toStringAsFixed(2)}',
+                                const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              );
+                            }).toList();
+                          },
+                        ),
+                      ),
                     ),
                   ),
                 ),
-              ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
@@ -247,7 +443,19 @@ class HomeScreen extends StatelessWidget {
         label: Text(label),
         selected: isSelected,
         onSelected: (selected) {
-          // Would update chart data based on time filter
+          if (selected) {
+            setState(() {
+              _selectedTimeFilter = label;
+            });
+            
+            // Show a snackbar to indicate the time filter has changed
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Showing data for $label'),
+                duration: const Duration(seconds: 1),
+              ),
+            );
+          }
         },
         labelStyle: TextStyle(
           color: isSelected ? Colors.black : Colors.white,
@@ -625,6 +833,109 @@ class HomeScreen extends StatelessWidget {
     );
   }
   
+  // Generate chart data based on the selected time filter
+  List<FlSpot> _generateChartData(
+    String timeFilter, 
+    double baseValue, 
+    double currentValue, 
+    double variance
+  ) {
+    final random = Random();
+    final spots = <FlSpot>[];
+    
+    // Number of data points based on time filter
+    int numPoints;
+    switch (timeFilter) {
+      case '1D':
+        numPoints = 24; // Hourly data for 1 day
+        break;
+      case '1W':
+        numPoints = 7; // Daily data for 1 week
+        break;
+      case '1M':
+        numPoints = 30; // Daily data for 1 month
+        break;
+      case '3M':
+        numPoints = 12; // Weekly data for 3 months
+        break;
+      case '1Y':
+        numPoints = 12; // Monthly data for 1 year
+        break;
+      case 'All':
+        numPoints = 24; // Monthly data for 2 years
+        break;
+      default:
+        numPoints = 7; // Default to 1 week
+    }
+    
+    // Generate different patterns based on time filter
+    for (int i = 0; i < numPoints; i++) {
+      double value;
+      
+      switch (timeFilter) {
+        case '1D':
+          // More volatile intraday pattern
+          value = baseValue + (currentValue - baseValue) * (i / (numPoints - 1));
+          value += (random.nextDouble() * 2 - 1) * variance * 0.5;
+          break;
+        case '1W':
+          // Gradual increase with some fluctuation
+          value = baseValue + (currentValue - baseValue) * (i / (numPoints - 1));
+          value += (random.nextDouble() * 2 - 1) * variance;
+          break;
+        case '1M':
+          // More pronounced ups and downs
+          final progress = i / (numPoints - 1);
+          value = baseValue + (currentValue - baseValue) * progress;
+          // Add a sine wave pattern
+          value += sin(progress * 3 * pi) * variance * 2;
+          // Add some randomness
+          value += (random.nextDouble() * 2 - 1) * variance * 0.5;
+          break;
+        case '3M':
+          // Longer-term trend with market cycles
+          final progress = i / (numPoints - 1);
+          value = baseValue + (currentValue - baseValue) * progress;
+          // Add a wave pattern
+          value += sin(progress * 2 * pi) * variance * 3;
+          // Add some randomness
+          value += (random.nextDouble() * 2 - 1) * variance;
+          break;
+        case '1Y':
+          // Annual pattern with seasonal effects
+          final progress = i / (numPoints - 1);
+          value = baseValue + (currentValue - baseValue) * progress;
+          // Add a seasonal pattern
+          value += sin(progress * pi) * variance * 4;
+          // Add some randomness
+          value += (random.nextDouble() * 2 - 1) * variance * 1.5;
+          break;
+        case 'All':
+          // Long-term growth with market cycles
+          final progress = i / (numPoints - 1);
+          value = baseValue * pow(1.15, progress); // Compound growth
+          // Add market cycles
+          value += sin(progress * 3 * pi) * variance * 5;
+          // Add some randomness
+          value += (random.nextDouble() * 2 - 1) * variance * 2;
+          break;
+        default:
+          // Default pattern (1W)
+          value = baseValue + (currentValue - baseValue) * (i / (numPoints - 1));
+          value += (random.nextDouble() * 2 - 1) * variance;
+      }
+      
+      // Ensure the last point matches the current value
+      if (i == numPoints - 1) {
+        value = currentValue;
+      }
+      
+      spots.add(FlSpot(i.toDouble(), value));
+    }
+    
+    return spots;
+  }
+
   void _showSellSongDialog(BuildContext context, Song song, UserDataProvider userDataProvider, int maxQuantity) {
     int quantity = 1;
     

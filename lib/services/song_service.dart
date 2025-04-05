@@ -10,7 +10,7 @@ class SongService {
       genre: 'Pop',
       currentPrice: 45.0,
       previousPrice: 42.5,
-      albumArtUrl: 'https://via.placeholder.com/150',
+      albumArtUrl: null, // Using null instead of placeholder URL to avoid network errors
     ),
     Song(
       id: '2',
@@ -19,7 +19,7 @@ class SongService {
       genre: 'Pop',
       currentPrice: 38.75,
       previousPrice: 40.0,
-      albumArtUrl: 'https://via.placeholder.com/150',
+      albumArtUrl: null, // Using null instead of placeholder URL to avoid network errors
     ),
     Song(
       id: '3',
@@ -28,7 +28,7 @@ class SongService {
       genre: 'Pop',
       currentPrice: 32.5,
       previousPrice: 30.0,
-      albumArtUrl: 'https://via.placeholder.com/150',
+      albumArtUrl: null, // Using null instead of placeholder URL to avoid network errors
     ),
     Song(
       id: '4',
@@ -37,7 +37,7 @@ class SongService {
       genre: 'Hip-Hop',
       currentPrice: 55.0,
       previousPrice: 48.0,
-      albumArtUrl: 'https://via.placeholder.com/150',
+      albumArtUrl: null, // Using null instead of placeholder URL to avoid network errors
     ),
     Song(
       id: '5',
@@ -46,7 +46,7 @@ class SongService {
       genre: 'Pop',
       currentPrice: 28.5,
       previousPrice: 30.0,
-      albumArtUrl: 'https://via.placeholder.com/150',
+      albumArtUrl: null, // Using null instead of placeholder URL to avoid network errors
     ),
     Song(
       id: '6',
@@ -55,7 +55,7 @@ class SongService {
       genre: 'R&B',
       currentPrice: 42.0,
       previousPrice: 38.5,
-      albumArtUrl: 'https://via.placeholder.com/150',
+      albumArtUrl: null, // Using null instead of placeholder URL to avoid network errors
     ),
     Song(
       id: '7',
@@ -64,7 +64,7 @@ class SongService {
       genre: 'Pop',
       currentPrice: 60.0,
       previousPrice: 52.5,
-      albumArtUrl: 'https://via.placeholder.com/150',
+      albumArtUrl: null, // Using null instead of placeholder URL to avoid network errors
     ),
     Song(
       id: '8',
@@ -73,7 +73,7 @@ class SongService {
       genre: 'Pop Rock',
       currentPrice: 58.25,
       previousPrice: 55.0,
-      albumArtUrl: 'https://via.placeholder.com/150',
+      albumArtUrl: null, // Using null instead of placeholder URL to avoid network errors
     ),
     Song(
       id: '9',
@@ -82,7 +82,7 @@ class SongService {
       genre: 'Pop',
       currentPrice: 35.75,
       previousPrice: 33.0,
-      albumArtUrl: 'https://via.placeholder.com/150',
+      albumArtUrl: null, // Using null instead of placeholder URL to avoid network errors
     ),
     Song(
       id: '10',
@@ -91,7 +91,7 @@ class SongService {
       genre: 'Hip-Hop',
       currentPrice: 25.0,
       previousPrice: 28.0,
-      albumArtUrl: 'https://via.placeholder.com/150',
+      albumArtUrl: null, // Using null instead of placeholder URL to avoid network errors
     ),
     Song(
       id: '11',
@@ -100,7 +100,7 @@ class SongService {
       genre: 'K-Pop',
       currentPrice: 65.0,
       previousPrice: 58.0,
-      albumArtUrl: 'https://via.placeholder.com/150',
+      albumArtUrl: null, // Using null instead of placeholder URL to avoid network errors
     ),
     Song(
       id: '12',
@@ -109,7 +109,7 @@ class SongService {
       genre: 'Hip-Hop',
       currentPrice: 30.0,
       previousPrice: 32.5,
-      albumArtUrl: 'https://via.placeholder.com/150',
+      albumArtUrl: null, // Using null instead of placeholder URL to avoid network errors
     ),
     Song(
       id: '13',
@@ -118,7 +118,7 @@ class SongService {
       genre: 'R&B',
       currentPrice: 40.0,
       previousPrice: 35.0,
-      albumArtUrl: 'https://via.placeholder.com/150',
+      albumArtUrl: null, // Using null instead of placeholder URL to avoid network errors
     ),
     Song(
       id: '14',
@@ -127,7 +127,7 @@ class SongService {
       genre: 'Pop',
       currentPrice: 48.0,
       previousPrice: 45.0,
-      albumArtUrl: 'https://via.placeholder.com/150',
+      albumArtUrl: null, // Using null instead of placeholder URL to avoid network errors
     ),
     Song(
       id: '15',
@@ -136,7 +136,7 @@ class SongService {
       genre: 'K-Pop',
       currentPrice: 62.5,
       previousPrice: 60.0,
-      albumArtUrl: 'https://via.placeholder.com/150',
+      albumArtUrl: null, // Using null instead of placeholder URL to avoid network errors
     ),
   ];
 

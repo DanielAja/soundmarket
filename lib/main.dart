@@ -4,6 +4,7 @@ import 'providers/user_data_provider.dart';
 import 'screens/home_screen.dart';
 import 'screens/discover_screen.dart';
 import 'screens/profile_screen.dart';
+import 'screens/transaction_history_screen.dart';
 
 void main() {
   // Ensure Flutter bindings are initialized for services like shared_preferences
