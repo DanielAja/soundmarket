@@ -1,19 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:uuid/uuid.dart';
 import '../models/user_profile.dart';
 import '../models/portfolio_item.dart';
 import '../models/song.dart';
+import '../models/transaction.dart';
 import '../services/storage_service.dart';
 import '../services/song_service.dart';
 
 class UserDataProvider with ChangeNotifier {
   UserProfile? _userProfile;
   List<PortfolioItem> _portfolio = [];
+  List<Transaction> _transactions = [];
   final StorageService _storageService = StorageService();
   final SongService _songService = SongService();
+  final _uuid = const Uuid();
   
   // Getters
   UserProfile? get userProfile => _userProfile;
   List<PortfolioItem> get portfolio => _portfolio;
+  List<Transaction> get transactions => _transactions;
   
   // Calculate total portfolio value based on current song prices
   double get totalPortfolioValue {
@@ -55,6 +60,7 @@ class UserDataProvider with ChangeNotifier {
       final data = await _storageService.loadUserData();
       _userProfile = data['profile'] as UserProfile?;
       _portfolio = (data['portfolio'] as List<PortfolioItem>?) ?? [];
+      _transactions = (data['transactions'] as List<Transaction>?) ?? [];
       
       // Initialize with default data if nothing is loaded
       _userProfile ??= UserProfile(
@@ -73,6 +79,7 @@ class UserDataProvider with ChangeNotifier {
         displayName: 'New Investor',
       );
       _portfolio = [];
+      _transactions = [];
       notifyListeners();
     }
   }
@@ -81,11 +88,39 @@ class UserDataProvider with ChangeNotifier {
   Future<void> _saveData() async {
     try {
       if (_userProfile != null) {
-        await _storageService.saveUserData(_userProfile!, _portfolio);
+        await _storageService.saveUserData(_userProfile!, _portfolio, _transactions);
       }
     } catch (e) {
       print('Error saving data: $e');
     }
+  }
+
+  // Add a transaction to history
+  void _addTransaction(
+    String songId, 
+    String songName, 
+    String artistName, 
+    TransactionType type, 
+    int quantity, 
+    double price,
+    String? albumArtUrl,
+  ) {
+    final transaction = Transaction(
+      id: _uuid.v4(),
+      songId: songId,
+      songName: songName,
+      artistName: artistName,
+      type: type,
+      quantity: quantity,
+      price: price,
+      timestamp: DateTime.now(),
+      albumArtUrl: albumArtUrl,
+    );
+    
+    _transactions.add(transaction);
+    
+    // Sort transactions by timestamp (newest first)
+    _transactions.sort((a, b) => b.timestamp.compareTo(a.timestamp));
   }
 
   // Buy a song
@@ -133,6 +168,17 @@ class UserDataProvider with ChangeNotifier {
       ));
     }
     
+    // Add transaction to history
+    _addTransaction(
+      song.id,
+      song.name,
+      song.artist,
+      TransactionType.buy,
+      quantity,
+      song.currentPrice,
+      song.albumArtUrl,
+    );
+    
     // Save data
     await _saveData();
     notifyListeners();
@@ -175,6 +221,17 @@ class UserDataProvider with ChangeNotifier {
       );
     }
     
+    // Add transaction to history
+    _addTransaction(
+      item.songId,
+      item.songName,
+      item.artistName,
+      TransactionType.sell,
+      quantity,
+      currentPrice,
+      item.albumArtUrl,
+    );
+    
     // Save data
     await _saveData();
     notifyListeners();
@@ -189,6 +246,7 @@ class UserDataProvider with ChangeNotifier {
       displayName: 'New Investor',
     );
     _portfolio = [];
+    _transactions = [];
     
     // Clear saved data
     await _storageService.clearAllData();
@@ -213,5 +271,37 @@ class UserDataProvider with ChangeNotifier {
   int getQuantityOwned(String songId) {
     final item = getPortfolioItemBySongId(songId);
     return item?.quantity ?? 0;
+  }
+  
+  // Get transactions for a specific song
+  List<Transaction> getTransactionsForSong(String songId) {
+    return _transactions.where((t) => t.songId == songId).toList();
+  }
+  
+  // Get transactions by type (buy or sell)
+  List<Transaction> getTransactionsByType(TransactionType type) {
+    return _transactions.where((t) => t.type == type).toList();
+  }
+  
+  // Get transactions within a date range
+  List<Transaction> getTransactionsInDateRange(DateTime start, DateTime end) {
+    return _transactions.where((t) => 
+      t.timestamp.isAfter(start) && 
+      t.timestamp.isBefore(end.add(const Duration(days: 1)))
+    ).toList();
+  }
+  
+  // Calculate total spent on purchases
+  double getTotalSpent() {
+    return _transactions
+        .where((t) => t.type == TransactionType.buy)
+        .fold(0.0, (sum, t) => sum + t.totalValue);
+  }
+  
+  // Calculate total earned from sales
+  double getTotalEarned() {
+    return _transactions
+        .where((t) => t.type == TransactionType.sell)
+        .fold(0.0, (sum, t) => sum + t.totalValue);
   }
 }

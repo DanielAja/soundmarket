@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/user_data_provider.dart';
+import 'transaction_history_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -164,31 +165,61 @@ class ProfileScreen extends StatelessWidget {
   }
 
   Widget _buildStatisticsSection(BuildContext context) {
-    // Placeholder for statistics
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Your Statistics',
-          style: TextStyle(
-            fontSize: 18.0,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 16.0),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
+    return Consumer<UserDataProvider>(
+      builder: (context, userDataProvider, child) {
+        // Calculate statistics
+        final songsOwned = userDataProvider.portfolio.length;
+        
+        // Calculate unique artists backed
+        final artistsBacked = userDataProvider.portfolio
+            .map((item) => item.artistName)
+            .toSet()
+            .length;
+        
+        // Calculate return percentage
+        double returnPercentage = 0.0;
+        if (userDataProvider.getTotalSpent() > 0) {
+          final totalSpent = userDataProvider.getTotalSpent();
+          final currentValue = userDataProvider.totalPortfolioValue;
+          returnPercentage = ((currentValue / totalSpent) - 1) * 100;
+        }
+        
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildStatItem(context, '0', 'Songs Owned'),
-            _buildStatItem(context, '0', 'Artists Backed'),
-            _buildStatItem(context, '0%', 'Return'),
+            const Text(
+              'Your Statistics',
+              style: TextStyle(
+                fontSize: 18.0,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16.0),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildStatItem(context, songsOwned.toString(), 'Songs Owned'),
+                _buildStatItem(context, artistsBacked.toString(), 'Artists Backed'),
+                _buildStatItem(
+                  context, 
+                  '${returnPercentage.toStringAsFixed(1)}%', 
+                  'Return',
+                  color: returnPercentage >= 0 ? Colors.green : Colors.red,
+                ),
+              ],
+            ),
           ],
-        ),
-      ],
+        );
+      },
     );
   }
 
-  Widget _buildStatItem(BuildContext context, String value, String label) {
+  Widget _buildStatItem(
+    BuildContext context, 
+    String value, 
+    String label, 
+    {Color? color}
+  ) {
     return Column(
       children: [
         Text(
@@ -196,7 +227,7 @@ class ProfileScreen extends StatelessWidget {
           style: TextStyle(
             fontSize: 20.0,
             fontWeight: FontWeight.bold,
-            color: Theme.of(context).colorScheme.primary,
+            color: color ?? Theme.of(context).colorScheme.primary,
           ),
         ),
         const SizedBox(height: 4.0),
@@ -240,9 +271,12 @@ class ProfileScreen extends StatelessWidget {
           title: const Text('Transaction History'),
           trailing: const Icon(Icons.chevron_right),
           onTap: () {
-            // TODO: Navigate to transaction history
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Transaction history coming soon!')),
+            // Navigate to transaction history screen
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const TransactionHistoryScreen(),
+              ),
             );
           },
         ),

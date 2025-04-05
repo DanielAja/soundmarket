@@ -2,11 +2,13 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user_profile.dart';
 import '../models/portfolio_item.dart';
+import '../models/transaction.dart';
 
 class StorageService {
   // Keys for SharedPreferences
   static const String _userProfileKey = 'user_profile';
   static const String _portfolioKey = 'portfolio';
+  static const String _transactionsKey = 'transactions';
   
   // Save user profile to local storage
   Future<void> saveUserProfile(UserProfile profile) async {
@@ -61,20 +63,55 @@ class StorageService {
     }
   }
   
-  // Save both user profile and portfolio
-  Future<void> saveUserData(UserProfile profile, List<PortfolioItem> portfolio) async {
-    await saveUserProfile(profile);
-    await savePortfolio(portfolio);
+  // Save transactions to local storage
+  Future<void> saveTransactions(List<Transaction> transactions) async {
+    final prefs = await SharedPreferences.getInstance();
+    final transactionsJsonList = transactions.map((item) => item.toJson()).toList();
+    final transactionsJson = jsonEncode(transactionsJsonList);
+    await prefs.setString(_transactionsKey, transactionsJson);
   }
   
-  // Load both user profile and portfolio
+  // Load transactions from local storage
+  Future<List<Transaction>> loadTransactions() async {
+    final prefs = await SharedPreferences.getInstance();
+    final transactionsJson = prefs.getString(_transactionsKey);
+    
+    if (transactionsJson == null) {
+      return [];
+    }
+    
+    try {
+      final List<dynamic> transactionsList = jsonDecode(transactionsJson);
+      return transactionsList
+          .map((item) => Transaction.fromJson(item))
+          .toList();
+    } catch (e) {
+      print('Error loading transactions: $e');
+      return [];
+    }
+  }
+  
+  // Save user profile, portfolio, and transactions
+  Future<void> saveUserData(
+    UserProfile profile, 
+    List<PortfolioItem> portfolio,
+    List<Transaction> transactions,
+  ) async {
+    await saveUserProfile(profile);
+    await savePortfolio(portfolio);
+    await saveTransactions(transactions);
+  }
+  
+  // Load user profile, portfolio, and transactions
   Future<Map<String, dynamic>> loadUserData() async {
     final profile = await loadUserProfile();
     final portfolio = await loadPortfolio();
+    final transactions = await loadTransactions();
     
     return {
       'profile': profile,
       'portfolio': portfolio,
+      'transactions': transactions,
     };
   }
   
@@ -83,5 +120,6 @@ class StorageService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_userProfileKey);
     await prefs.remove(_portfolioKey);
+    await prefs.remove(_transactionsKey);
   }
 }
