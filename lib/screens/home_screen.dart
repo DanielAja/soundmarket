@@ -354,7 +354,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         leftTitles: AxisTitles(
                           sideTitles: SideTitles(
                             showTitles: true,
-                            interval: (maxY - minY) / 4,
+                            interval: max(1.0, (maxY - minY) / 4), // Ensure interval is not zero
                             reservedSize: 40,
                             getTitlesWidget: (value, meta) {
                               return Padding(
@@ -460,9 +460,15 @@ class _HomeScreenState extends State<HomeScreen> {
         labelStyle: TextStyle(
           color: isSelected ? Colors.black : Colors.white,
           fontSize: 12.0,
+          fontWeight: FontWeight.w600,
+          fontFamily: 'Poppins',
         ),
-        backgroundColor: Colors.grey[800],
-        selectedColor: Colors.green,
+        backgroundColor: const Color(0xFF1E1E1E),
+        selectedColor: Theme.of(context).colorScheme.primary,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16.0),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
       ),
     );
   }

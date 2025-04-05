@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'providers/user_data_provider.dart';
 import 'screens/home_screen.dart';
 import 'screens/discover_screen.dart';
@@ -26,21 +27,77 @@ class SoundMarketApp extends StatelessWidget {
     return MaterialApp(
       title: 'Sound Market',
       theme: ThemeData(
-        // Define a base theme - mix of Spotify (dark) and Robinhood (green accents)
-        brightness: Brightness.dark, // Dark theme base like Spotify
-        primaryColor: Colors.green, // Robinhood green for primary elements
+        // Cash App inspired theme
+        brightness: Brightness.dark,
+        primaryColor: const Color(0xFF00D632), // Cash App green
+        scaffoldBackgroundColor: Colors.black,
         colorScheme: ColorScheme.dark(
-          primary: Colors.green,       // Primary color for buttons, etc.
-          secondary: Colors.greenAccent, // Accent color
-          background: Colors.black,     // Spotify-like black background
-          surface: Colors.grey[900]!,   // Slightly lighter surface color
-          onPrimary: Colors.black,      // Text on primary color
+          primary: const Color(0xFF00D632),    // Cash App green
+          secondary: const Color(0xFF00C2FF),  // Cash App blue accent
+          background: Colors.black,
+          surface: const Color(0xFF121212),    // Dark surface
+          onPrimary: Colors.black,
           onSecondary: Colors.black,
           onBackground: Colors.white,
           onSurface: Colors.white,
         ),
+        // Card theme
+        cardTheme: CardTheme(
+          color: const Color(0xFF121212),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16.0),
+          ),
+          elevation: 0,
+        ),
+        // Button theme
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF00D632),
+            foregroundColor: Colors.black,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(24.0),
+            ),
+            padding: const EdgeInsets.symmetric(vertical: 16.0),
+          ),
+        ),
+        // Text theme with Cash App-like font
+        textTheme: GoogleFonts.poppinsTextTheme(
+          ThemeData.dark().textTheme,
+        ).copyWith(
+          titleLarge: GoogleFonts.poppins(
+            fontSize: 24,
+            fontWeight: FontWeight.w600,
+          ),
+          titleMedium: GoogleFonts.poppins(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+          ),
+          bodyLarge: GoogleFonts.poppins(
+            fontSize: 16,
+            fontWeight: FontWeight.normal,
+          ),
+          bodyMedium: GoogleFonts.poppins(
+            fontSize: 14,
+            fontWeight: FontWeight.normal,
+          ),
+        ),
+        // App bar theme
+        appBarTheme: AppBarTheme(
+          backgroundColor: Colors.black,
+          elevation: 0,
+          titleTextStyle: GoogleFonts.poppins(
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+          ),
+        ),
+        // Bottom navigation bar theme
+        bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+          backgroundColor: Colors.black,
+          selectedItemColor: Color(0xFF00D632),
+          unselectedItemColor: Colors.grey,
+        ),
         useMaterial3: true,
-        // Define other theme properties like text themes if needed
       ),
       home: const MainNavigationWrapper(),
     );
