@@ -1,0 +1,13 @@
+{
+    "folders": [
+      {
+        "path": "."
+      }
+    ],
+    "settings": {
+      "terminal.integrated.env.osx": {
+        "PATH": "${env:HOME}/.rbenv/shims:${env:PATH}"
+      },
+      "dart.flutterSdkPath": "${env:HOME}/flutter"
+    }
+  }
