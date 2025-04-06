@@ -16,6 +16,9 @@ class UserDataProvider with ChangeNotifier {
   final SongService _songService = SongService();
   final _uuid = const Uuid();
   
+  // Loading state
+  bool _isLoading = false;
+  
   // Subscription to song updates
   StreamSubscription? _songUpdateSubscription;
   
@@ -23,6 +26,7 @@ class UserDataProvider with ChangeNotifier {
   UserProfile? get userProfile => _userProfile;
   List<PortfolioItem> get portfolio => _portfolio;
   List<Transaction> get transactions => _transactions;
+  bool get isLoading => _isLoading;
   
   // Calculate total portfolio value based on current song prices
   double get totalPortfolioValue {
@@ -345,15 +349,24 @@ class UserDataProvider with ChangeNotifier {
     return _songService.getFormattedStreamCount(songId);
   }
   
-  // Refresh data to update prices in real-time
+  // Refresh data to update prices in real-time and reload portfolio data
   Future<void> refreshData() async {
-    // Trigger a manual update of song prices
-    _songService.triggerPriceUpdate();
-    
-    // Notify listeners to update the UI
+    // Set loading state
+    _isLoading = true;
     notifyListeners();
     
-    // Return a Future that completes immediately for async compatibility
-    return Future.value();
+    try {
+      // Reload portfolio data from storage
+      await _loadData();
+      
+      // Trigger a manual update of song prices
+      _songService.triggerPriceUpdate();
+    } catch (e) {
+      print('Error refreshing data: $e');
+    } finally {
+      // Clear loading state
+      _isLoading = false;
+      notifyListeners();
+    }
   }
 }

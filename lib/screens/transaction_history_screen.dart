@@ -58,6 +58,13 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> wit
       ),
       body: Consumer<UserDataProvider>(
         builder: (context, userDataProvider, child) {
+          // Show loading indicator when refreshing data
+          if (userDataProvider.isLoading) {
+            return const Center(
+              child: CircularProgressIndicator(),
+            );
+          }
+          
           final transactions = _getFilteredTransactions(userDataProvider);
           
           if (transactions.isEmpty) {
@@ -90,12 +97,15 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> wit
             );
           }
           
-          return ListView.builder(
-            itemCount: transactions.length,
-            itemBuilder: (context, index) {
-              final transaction = transactions[index];
-              return _buildTransactionItem(transaction);
-            },
+          return RefreshIndicator(
+            onRefresh: () => userDataProvider.refreshData(),
+            child: ListView.builder(
+              itemCount: transactions.length,
+              itemBuilder: (context, index) {
+                final transaction = transactions[index];
+                return _buildTransactionItem(transaction);
+              },
+            ),
           );
         },
       ),

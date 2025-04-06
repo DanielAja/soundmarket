@@ -47,6 +47,13 @@ class _DiscoverScreenState extends State<DiscoverScreen> with TickerProviderStat
       ),
       body: Consumer<UserDataProvider>(
         builder: (context, userDataProvider, child) {
+          // Show loading indicator when refreshing data
+          if (userDataProvider.isLoading) {
+            return const Center(
+              child: CircularProgressIndicator(),
+            );
+          }
+          
           final topSongs = userDataProvider.getTopSongs(limit: 50);
           final topMovers = userDataProvider.getTopMovers(limit: 50);
           final risingArtists = userDataProvider.risingArtists;

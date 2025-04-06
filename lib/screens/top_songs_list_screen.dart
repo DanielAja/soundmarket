@@ -29,6 +29,13 @@ class TopSongsListScreen extends StatelessWidget {
       ),
       body: Consumer<UserDataProvider>(
         builder: (context, userDataProvider, child) {
+          // Show loading indicator when refreshing data
+          if (userDataProvider.isLoading) {
+            return const Center(
+              child: CircularProgressIndicator(),
+            );
+          }
+          
           List<Song> songs = [];
           
           switch (listType) {
@@ -54,71 +61,74 @@ class TopSongsListScreen extends StatelessWidget {
             );
           }
           
-          return ListView.builder(
-            padding: const EdgeInsets.all(16.0),
-            itemCount: songs.length,
-            itemBuilder: (context, index) {
-              final song = songs[index];
-              final isOwned = userDataProvider.ownsSong(song.id);
-              
-              return Card(
-                margin: const EdgeInsets.only(bottom: 12.0),
-                child: ListTile(
-                  leading: Container(
-                    width: 50,
-                    height: 50,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[700],
-                      borderRadius: BorderRadius.circular(4.0),
-                    ),
-                    child: song.albumArtUrl != null
-                        ? Image.network(
-                            song.albumArtUrl!,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return const Icon(Icons.music_note);
-                            },
-                          )
-                        : const Icon(Icons.music_note),
-                  ),
-                  title: Text(
-                    song.name,
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  subtitle: Text(song.artist),
-                  trailing: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        '\$${song.currentPrice.toStringAsFixed(2)}',
-                        style: const TextStyle(fontWeight: FontWeight.bold),
+          return RefreshIndicator(
+            onRefresh: () => userDataProvider.refreshData(),
+            child: ListView.builder(
+              padding: const EdgeInsets.all(16.0),
+              itemCount: songs.length,
+              itemBuilder: (context, index) {
+                final song = songs[index];
+                final isOwned = userDataProvider.ownsSong(song.id);
+                
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 12.0),
+                  child: ListTile(
+                    leading: Container(
+                      width: 50,
+                      height: 50,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[700],
+                        borderRadius: BorderRadius.circular(4.0),
                       ),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            song.isPriceUp ? Icons.arrow_upward : Icons.arrow_downward,
-                            size: 12.0,
-                            color: song.isPriceUp ? Colors.green : Colors.red,
-                          ),
-                          Text(
-                            '${song.priceChangePercent.abs().toStringAsFixed(1)}%',
-                            style: TextStyle(
-                              fontSize: 12.0,
+                      child: song.albumArtUrl != null
+                          ? Image.network(
+                              song.albumArtUrl!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return const Icon(Icons.music_note);
+                              },
+                            )
+                          : const Icon(Icons.music_note),
+                    ),
+                    title: Text(
+                      song.name,
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    subtitle: Text(song.artist),
+                    trailing: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          '\$${song.currentPrice.toStringAsFixed(2)}',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              song.isPriceUp ? Icons.arrow_upward : Icons.arrow_downward,
+                              size: 12.0,
                               color: song.isPriceUp ? Colors.green : Colors.red,
                             ),
-                          ),
-                        ],
-                      ),
-                    ],
+                            Text(
+                              '${song.priceChangePercent.abs().toStringAsFixed(1)}%',
+                              style: TextStyle(
+                                fontSize: 12.0,
+                                color: song.isPriceUp ? Colors.green : Colors.red,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    onTap: () {
+                      _showSongActions(context, song, userDataProvider);
+                    },
                   ),
-                  onTap: () {
-                    _showSongActions(context, song, userDataProvider);
-                  },
-                ),
-              );
-            },
+                );
+              },
+            ),
           );
         },
       ),

@@ -60,12 +60,22 @@ SoundMarket is a Flutter application that simulates a music investment platform 
    cd soundmarket
    ```
 
-3. Install dependencies:
+3. Set up API keys:
+   - Copy `lib/core/config/api_keys.template.dart` to `lib/core/config/api_keys.dart`
+   - Replace the placeholder values with your actual Spotify API credentials:
+     ```dart
+     static const String spotifyClientId = 'YOUR_SPOTIFY_CLIENT_ID';
+     static const String spotifyClientSecret = 'YOUR_SPOTIFY_CLIENT_SECRET';
+     static const String spotifyRedirectUri = 'YOUR_SPOTIFY_REDIRECT_URI';
+     ```
+   - Note: The `api_keys.dart` file is ignored by git to keep your credentials secure
+
+4. Install dependencies:
    ```
    flutter pub get
    ```
 
-4. Run the app:
+5. Run the app:
    ```
    flutter run
    ```

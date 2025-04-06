@@ -24,6 +24,13 @@ class PortfolioDetailScreen extends StatelessWidget {
       ),
       body: Consumer<UserDataProvider>(
         builder: (context, provider, child) {
+          // Show loading indicator when refreshing data
+          if (provider.isLoading) {
+            return const Center(
+              child: CircularProgressIndicator(),
+            );
+          }
+          
           final portfolio = provider.portfolio;
           
           if (portfolio.isEmpty) {
@@ -36,21 +43,24 @@ class PortfolioDetailScreen extends StatelessWidget {
             );
           }
           
-          return ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              _buildPortfolioSummary(context, provider),
-              const SizedBox(height: 24),
-              const Text(
-                'Your Songs',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
+          return RefreshIndicator(
+            onRefresh: () => provider.refreshData(),
+            child: ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                _buildPortfolioSummary(context, provider),
+                const SizedBox(height: 24),
+                const Text(
+                  'Your Songs',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              ...portfolio.map((item) => _buildPortfolioItemCard(context, item, provider)),
-            ],
+                const SizedBox(height: 16),
+                ...portfolio.map((item) => _buildPortfolioItemCard(context, item, provider)),
+              ],
+            ),
           );
         },
       ),

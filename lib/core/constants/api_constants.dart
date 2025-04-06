@@ -45,4 +45,15 @@ class ApiConstants {
   static const int forbiddenErrorCode = 403;
   static const int notFoundErrorCode = 404;
   static const int serverErrorCode = 500;
+  
+  // Spotify API
+  static const String spotifyBaseUrl = 'https://api.spotify.com/v1';
+  static const String spotifyAuthUrl = 'https://accounts.spotify.com/api/token';
+  static const String spotifySearch = '$spotifyBaseUrl/search';
+  static const String spotifyTracks = '$spotifyBaseUrl/tracks';
+  static const String spotifyArtists = '$spotifyBaseUrl/artists';
+  static const String spotifyNewReleases = '$spotifyBaseUrl/browse/new-releases';
+  static const String spotifyRecommendations = '$spotifyBaseUrl/recommendations';
+  static const String spotifyCategories = '$spotifyBaseUrl/browse/categories';
+  static const String spotifyFeaturedPlaylists = '$spotifyBaseUrl/browse/featured-playlists';
 }

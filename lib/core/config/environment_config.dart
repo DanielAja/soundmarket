@@ -1,4 +1,6 @@
 /// Environment-specific configurations (dev, staging, prod)
+import 'api_keys.dart';
+
 enum Environment {
   development,
   staging,
@@ -43,20 +45,29 @@ class EnvironmentConfig {
       case Environment.development:
         return {
           'logLevel': 'debug',
-          'enableMockData': true,
+          'enableMockData': false, // Changed from true to use real API
           'refreshInterval': 10, // seconds
+          'spotifyClientId': ApiKeys.spotifyClientId,
+          'spotifyClientSecret': ApiKeys.spotifyClientSecret,
+          'spotifyRedirectUri': ApiKeys.spotifyRedirectUri,
         };
       case Environment.staging:
         return {
           'logLevel': 'info',
           'enableMockData': false,
           'refreshInterval': 30, // seconds
+          'spotifyClientId': ApiKeys.spotifyClientId,
+          'spotifyClientSecret': ApiKeys.spotifyClientSecret,
+          'spotifyRedirectUri': ApiKeys.spotifyRedirectUri,
         };
       case Environment.production:
         return {
           'logLevel': 'error',
           'enableMockData': false,
           'refreshInterval': 60, // seconds
+          'spotifyClientId': ApiKeys.spotifyClientId,
+          'spotifyClientSecret': ApiKeys.spotifyClientSecret,
+          'spotifyRedirectUri': ApiKeys.spotifyRedirectUri,
         };
     }
   }

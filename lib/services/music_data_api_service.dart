@@ -1,9 +1,9 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:math';
 import 'dart:collection';
-import 'package:http/http.dart' as http;
 import '../models/song.dart';
+import '../core/config/environment_config.dart';
+import 'spotify_api_service.dart';
 
 class MusicDataApiService {
   // Singleton pattern
@@ -15,13 +15,16 @@ class MusicDataApiService {
   final _priceUpdateController = StreamController<Map<String, double>>.broadcast();
   Stream<Map<String, double>> get priceUpdates => _priceUpdateController.stream;
 
-  // Timer for simulating real-time updates
+  // Timer for periodic updates
   Timer? _updateTimer;
   
-  // Flag to control updates based on active tab
-  bool _isDiscoverTabActive = false;
+  // Spotify API service
+  final SpotifyApiService _spotifyApi = SpotifyApiService();
   
-  // Mock data for streams (in a real app, this would come from an actual API)
+  // Cache of songs
+  final Map<String, Song> _songsCache = {};
+  
+  // Store stream counts (simulated but based on real popularity)
   final Map<String, int> _songStreams = {};
   
   // Store recent prices for moving average calculation
@@ -29,37 +32,72 @@ class MusicDataApiService {
   
   // Price calculation factors
   final double _basePrice = 5.0;
-  final double _streamMultiplier = 0.0001; // Price increase per stream
-  final double _volatilityFactor = 0.02; // Reduced volatility (2% instead of 5%)
-  final int _movingAveragePeriod = 5; // Number of periods for moving average
-  final double _maxPriceChangePercent = 2.0; // Maximum price change per update (2%)
+  final double _streamMultiplier = 0.0001;
+  final double _volatilityFactor = 0.02;
+  final int _movingAveragePeriod = 5;
+  final double _maxPriceChangePercent = 2.0;
   
-  // Initialize the service
-  void initialize(List<Song> songs) {
-    // Initialize stream counts and price history for songs
-    for (var song in songs) {
-      // Initial stream count (would come from API in real app)
-      _songStreams[song.id] = _getInitialStreamCount(song);
+  // Initialize with real data
+  Future<void> initialize(List<Song> initialSongs) async {
+    try {
+      // Check if Spotify credentials are set
+      final clientId = EnvironmentConfig.settings['spotifyClientId'];
+      final clientSecret = EnvironmentConfig.settings['spotifyClientSecret'];
       
-      // Initialize price history with current price
-      _recentPrices[song.id] = Queue<double>();
-      _recentPrices[song.id]!.add(song.currentPrice);
+      if (clientId.isEmpty || clientSecret.isEmpty) {
+        print('Warning: Spotify API credentials not set. Using fallback data.');
+        throw Exception('Spotify API credentials not set');
+      }
+      
+      // Fetch top tracks from Spotify
+      final topTracks = await _spotifyApi.getTopTracks();
+      
+      if (topTracks.isEmpty) {
+        print('Warning: No tracks returned from Spotify API. Using fallback data.');
+        throw Exception('No tracks returned from Spotify API');
+      } else {
+        print('Successfully fetched ${topTracks.length} tracks from Spotify API');
+      }
+      
+      // Initialize cache with fetched songs
+      for (var song in topTracks) {
+        _songsCache[song.id] = song;
+        _songStreams[song.id] = _estimateStreamCount(song);
+        
+        // Initialize price history
+        _recentPrices[song.id] = Queue<double>();
+        _recentPrices[song.id]!.add(song.currentPrice);
+      }
+      
+      print('Successfully loaded ${topTracks.length} songs from Spotify API');
+      
+      // Start periodic updates
+      _startRealtimeUpdates();
+    } catch (e) {
+      print('Error initializing music data: $e');
+      
+      // Fallback to initial songs if API fails
+      for (var song in initialSongs) {
+        _songsCache[song.id] = song;
+        _songStreams[song.id] = _estimateStreamCount(song);
+        
+        _recentPrices[song.id] = Queue<double>();
+        _recentPrices[song.id]!.add(song.currentPrice);
+      }
+      
+      // Start periodic updates even with fallback data
+      _startRealtimeUpdates();
+      
+      // Rethrow the exception so the caller knows there was an error
+      throw e;
     }
-    
-    // Start the update timer, but updates will only happen when discover tab is active
-    _startRealtimeUpdates();
   }
   
-  // Set whether the discover tab is active
-  void setDiscoverTabActive(bool isActive) {
-    _isDiscoverTabActive = isActive;
-  }
-  
-  // Get initial stream count based on song price
-  int _getInitialStreamCount(Song song) {
+  // Estimate stream count based on song price/popularity
+  int _estimateStreamCount(Song song) {
     // Reverse-engineer stream count from current price
     final baseStreamCount = ((song.currentPrice - _basePrice) / _streamMultiplier).round();
-    return max(0, baseStreamCount);
+    return max(1000, baseStreamCount);
   }
   
   // Start real-time updates
@@ -67,102 +105,83 @@ class MusicDataApiService {
     // Cancel any existing timer
     _updateTimer?.cancel();
     
-    // Create a new timer that fires every 5 seconds
-    _updateTimer = Timer.periodic(const Duration(seconds: 5), (_) {
-      // Always update prices regardless of which tab is active
+    // Create a new timer that fires periodically
+    _updateTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       _updateStreamCounts();
       _updatePrices();
     });
   }
   
-  // Update stream counts (simulated)
+  // Set whether the discover tab is active (kept for compatibility with existing code)
+  void setDiscoverTabActive(bool isActive) {
+    // This method is kept for compatibility but doesn't affect functionality anymore
+    // as we're using real data and updates happen regardless of which tab is active
+  }
+  
+  // Update stream counts (still simulated but based on real popularity)
   void _updateStreamCounts() {
     final random = Random();
     
-    // Update each song's stream count
     _songStreams.forEach((songId, streamCount) {
-      // Simulate stream count increase (more popular songs get more streams)
-      final popularity = streamCount / 1000000; // Normalize to 0-1 range
-      final baseIncrease = max(10, (streamCount * 0.001).round()); // 0.1% base increase
-      
-      // Calculate stream increase with some randomness
+      final popularity = streamCount / 1000000;
+      final baseIncrease = max(10, (streamCount * 0.001).round());
       final increase = (baseIncrease * (0.5 + random.nextDouble())).round();
       
-      // Update stream count
       _songStreams[songId] = streamCount + increase;
     });
   }
   
-  // Update prices based on stream counts with improved stability
+  // Update prices based on stream counts
   void _updatePrices() {
     final random = Random();
     final updates = <String, double>{};
     
-    // Calculate new price for each song
     _songStreams.forEach((songId, streamCount) {
-      // Get current price (last price in the queue)
-      final currentPrice = _recentPrices[songId]!.last;
-      
-      // Base price calculation
-      final basePrice = _basePrice + (streamCount * _streamMultiplier);
-      
-      // Add reduced volatility with trend bias
-      // This creates a more stable random component that's biased by recent trends
-      final trendBias = _calculateTrendBias(songId);
-      final volatilityRange = basePrice * _volatilityFactor;
-      final volatility = volatilityRange * ((random.nextDouble() * 1.5) - 0.5 + (trendBias * 0.5));
-      
-      // Calculate raw new price
-      var rawNewPrice = max(0.1, basePrice + volatility);
-      
-      // Apply moving average to smooth out price changes
-      _addToRecentPrices(songId, rawNewPrice);
-      final smoothedPrice = _calculateMovingAverage(songId);
-      
-      // Limit maximum price change to prevent extreme fluctuations
-      final maxChange = currentPrice * (_maxPriceChangePercent / 100);
-      final limitedPrice = _limitPriceChange(currentPrice, smoothedPrice, maxChange);
-      
-      // Add to updates with 2 decimal precision
-      updates[songId] = double.parse(limitedPrice.toStringAsFixed(2));
+      if (_recentPrices.containsKey(songId)) {
+        final currentPrice = _recentPrices[songId]!.last;
+        
+        final basePrice = _basePrice + (streamCount * _streamMultiplier);
+        final trendBias = _calculateTrendBias(songId);
+        final volatilityRange = basePrice * _volatilityFactor;
+        final volatility = volatilityRange * ((random.nextDouble() * 1.5) - 0.5 + (trendBias * 0.5));
+        
+        var rawNewPrice = max(0.1, basePrice + volatility);
+        
+        _addToRecentPrices(songId, rawNewPrice);
+        final smoothedPrice = _calculateMovingAverage(songId);
+        
+        final maxChange = currentPrice * (_maxPriceChangePercent / 100);
+        final limitedPrice = _limitPriceChange(currentPrice, smoothedPrice, maxChange);
+        
+        updates[songId] = double.parse(limitedPrice.toStringAsFixed(2));
+      }
     });
     
-    // Send updates through the stream
     if (updates.isNotEmpty) {
       _priceUpdateController.add(updates);
     }
   }
   
-  // Add a price to the recent prices queue
+  // The following methods remain largely unchanged from the original implementation
   void _addToRecentPrices(String songId, double price) {
     final queue = _recentPrices[songId]!;
-    
-    // Add the new price
     queue.add(price);
-    
-    // Keep only the most recent prices based on moving average period
     while (queue.length > _movingAveragePeriod) {
       queue.removeFirst();
     }
   }
   
-  // Calculate moving average of recent prices
   double _calculateMovingAverage(String songId) {
     final queue = _recentPrices[songId]!;
-    
     if (queue.isEmpty) return 0;
-    
     final sum = queue.fold<double>(0, (sum, price) => sum + price);
     return sum / queue.length;
   }
   
-  // Calculate trend bias (-1 to 1) based on recent price movements
   double _calculateTrendBias(String songId) {
     final queue = _recentPrices[songId]!;
-    
     if (queue.length < 2) return 0;
     
-    // Calculate average price change over recent periods
     double totalChangePercent = 0;
     double prevPrice = queue.first;
     
@@ -173,15 +192,12 @@ class MusicDataApiService {
       prevPrice = currentPrice;
     }
     
-    // Return normalized trend (-1 to 1 range)
     final avgChangePercent = totalChangePercent / (queue.length - 1);
-    return avgChangePercent * 10; // Scale to make small changes more significant
+    return avgChangePercent * 10;
   }
   
-  // Limit price change to prevent extreme fluctuations
   double _limitPriceChange(double currentPrice, double newPrice, double maxChange) {
     if ((newPrice - currentPrice).abs() > maxChange) {
-      // Limit the change to maxChange in the appropriate direction
       return currentPrice + (newPrice > currentPrice ? maxChange : -maxChange);
     }
     return newPrice;
@@ -192,7 +208,7 @@ class MusicDataApiService {
     return _songStreams[songId] ?? 0;
   }
   
-  // Get formatted stream count (e.g., "1.2M")
+  // Get formatted stream count
   String getFormattedStreamCount(String songId) {
     final count = getStreamCount(songId);
     
@@ -207,18 +223,71 @@ class MusicDataApiService {
     }
   }
   
-  // Trigger a manual update of prices immediately
+  // Search for songs
+  Future<List<Song>> searchSongs(String query) async {
+    try {
+      return await _spotifyApi.searchTracks(query);
+    } catch (e) {
+      print('Error searching songs: $e');
+      return [];
+    }
+  }
+  
+  // Get new releases
+  Future<List<Song>> getNewReleases() async {
+    try {
+      return await _spotifyApi.getNewReleases();
+    } catch (e) {
+      print('Error getting new releases: $e');
+      return [];
+    }
+  }
+  
+  // Trigger a manual update
   void triggerPriceUpdate() {
-    // Update stream counts
     _updateStreamCounts();
-    
-    // Update prices based on new stream counts
     _updatePrices();
+  }
+  
+  // Refresh data from API
+  Future<void> refreshData() async {
+    try {
+      final topTracks = await _spotifyApi.getTopTracks();
+      
+      // Update cache with new data
+      for (var song in topTracks) {
+        if (_songsCache.containsKey(song.id)) {
+          // Store previous price
+          song.previousPrice = _songsCache[song.id]!.currentPrice;
+        }
+        
+        _songsCache[song.id] = song;
+        
+        // Update stream count if not already set
+        if (!_songStreams.containsKey(song.id)) {
+          _songStreams[song.id] = _estimateStreamCount(song);
+        }
+        
+        // Initialize price history if not already set
+        if (!_recentPrices.containsKey(song.id)) {
+          _recentPrices[song.id] = Queue<double>();
+          _recentPrices[song.id]!.add(song.currentPrice);
+        }
+      }
+    } catch (e) {
+      print('Error refreshing data: $e');
+    }
+  }
+  
+  // Get all cached songs
+  List<Song> getAllCachedSongs() {
+    return _songsCache.values.toList();
   }
   
   // Dispose resources
   void dispose() {
     _updateTimer?.cancel();
     _priceUpdateController.close();
+    _spotifyApi.dispose();
   }
 }

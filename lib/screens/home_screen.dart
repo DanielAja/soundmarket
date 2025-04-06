@@ -39,6 +39,13 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       body: Consumer<UserDataProvider>(
         builder: (context, userDataProvider, child) {
+          // Show loading indicator when refreshing data
+          if (userDataProvider.isLoading) {
+            return const Center(
+              child: CircularProgressIndicator(),
+            );
+          }
+          
           final portfolio = userDataProvider.portfolio;
           final portfolioValue = userDataProvider.totalPortfolioValue;
           

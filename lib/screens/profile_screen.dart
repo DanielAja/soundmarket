@@ -16,6 +16,13 @@ class ProfileScreen extends StatelessWidget {
         title: const Text('Profile'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () {
+              // Refresh data to get latest prices
+              context.read<UserDataProvider>().refreshData();
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () {
               // TODO: Navigate to settings screen
@@ -28,25 +35,33 @@ class ProfileScreen extends StatelessWidget {
       ),
       body: Consumer<UserDataProvider>(
         builder: (context, userDataProvider, child) {
+          // Show loading indicator when refreshing data
+          if (userDataProvider.isLoading) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          
           final userProfile = userDataProvider.userProfile;
           
           if (userProfile == null) {
             return const Center(child: CircularProgressIndicator());
           }
           
-          return ListView(
-            padding: const EdgeInsets.all(16.0),
-            children: [
-              _buildProfileHeader(context, userProfile.displayName ?? 'User'),
-              const SizedBox(height: 24.0),
-              _buildBalanceCard(context, userDataProvider),
-              const SizedBox(height: 24.0),
-              _buildStatisticsSection(context),
-              const SizedBox(height: 24.0),
-              _buildPortfolioSection(context, userDataProvider),
-              const SizedBox(height: 24.0),
-              _buildActionButtons(context, userDataProvider),
-            ],
+          return RefreshIndicator(
+            onRefresh: () => userDataProvider.refreshData(),
+            child: ListView(
+              padding: const EdgeInsets.all(16.0),
+              children: [
+                _buildProfileHeader(context, userProfile.displayName ?? 'User'),
+                const SizedBox(height: 24.0),
+                _buildBalanceCard(context, userDataProvider),
+                const SizedBox(height: 24.0),
+                _buildStatisticsSection(context),
+                const SizedBox(height: 24.0),
+                _buildPortfolioSection(context, userDataProvider),
+                const SizedBox(height: 24.0),
+                _buildActionButtons(context, userDataProvider),
+              ],
+            ),
           );
         },
       ),

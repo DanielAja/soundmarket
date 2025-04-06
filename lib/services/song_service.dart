@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math';
 import '../models/song.dart';
 import 'music_data_api_service.dart';
 
@@ -13,27 +12,8 @@ class SongService {
   List<Song>? _cachedTopMovers;
   List<String>? _cachedRisingArtists;
   
-  SongService._internal() {
-    // Generate more songs for the initial lists (up to 50)
-    if (_songs.length < 50) {
-      _generateMoreSongs(50 - _songs.length);
-    }
-    
-    // Initialize the music data API service
-    _initializeMusicDataApi();
-    
-    // Initialize the cached lists
-    final topSongs = List<Song>.from(_songs);
-    topSongs.sort((a, b) => b.currentPrice.compareTo(a.currentPrice));
-    _cachedTopSongs = topSongs.take(50).toList();
-    
-    final topMovers = List<Song>.from(_songs);
-    topMovers.sort((a, b) => b.priceChangePercent.abs().compareTo(a.priceChangePercent.abs()));
-    _cachedTopMovers = topMovers.take(50).toList();
-    
-    // Initialize rising artists list
-    _cachedRisingArtists = _calculateRisingArtists();
-  }
+  // Songs list (will be populated from API)
+  final List<Song> _songs = [];
   
   // Music data API service
   final MusicDataApiService _musicDataApi = MusicDataApiService();
@@ -45,13 +25,112 @@ class SongService {
   // Subscription to price updates
   StreamSubscription? _priceUpdateSubscription;
   
-  // Initialize the music data API service
-  void _initializeMusicDataApi() {
-    // Initialize the API with our songs
-    _musicDataApi.initialize(_songs);
+  SongService._internal() {
+    // Initialize with fallback data first
+    _initializeFallbackData();
     
-    // Listen for price updates
-    _priceUpdateSubscription = _musicDataApi.priceUpdates.listen(_updateSongPrices);
+    // Then try to initialize the music data API service
+    _initializeMusicDataApi();
+  }
+  
+  // Initialize with fallback data in case API fails
+  void _initializeFallbackData() {
+    // Add some fallback songs if the list is empty
+    if (_songs.isEmpty) {
+      _songs.addAll(_getFallbackSongs());
+      _updateCachedLists();
+    }
+  }
+  
+  // Initialize the music data API service
+  Future<void> _initializeMusicDataApi() async {
+    try {
+      // Initialize the API with empty list (it will fetch data from Spotify)
+      await _musicDataApi.initialize([]);
+      
+      // Get initial songs from API
+      final apiSongs = _musicDataApi.getAllCachedSongs();
+      
+      // Only replace fallback data if we got songs from the API
+      if (apiSongs.isNotEmpty) {
+        _songs.clear();
+        _songs.addAll(apiSongs);
+        _updateCachedLists();
+      }
+      
+      // Listen for price updates
+      _priceUpdateSubscription = _musicDataApi.priceUpdates.listen(_updateSongPrices);
+    } catch (e) {
+      print('Error initializing music data API: $e');
+      // Fallback data is already loaded, so we don't need to do anything else
+    }
+  }
+  
+  // Get fallback songs in case API fails
+  List<Song> _getFallbackSongs() {
+    return [
+      Song(
+        id: '1',
+        name: 'Blinding Lights',
+        artist: 'The Weeknd',
+        genre: 'Pop',
+        currentPrice: 45.0,
+        previousPrice: 42.5,
+        albumArtUrl: 'https://i.scdn.co/image/ab67616d0000b273b5d374b3c8617f0c6c410daf',
+      ),
+      Song(
+        id: '2',
+        name: 'Levitating',
+        artist: 'Dua Lipa',
+        genre: 'Pop',
+        currentPrice: 38.75,
+        previousPrice: 40.0,
+        albumArtUrl: 'https://i.scdn.co/image/ab67616d0000b273d4daf28d55fe4197ede848be',
+      ),
+      Song(
+        id: '3',
+        name: 'Save Your Tears',
+        artist: 'The Weeknd',
+        genre: 'Pop',
+        currentPrice: 32.5,
+        previousPrice: 30.0,
+        albumArtUrl: 'https://i.scdn.co/image/ab67616d0000b273c6af5ffa661a365b77df6ef6',
+      ),
+      Song(
+        id: '4',
+        name: 'Montero (Call Me By Your Name)',
+        artist: 'Lil Nas X',
+        genre: 'Hip-Hop',
+        currentPrice: 55.0,
+        previousPrice: 48.0,
+        albumArtUrl: 'https://i.scdn.co/image/ab67616d0000b273be82673b5f79d9658ec0a9fd',
+      ),
+      Song(
+        id: '5',
+        name: 'Peaches',
+        artist: 'Justin Bieber',
+        genre: 'Pop',
+        currentPrice: 28.5,
+        previousPrice: 30.0,
+        albumArtUrl: 'https://i.scdn.co/image/ab67616d0000b273e6f407c7f3a0ec98845e4431',
+      ),
+    ];
+  }
+  
+  // Update cached lists
+  void _updateCachedLists() {
+    // Update top songs
+    final topSongs = List<Song>.from(_songs);
+    topSongs.sort((a, b) => b.currentPrice.compareTo(a.currentPrice));
+    _cachedTopSongs = topSongs;
+    
+    // Update top movers
+    final topMovers = List<Song>.from(_songs);
+    topMovers.sort((a, b) => b.priceChangePercent.abs().compareTo(a.priceChangePercent.abs()));
+    _cachedTopMovers = topMovers;
+    
+    // Update rising artists
+    _cachedRisingArtists = _calculateRisingArtists();
   }
   
   // Update song prices based on API data
@@ -73,10 +152,24 @@ class SongService {
     
     // Notify listeners if there were updates
     if (hasUpdates) {
-      // Don't clear the cached lists - we want to maintain the same order
-      // even when prices change
+      _updateCachedLists();
       _songUpdateController.add(List.from(_songs));
     }
+  }
+  
+  // Refresh data from API
+  Future<void> refreshData() async {
+    await _musicDataApi.refreshData();
+    
+    // Clear and repopulate songs list
+    _songs.clear();
+    _songs.addAll(_musicDataApi.getAllCachedSongs());
+    
+    // Update cached lists
+    _updateCachedLists();
+    
+    // Notify listeners
+    _songUpdateController.add(List.from(_songs));
   }
   
   // Get stream count for a song
@@ -91,156 +184,19 @@ class SongService {
   
   // Trigger a manual update of song prices
   void triggerPriceUpdate() {
-    // Request the music data API to update prices immediately
     _musicDataApi.triggerPriceUpdate();
   }
   
-  // Dispose resources
-  void dispose() {
-    _priceUpdateSubscription?.cancel();
-    _songUpdateController.close();
-    _musicDataApi.dispose();
+  // Search for songs
+  Future<List<Song>> searchSongs(String query) async {
+    return await _musicDataApi.searchSongs(query);
   }
   
-  // Mock song data
-  final List<Song> _songs = [
-    Song(
-      id: '1',
-      name: 'Blinding Lights',
-      artist: 'The Weeknd',
-      genre: 'Pop',
-      currentPrice: 45.0,
-      previousPrice: 42.5,
-      albumArtUrl: null, // Using null instead of placeholder URL to avoid network errors
-    ),
-    Song(
-      id: '2',
-      name: 'Levitating',
-      artist: 'Dua Lipa',
-      genre: 'Pop',
-      currentPrice: 38.75,
-      previousPrice: 40.0,
-      albumArtUrl: null, // Using null instead of placeholder URL to avoid network errors
-    ),
-    Song(
-      id: '3',
-      name: 'Save Your Tears',
-      artist: 'The Weeknd',
-      genre: 'Pop',
-      currentPrice: 32.5,
-      previousPrice: 30.0,
-      albumArtUrl: null, // Using null instead of placeholder URL to avoid network errors
-    ),
-    Song(
-      id: '4',
-      name: 'Montero (Call Me By Your Name)',
-      artist: 'Lil Nas X',
-      genre: 'Hip-Hop',
-      currentPrice: 55.0,
-      previousPrice: 48.0,
-      albumArtUrl: null, // Using null instead of placeholder URL to avoid network errors
-    ),
-    Song(
-      id: '5',
-      name: 'Peaches',
-      artist: 'Justin Bieber',
-      genre: 'Pop',
-      currentPrice: 28.5,
-      previousPrice: 30.0,
-      albumArtUrl: null, // Using null instead of placeholder URL to avoid network errors
-    ),
-    Song(
-      id: '6',
-      name: 'Leave The Door Open',
-      artist: 'Silk Sonic',
-      genre: 'R&B',
-      currentPrice: 42.0,
-      previousPrice: 38.5,
-      albumArtUrl: null, // Using null instead of placeholder URL to avoid network errors
-    ),
-    Song(
-      id: '7',
-      name: 'Drivers License',
-      artist: 'Olivia Rodrigo',
-      genre: 'Pop',
-      currentPrice: 60.0,
-      previousPrice: 52.5,
-      albumArtUrl: null, // Using null instead of placeholder URL to avoid network errors
-    ),
-    Song(
-      id: '8',
-      name: 'Good 4 U',
-      artist: 'Olivia Rodrigo',
-      genre: 'Pop Rock',
-      currentPrice: 58.25,
-      previousPrice: 55.0,
-      albumArtUrl: null, // Using null instead of placeholder URL to avoid network errors
-    ),
-    Song(
-      id: '9',
-      name: 'Kiss Me More',
-      artist: 'Doja Cat ft. SZA',
-      genre: 'Pop',
-      currentPrice: 35.75,
-      previousPrice: 33.0,
-      albumArtUrl: null, // Using null instead of placeholder URL to avoid network errors
-    ),
-    Song(
-      id: '10',
-      name: 'Astronaut In The Ocean',
-      artist: 'Masked Wolf',
-      genre: 'Hip-Hop',
-      currentPrice: 25.0,
-      previousPrice: 28.0,
-      albumArtUrl: null, // Using null instead of placeholder URL to avoid network errors
-    ),
-    Song(
-      id: '11',
-      name: 'Butter',
-      artist: 'BTS',
-      genre: 'K-Pop',
-      currentPrice: 65.0,
-      previousPrice: 58.0,
-      albumArtUrl: null, // Using null instead of placeholder URL to avoid network errors
-    ),
-    Song(
-      id: '12',
-      name: 'Mood',
-      artist: '24kGoldn ft. iann dior',
-      genre: 'Hip-Hop',
-      currentPrice: 30.0,
-      previousPrice: 32.5,
-      albumArtUrl: null, // Using null instead of placeholder URL to avoid network errors
-    ),
-    Song(
-      id: '13',
-      name: 'Heartbreak Anniversary',
-      artist: 'Giveon',
-      genre: 'R&B',
-      currentPrice: 40.0,
-      previousPrice: 35.0,
-      albumArtUrl: null, // Using null instead of placeholder URL to avoid network errors
-    ),
-    Song(
-      id: '14',
-      name: 'Deja Vu',
-      artist: 'Olivia Rodrigo',
-      genre: 'Pop',
-      currentPrice: 48.0,
-      previousPrice: 45.0,
-      albumArtUrl: null, // Using null instead of placeholder URL to avoid network errors
-    ),
-    Song(
-      id: '15',
-      name: 'Dynamite',
-      artist: 'BTS',
-      genre: 'K-Pop',
-      currentPrice: 62.5,
-      previousPrice: 60.0,
-      albumArtUrl: null, // Using null instead of placeholder URL to avoid network errors
-    ),
-  ];
-
+  // Get new releases
+  Future<List<Song>> getNewReleases() async {
+    return await _musicDataApi.getNewReleases();
+  }
+  
   // Get all songs
   List<Song> getAllSongs() {
     return List.from(_songs);
@@ -257,121 +213,20 @@ class SongService {
   
   // Get top songs (by price)
   List<Song> getTopSongs({int limit = 10}) {
-    // If we already have a cached list and it's large enough, return a subset
-    if (_cachedTopSongs != null) {
-      // If requested limit is larger than our cached list, we need to create a new sorted list
-      if (limit > _cachedTopSongs!.length) {
-        // Generate more songs if needed for the top 100 view
-        if (limit > _songs.length) {
-          _generateMoreSongs(limit - _songs.length);
-        }
-        
-        final sortedSongs = List<Song>.from(_songs);
-        sortedSongs.sort((a, b) => b.currentPrice.compareTo(a.currentPrice));
-        _cachedTopSongs = sortedSongs; // Cache all sorted songs
-        return sortedSongs.take(limit).toList();
-      }
-      
-      // Return the requested number of songs from the cache
-      return _cachedTopSongs!.take(limit).toList();
+    if (_cachedTopSongs == null || _cachedTopSongs!.isEmpty) {
+      return [];
     }
     
-    // Generate more songs if needed for the top 100 view
-    if (limit > _songs.length) {
-      _generateMoreSongs(limit - _songs.length);
-    }
-    
-    // Otherwise, create and cache a new sorted list (all songs)
-    final sortedSongs = List<Song>.from(_songs);
-    sortedSongs.sort((a, b) => b.currentPrice.compareTo(a.currentPrice));
-    _cachedTopSongs = sortedSongs; // Cache all sorted songs
-    return sortedSongs.take(limit).toList();
+    return _cachedTopSongs!.take(limit).toList();
   }
   
   // Get top movers (by percentage change)
   List<Song> getTopMovers({int limit = 10}) {
-    // If we already have a cached list and it's large enough, return a subset
-    if (_cachedTopMovers != null) {
-      // If requested limit is larger than our cached list, we need to create a new sorted list
-      if (limit > _cachedTopMovers!.length) {
-        // Generate more songs if needed for the top 100 view
-        if (limit > _songs.length) {
-          _generateMoreSongs(limit - _songs.length);
-        }
-        
-        final sortedSongs = List<Song>.from(_songs);
-        sortedSongs.sort((a, b) => b.priceChangePercent.abs().compareTo(a.priceChangePercent.abs()));
-        _cachedTopMovers = sortedSongs; // Cache all sorted songs
-        return sortedSongs.take(limit).toList();
-      }
-      
-      // Return the requested number of songs from the cache
-      return _cachedTopMovers!.take(limit).toList();
+    if (_cachedTopMovers == null || _cachedTopMovers!.isEmpty) {
+      return [];
     }
     
-    // Generate more songs if needed for the top 100 view
-    if (limit > _songs.length) {
-      _generateMoreSongs(limit - _songs.length);
-    }
-    
-    // Otherwise, create and cache a new sorted list (all songs)
-    final sortedSongs = List<Song>.from(_songs);
-    sortedSongs.sort((a, b) => b.priceChangePercent.abs().compareTo(a.priceChangePercent.abs()));
-    _cachedTopMovers = sortedSongs; // Cache all sorted songs
-    return sortedSongs.take(limit).toList();
-  }
-  
-  // Generate additional songs for the top 100 view
-  void _generateMoreSongs(int count) {
-    final random = Random();
-    final existingIds = _songs.map((s) => s.id).toSet();
-    final genres = [
-      'Pop', 'Hip-Hop', 'R&B', 'Rock', 'Electronic', 'Country', 
-      'Jazz', 'Classical', 'K-Pop', 'Latin', 'Indie', 'Folk',
-      'Metal', 'Blues', 'Reggae', 'Punk', 'Soul', 'Funk'
-    ];
-    final artists = [
-      'Taylor Swift', 'Drake', 'Beyoncé', 'Ed Sheeran', 'Ariana Grande',
-      'The Weeknd', 'Billie Eilish', 'Post Malone', 'Dua Lipa', 'Bad Bunny',
-      'Justin Bieber', 'Kendrick Lamar', 'Rihanna', 'Harry Styles', 'BTS',
-      'Lady Gaga', 'Travis Scott', 'Adele', 'Kanye West', 'Olivia Rodrigo',
-      'Bruno Mars', 'Coldplay', 'SZA', 'J Balvin', 'Cardi B',
-      'Imagine Dragons', 'Doja Cat', 'Shawn Mendes', 'Maroon 5', 'Lil Nas X'
-    ];
-    final songNames = [
-      'Midnight Dreams', 'Summer Vibes', 'Electric Heart', 'Ocean Eyes', 'Dancing in the Dark',
-      'Neon Lights', 'Golden Hour', 'Starlight', 'Wildest Dreams', 'Euphoria',
-      'Lost in Translation', 'Moonlight Sonata', 'Sunset Boulevard', 'City Lights', 'Paradise',
-      'Daydreamer', 'Wanderlust', 'Nostalgia', 'Serendipity', 'Bittersweet Symphony',
-      'Velvet Sky', 'Cosmic Love', 'Eternal Flame', 'Whispers in the Wind', 'Echoes',
-      'Silhouette', 'Kaleidoscope', 'Stardust', 'Mirage', 'Dreamscape',
-      'Fireflies', 'Aurora', 'Cascade', 'Reverie', 'Labyrinth',
-      'Illusion', 'Serenade', 'Lullaby', 'Rhapsody', 'Harmony',
-      'Enigma', 'Utopia', 'Dystopia', 'Nirvana', 'Elysium',
-      'Solitude', 'Infinity', 'Nebula', 'Zenith', 'Eclipse'
-    ];
-    
-    for (int i = 0; i < count; i++) {
-      final id = (existingIds.length + i + 1).toString();
-      final genre = genres[random.nextInt(genres.length)];
-      final artist = artists[random.nextInt(artists.length)];
-      final name = songNames[random.nextInt(songNames.length)] + ' ' + (i + 1).toString();
-      final currentPrice = 10.0 + random.nextDouble() * 90.0; // Random price between $10 and $100
-      final priceChange = currentPrice * (0.2 * (random.nextDouble() * 2 - 1)); // Random change ±20%
-      final previousPrice = max(0.01, currentPrice - priceChange);
-      
-      _songs.add(Song(
-        id: id,
-        name: name,
-        artist: artist,
-        genre: genre,
-        currentPrice: double.parse(currentPrice.toStringAsFixed(2)),
-        previousPrice: double.parse(previousPrice.toStringAsFixed(2)),
-        albumArtUrl: null,
-      ));
-      
-      existingIds.add(id);
-    }
+    return _cachedTopMovers!.take(limit).toList();
   }
   
   // Get songs by genre
@@ -426,14 +281,17 @@ class SongService {
   
   // Get rising artists (artists with highest average price increase)
   List<String> getRisingArtists({int limit = 5}) {
-    // If we already have a cached list, return it
-    if (_cachedRisingArtists != null) {
-      return _cachedRisingArtists!.take(limit).toList();
+    if (_cachedRisingArtists == null || _cachedRisingArtists!.isEmpty) {
+      return [];
     }
     
-    // Calculate and cache the result
-    _cachedRisingArtists = _calculateRisingArtists();
-    
     return _cachedRisingArtists!.take(limit).toList();
+  }
+  
+  // Dispose resources
+  void dispose() {
+    _priceUpdateSubscription?.cancel();
+    _songUpdateController.close();
+    _musicDataApi.dispose();
   }
 }
