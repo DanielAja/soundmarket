@@ -8,28 +8,28 @@ class AppTextStyles {
   static final TextStyle heading1 = GoogleFonts.poppins(
     fontSize: 32,
     fontWeight: FontWeight.bold,
-    color: ColorPalette.onBackground,
+    color: ColorPalette.textPrimary,
     letterSpacing: -0.5,
   );
   
   static final TextStyle heading2 = GoogleFonts.poppins(
     fontSize: 28,
     fontWeight: FontWeight.bold,
-    color: ColorPalette.onBackground,
+    color: ColorPalette.textPrimary,
     letterSpacing: -0.5,
   );
   
   static final TextStyle heading3 = GoogleFonts.poppins(
     fontSize: 24,
     fontWeight: FontWeight.w600,
-    color: ColorPalette.onBackground,
+    color: ColorPalette.textPrimary,
     letterSpacing: -0.25,
   );
   
   static final TextStyle heading4 = GoogleFonts.poppins(
     fontSize: 20,
     fontWeight: FontWeight.w600,
-    color: ColorPalette.onBackground,
+    color: ColorPalette.textPrimary,
     letterSpacing: -0.25,
   );
   
@@ -37,59 +37,59 @@ class AppTextStyles {
   static final TextStyle titleLarge = GoogleFonts.poppins(
     fontSize: 24,
     fontWeight: FontWeight.w600,
-    color: ColorPalette.onBackground,
+    color: ColorPalette.textPrimary,
   );
   
   static final TextStyle titleMedium = GoogleFonts.poppins(
     fontSize: 18,
     fontWeight: FontWeight.w600,
-    color: ColorPalette.onBackground,
+    color: ColorPalette.textPrimary,
   );
   
   static final TextStyle titleSmall = GoogleFonts.poppins(
     fontSize: 16,
     fontWeight: FontWeight.w600,
-    color: ColorPalette.onBackground,
+    color: ColorPalette.textPrimary,
   );
   
   // Body text
   static final TextStyle bodyLarge = GoogleFonts.poppins(
     fontSize: 16,
     fontWeight: FontWeight.normal,
-    color: ColorPalette.onBackground,
+    color: ColorPalette.textPrimary,
   );
   
   static final TextStyle bodyMedium = GoogleFonts.poppins(
     fontSize: 14,
     fontWeight: FontWeight.normal,
-    color: ColorPalette.onBackground,
+    color: ColorPalette.textSecondary,
   );
   
   static final TextStyle bodySmall = GoogleFonts.poppins(
     fontSize: 12,
     fontWeight: FontWeight.normal,
-    color: ColorPalette.onBackground,
+    color: ColorPalette.textSecondary,
   );
   
   // Labels
   static final TextStyle labelLarge = GoogleFonts.poppins(
     fontSize: 14,
     fontWeight: FontWeight.w500,
-    color: ColorPalette.onBackground,
+    color: ColorPalette.textSecondary,
     letterSpacing: 0.5,
   );
   
   static final TextStyle labelMedium = GoogleFonts.poppins(
     fontSize: 12,
     fontWeight: FontWeight.w500,
-    color: ColorPalette.onBackground,
+    color: ColorPalette.textSecondary,
     letterSpacing: 0.5,
   );
   
   static final TextStyle labelSmall = GoogleFonts.poppins(
     fontSize: 10,
     fontWeight: FontWeight.w500,
-    color: ColorPalette.onBackground,
+    color: ColorPalette.textTertiary,
     letterSpacing: 0.5,
   );
   
@@ -150,8 +150,20 @@ class AppTextStyles {
   
   // Helper methods to get dark theme variants
   static TextStyle withDarkColor(TextStyle style) {
+    // Map light theme colors to dark theme equivalents
+    Color darkColor;
+    if (style.color == ColorPalette.textPrimary) {
+      darkColor = ColorPalette.textPrimaryDark;
+    } else if (style.color == ColorPalette.textSecondary) {
+      darkColor = ColorPalette.textSecondaryDark;
+    } else if (style.color == ColorPalette.textTertiary) {
+      darkColor = ColorPalette.textTertiaryDark;
+    } else {
+      darkColor = ColorPalette.onBackgroundDark;
+    }
+    
     return style.copyWith(
-      color: ColorPalette.onBackgroundDark,
+      color: darkColor,
     );
   }
   
@@ -160,4 +172,12 @@ class AppTextStyles {
       color: color,
     );
   }
+  
+  // Caption text
+  static final TextStyle caption = GoogleFonts.poppins(
+    fontSize: 12,
+    fontWeight: FontWeight.normal,
+    color: ColorPalette.textTertiary,
+    letterSpacing: 0.4,
+  );
 }

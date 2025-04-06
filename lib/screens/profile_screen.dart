@@ -5,6 +5,7 @@ import '../models/song.dart';
 import '../providers/user_data_provider.dart';
 import 'transaction_history_screen.dart';
 import '../core/navigation/route_constants.dart';
+import '../core/theme/app_spacing.dart'; // Import AppSpacing
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -49,14 +50,15 @@ class ProfileScreen extends StatelessWidget {
           return RefreshIndicator(
             onRefresh: () => userDataProvider.refreshData(),
             child: ListView(
-              padding: const EdgeInsets.all(16.0),
+              padding: const EdgeInsets.all(AppSpacing.l), // Use AppSpacing.l
               children: [
                 _buildProfileHeader(context, userProfile.displayName ?? 'User'),
-                const SizedBox(height: 24.0),
+                const SizedBox(height: AppSpacing.xl), // Use AppSpacing.xl
                 _buildBalanceCard(context, userDataProvider),
-                const SizedBox(height: 24.0),
+                const SizedBox(height: AppSpacing.xl), // Use AppSpacing.xl
                 _buildStatisticsSection(context),
-                const SizedBox(height: 24.0),
+                const SizedBox(height: AppSpacing.xl), // Use AppSpacing.xl
+                // Note: _buildPortfolioSection is not currently used in the main ListView
                 _buildActionButtons(context, userDataProvider),
               ],
             ),
@@ -78,7 +80,7 @@ class ProfileScreen extends StatelessWidget {
             color: Colors.white,
           ),
         ),
-        const SizedBox(height: 16.0),
+        const SizedBox(height: AppSpacing.l), // Use AppSpacing.l
         Text(
           displayName,
           style: const TextStyle(
@@ -86,7 +88,7 @@ class ProfileScreen extends StatelessWidget {
             fontWeight: FontWeight.bold,
           ),
         ),
-        const SizedBox(height: 8.0),
+        const SizedBox(height: AppSpacing.s), // Use AppSpacing.s
         Text(
           'Member since April 2025',
           style: TextStyle(
@@ -101,7 +103,7 @@ class ProfileScreen extends StatelessWidget {
     return Card(
       elevation: 4.0,
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(AppSpacing.l), // Use AppSpacing.l
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -112,7 +114,7 @@ class ProfileScreen extends StatelessWidget {
                 fontWeight: FontWeight.bold,
               ),
             ),
-            const SizedBox(height: 16.0),
+            const SizedBox(height: AppSpacing.l), // Use AppSpacing.l
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -154,9 +156,9 @@ class ProfileScreen extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 16.0),
+            const SizedBox(height: AppSpacing.l), // Use AppSpacing.l
             const Divider(),
-            const SizedBox(height: 8.0),
+            const SizedBox(height: AppSpacing.s), // Use AppSpacing.s
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -212,7 +214,7 @@ class ProfileScreen extends StatelessWidget {
                 fontWeight: FontWeight.bold,
               ),
             ),
-            const SizedBox(height: 16.0),
+            const SizedBox(height: AppSpacing.l), // Use AppSpacing.l
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
@@ -248,7 +250,7 @@ class ProfileScreen extends StatelessWidget {
             color: color ?? Theme.of(context).colorScheme.primary,
           ),
         ),
-        const SizedBox(height: 4.0),
+        const SizedBox(height: AppSpacing.xs), // Use AppSpacing.xs
         Text(
           label,
           style: TextStyle(
@@ -260,6 +262,7 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
+  // This widget seems unused in the main build method, but refactoring anyway
   Widget _buildPortfolioSection(BuildContext context, UserDataProvider userDataProvider) {
     final portfolio = userDataProvider.portfolio;
     
@@ -267,7 +270,7 @@ class ProfileScreen extends StatelessWidget {
       return Card(
         elevation: 2.0,
         child: Padding(
-          padding: const EdgeInsets.all(16.0),
+          padding: const EdgeInsets.all(AppSpacing.l), // Use AppSpacing.l
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -278,7 +281,7 @@ class ProfileScreen extends StatelessWidget {
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              const SizedBox(height: 16.0),
+              const SizedBox(height: AppSpacing.l), // Use AppSpacing.l
               Center(
                 child: Column(
                   children: [
@@ -287,14 +290,14 @@ class ProfileScreen extends StatelessWidget {
                       size: 48.0,
                       color: Colors.grey[400],
                     ),
-                    const SizedBox(height: 8.0),
+                    const SizedBox(height: AppSpacing.s), // Use AppSpacing.s
                     Text(
                       'No songs in your portfolio yet',
                       style: TextStyle(
                         color: Colors.grey[600],
                       ),
                     ),
-                    const SizedBox(height: 16.0),
+                    const SizedBox(height: AppSpacing.l), // Use AppSpacing.l
                     ElevatedButton(
                       onPressed: () {
                         // Navigate to discover screen to buy songs
@@ -314,7 +317,7 @@ class ProfileScreen extends StatelessWidget {
     return Card(
       elevation: 2.0,
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(AppSpacing.l), // Use AppSpacing.l
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -325,7 +328,7 @@ class ProfileScreen extends StatelessWidget {
                 fontWeight: FontWeight.bold,
               ),
             ),
-            const SizedBox(height: 8.0),
+            const SizedBox(height: AppSpacing.s), // Use AppSpacing.s
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -344,7 +347,7 @@ class ProfileScreen extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 8.0),
+            const SizedBox(height: AppSpacing.s), // Use AppSpacing.s
             ListView.separated(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
@@ -380,7 +383,7 @@ class ProfileScreen extends StatelessWidget {
                           height: 50,
                           decoration: BoxDecoration(
                             color: Colors.grey[300],
-                            borderRadius: BorderRadius.circular(4.0),
+                            borderRadius: BorderRadius.circular(AppSpacing.xs), // Use AppSpacing.xs
                           ),
                           child: item.albumArtUrl != null
                               ? Image.network(
@@ -392,7 +395,7 @@ class ProfileScreen extends StatelessWidget {
                                 )
                               : const Icon(Icons.music_note),
                         ),
-                        const SizedBox(width: 12.0),
+                        const SizedBox(width: AppSpacing.m), // Use AppSpacing.m
                         // Song details
                         Expanded(
                           child: Column(
@@ -413,14 +416,14 @@ class ProfileScreen extends StatelessWidget {
                                   fontSize: 12.0,
                                 ),
                               ),
-                              const SizedBox(height: 4.0),
+                              const SizedBox(height: AppSpacing.xs), // Use AppSpacing.xs
                               Row(
                                 children: [
                                   Text(
                                     'Qty: ${item.quantity}',
                                     style: const TextStyle(fontSize: 12.0),
                                   ),
-                                  const SizedBox(width: 8.0),
+                                  const SizedBox(width: AppSpacing.s), // Use AppSpacing.s
                                   Text(
                                     'Avg: \$${item.purchasePrice.toStringAsFixed(2)}',
                                     style: const TextStyle(fontSize: 12.0),
@@ -462,7 +465,7 @@ class ProfileScreen extends StatelessWidget {
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 4.0),
+                            const SizedBox(height: AppSpacing.xs), // Use AppSpacing.xs
                             Text(
                               profitLoss >= 0
                                   ? '+\$${profitLoss.toStringAsFixed(2)}'
@@ -478,7 +481,7 @@ class ProfileScreen extends StatelessWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8.0),
+                    const SizedBox(height: AppSpacing.s), // Use AppSpacing.s
                     // Buy/Sell buttons
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
@@ -498,7 +501,7 @@ class ProfileScreen extends StatelessWidget {
                           ),
                           child: const Text('Buy'),
                         ),
-                        const SizedBox(width: 8.0),
+                        const SizedBox(width: AppSpacing.s), // Use AppSpacing.s
                         OutlinedButton(
                           onPressed: () => _showBuySellDialog(
                             context,
@@ -549,14 +552,14 @@ class ProfileScreen extends StatelessWidget {
               'Current Price: \$${currentPrice.toStringAsFixed(2)}',
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 8.0),
+            const SizedBox(height: AppSpacing.s), // Use AppSpacing.s
             if (isBuy)
               Text(
                 'Available Cash: \$${userDataProvider.userProfile!.cashBalance.toStringAsFixed(2)}',
               )
             else
               Text('Quantity Owned: ${item.quantity}'),
-            const SizedBox(height: 16.0),
+            const SizedBox(height: AppSpacing.l), // Use AppSpacing.l
             TextField(
               controller: quantityController,
               decoration: const InputDecoration(
@@ -565,7 +568,7 @@ class ProfileScreen extends StatelessWidget {
               ),
               keyboardType: TextInputType.number,
             ),
-            const SizedBox(height: 8.0),
+            const SizedBox(height: AppSpacing.s), // Use AppSpacing.s
             Text(
               isBuy
                   ? 'Max you can buy: $maxQuantity'
@@ -575,7 +578,7 @@ class ProfileScreen extends StatelessWidget {
                 color: Colors.grey[600],
               ),
             ),
-            const SizedBox(height: 16.0),
+            const SizedBox(height: AppSpacing.l), // Use AppSpacing.l
             StatefulBuilder(
               builder: (context, setState) {
                 final quantity = int.tryParse(quantityController.text) ?? 0;
@@ -673,7 +676,7 @@ class ProfileScreen extends StatelessWidget {
             fontWeight: FontWeight.bold,
           ),
         ),
-        const SizedBox(height: 16.0),
+        const SizedBox(height: AppSpacing.l), // Use AppSpacing.l
         ListTile(
           leading: const Icon(Icons.add_circle_outline),
           title: const Text('Add Funds'),

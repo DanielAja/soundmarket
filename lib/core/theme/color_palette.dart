@@ -12,21 +12,21 @@ class ColorPalette {
   
   // Background colors
   static const Color background = Colors.white;
-  static const Color onBackground = Colors.black;
-  static const Color backgroundDark = Colors.black;
-  static const Color onBackgroundDark = Colors.white;
+  static const Color onBackground = Color(0xFF121212); // Softer than pure black
+  static const Color backgroundDark = Color(0xFF121212); // Slightly lighter than pure black
+  static const Color onBackgroundDark = Color(0xFFF5F5F5); // Softer than pure white
   
   // Surface colors
   static const Color surface = Color(0xFFF5F5F5);
-  static const Color onSurface = Colors.black;
-  static const Color surfaceDark = Color(0xFF121212);
-  static const Color onSurfaceDark = Colors.white;
+  static const Color onSurface = Color(0xFF212121); // Slightly softer than pure black
+  static const Color surfaceDark = Color(0xFF1E1E1E); // Slightly lighter than background
+  static const Color onSurfaceDark = Color(0xFFECECEC); // Softer than pure white
   
   // Variant colors
   static const Color surfaceVariant = Color(0xFFE0E0E0);
-  static const Color onSurfaceVariant = Color(0xFF666666);
+  static const Color onSurfaceVariant = Color(0xFF555555); // Darker for better contrast
   static const Color surfaceVariantDark = Color(0xFF2A2A2A);
-  static const Color onSurfaceVariantDark = Color(0xFFAAAAAA);
+  static const Color onSurfaceVariantDark = Color(0xFFBBBBBB); // Brighter for better contrast
   
   // Error colors
   static const Color error = Color(0xFFB00020);
@@ -72,6 +72,14 @@ class ColorPalette {
   // Price change colors
   static const Color priceUp = Color(0xFF00D632);
   static const Color priceDown = Color(0xFFFF2D55);
+  
+  // Text colors
+  static const Color textPrimary = Color(0xFF121212); // Main text color (light theme)
+  static const Color textSecondary = Color(0xFF555555); // Secondary text (light theme)
+  static const Color textTertiary = Color(0xFF757575); // Tertiary text (light theme)
+  static const Color textPrimaryDark = Color(0xFFF5F5F5); // Main text color (dark theme)
+  static const Color textSecondaryDark = Color(0xFFBBBBBB); // Secondary text (dark theme)
+  static const Color textTertiaryDark = Color(0xFF999999); // Tertiary text (dark theme)
   
   // Neutral colors
   static const Color neutral50 = Color(0xFFFAFAFA);

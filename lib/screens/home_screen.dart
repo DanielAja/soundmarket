@@ -7,6 +7,7 @@ import '../models/portfolio_item.dart';
 import '../models/song.dart';
 import '../models/transaction.dart';
 import '../widgets/real_time_portfolio_widget.dart';
+import '../core/theme/app_spacing.dart'; // Import AppSpacing
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -60,12 +61,12 @@ class _HomeScreenState extends State<HomeScreen> {
               );
             },
             child: ListView(
-              padding: const EdgeInsets.all(16.0),
+              padding: const EdgeInsets.all(AppSpacing.l), // Use AppSpacing.l
               children: [
                 _buildPortfolioChart(context),
-                const SizedBox(height: 24.0),
+                const SizedBox(height: AppSpacing.xl), // Use AppSpacing.xl
                 _buildPortfolioSummary(context, userDataProvider),
-                const SizedBox(height: 16.0),
+                const SizedBox(height: AppSpacing.l), // Use AppSpacing.l
                 // Add real-time portfolio widget with buy/sell functionality
                 RealTimePortfolioWidget(
                   onItemTap: (item, song) => _showPortfolioItemDetails(context, item, song),
@@ -87,7 +88,7 @@ class _HomeScreenState extends State<HomeScreen> {
           color: Colors.grey[400],
           size: 24.0,
         ),
-        const SizedBox(height: 8.0),
+        const SizedBox(height: AppSpacing.s), // Use AppSpacing.s
         Text(
           value,
           style: const TextStyle(
@@ -95,7 +96,7 @@ class _HomeScreenState extends State<HomeScreen> {
             fontSize: 16.0,
           ),
         ),
-        const SizedBox(height: 4.0),
+        const SizedBox(height: AppSpacing.xs), // Use AppSpacing.xs
         Text(
           label,
           style: TextStyle(
@@ -119,7 +120,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Card(
       elevation: 4.0,
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(AppSpacing.l), // Use AppSpacing.l
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -130,7 +131,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 fontWeight: FontWeight.bold,
               ),
             ),
-            const SizedBox(height: 16.0),
+            const SizedBox(height: AppSpacing.l), // Use AppSpacing.l
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -145,9 +146,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             color: Colors.grey[400],
                           ),
                         ),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: AppSpacing.s), // Use AppSpacing.s
                         Icon(Icons.headphones, size: 14, color: Colors.grey[400]),
-                        const SizedBox(width: 2),
+                        const SizedBox(width: AppSpacing.xxs), // Use AppSpacing.xxs
                         Text(
                           userDataProvider.getFormattedTotalPortfolioStreamCount(),
                           style: TextStyle(
@@ -180,7 +181,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 4.0),
+                    const SizedBox(height: AppSpacing.xs), // Use AppSpacing.xs
                     Row(
                       children: [
                         Icon(
@@ -188,7 +189,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           color: isPositive ? Colors.green : Colors.red,
                           size: 16.0,
                         ),
-                        const SizedBox(width: 4.0),
+                        const SizedBox(width: AppSpacing.xs), // Use AppSpacing.xs
                         Text(
                           '${isPositive ? "+" : ""}${dailyChange.toStringAsFixed(2)} (${(dailyChange / (portfolioValue - dailyChange) * 100).toStringAsFixed(2)}%)',
                           style: TextStyle(
@@ -235,9 +236,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 16.0),
+            const SizedBox(height: AppSpacing.l), // Use AppSpacing.l
             const Divider(),
-            const SizedBox(height: 8.0),
+            const SizedBox(height: AppSpacing.s), // Use AppSpacing.s
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -450,11 +451,11 @@ class _HomeScreenState extends State<HomeScreen> {
         final chartColor = isPositive ? Colors.green : Colors.red;
         
         return Card(
-          elevation: 4.0,
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      elevation: 4.0,
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.l), // Use AppSpacing.l
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
@@ -476,7 +477,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           color: chartColor,
                           size: 16.0,
                         ),
-                        const SizedBox(width: 4.0),
+                        const SizedBox(width: AppSpacing.xs), // Use AppSpacing.xs
                         Text(
                           '${isPositive ? "+" : ""}${((spots.last.y / spots.first.y - 1) * 100).toStringAsFixed(2)}%',
                           style: TextStyle(
@@ -488,7 +489,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 16.0),
+                const SizedBox(height: AppSpacing.l), // Use AppSpacing.l
                 SizedBox(
                   height: 200.0,
                   child: LineChart(
@@ -572,7 +573,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               }
                               
                               return Padding(
-                                padding: const EdgeInsets.only(top: 8.0),
+                                padding: const EdgeInsets.only(top: AppSpacing.s), // Use AppSpacing.s
                                 child: Text(
                                   label,
                                   style: TextStyle(
@@ -591,7 +592,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             reservedSize: 40,
                             getTitlesWidget: (value, meta) {
                               return Padding(
-                                padding: const EdgeInsets.only(right: 8.0),
+                                padding: const EdgeInsets.only(right: AppSpacing.s), // Use AppSpacing.s
                                 child: Text(
                                   '\$${value.toInt()}',
                                   style: TextStyle(
@@ -661,7 +662,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 16.0),
+                const SizedBox(height: AppSpacing.l), // Use AppSpacing.l
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
@@ -686,7 +687,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildTimeFilterChip(String label, bool isSelected) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4.0),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs), // Use AppSpacing.xs
       child: ChoiceChip(
         label: Text(label),
         selected: isSelected,
@@ -716,7 +717,7 @@ class _HomeScreenState extends State<HomeScreen> {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16.0),
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.m, vertical: AppSpacing.s), // Use AppSpacing.m and AppSpacing.s
       ),
     );
   }
@@ -768,7 +769,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     // Handle bar
                     Center(
                       child: Container(
-                        margin: const EdgeInsets.only(top: 12, bottom: 8),
+                        margin: const EdgeInsets.only(top: AppSpacing.m, bottom: AppSpacing.s), // Use AppSpacing.m and AppSpacing.s
                         width: 40,
                         height: 4,
                         decoration: BoxDecoration(
@@ -780,7 +781,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     
                     // Header with song info
                     Padding(
-                      padding: const EdgeInsets.all(16.0),
+                      padding: const EdgeInsets.all(AppSpacing.l), // Use AppSpacing.l
                       child: Row(
                         children: [
                           GestureDetector(
@@ -796,7 +797,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               child: item.albumArtUrl == null ? const Icon(Icons.music_note, size: 30) : null,
                             ),
                           ),
-                          const SizedBox(width: 16),
+                          const SizedBox(width: AppSpacing.l), // Use AppSpacing.l
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -815,18 +816,18 @@ class _HomeScreenState extends State<HomeScreen> {
                                     color: Colors.grey[400],
                                   ),
                                 ),
-                                const SizedBox(height: 4),
+                                const SizedBox(height: AppSpacing.xs), // Use AppSpacing.xs
                                 Row(
                                   children: [
                                     Icon(Icons.headphones, size: 14, color: Colors.grey[400]),
-                                    const SizedBox(width: 4),
+                                    const SizedBox(width: AppSpacing.xs), // Use AppSpacing.xs
                                     Text(
                                       userDataProvider.getSongStreamCount(item.songId),
                                       style: TextStyle(color: Colors.grey[400], fontSize: 12),
                                     ),
-                                    const SizedBox(width: 12),
+                                    const SizedBox(width: AppSpacing.m), // Use AppSpacing.m
                                     Icon(Icons.category, size: 14, color: Colors.grey[400]),
-                                    const SizedBox(width: 4),
+                                    const SizedBox(width: AppSpacing.xs), // Use AppSpacing.xs
                                     Text(
                                       song.genre,
                                       style: TextStyle(color: Colors.grey[400], fontSize: 12),
@@ -842,7 +843,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     
                     // Listen button
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.l), // Use AppSpacing.l
                       child: ElevatedButton.icon(
                         onPressed: () {
                           // Launch music player or streaming service with this song
@@ -867,7 +868,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     
                     // Current price and performance
                     Padding(
-                      padding: const EdgeInsets.all(16.0),
+                      padding: const EdgeInsets.all(AppSpacing.l), // Use AppSpacing.l
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -881,7 +882,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   fontSize: 14,
                                 ),
                               ),
-                              const SizedBox(height: 4),
+                              const SizedBox(height: AppSpacing.xs), // Use AppSpacing.xs
                               Text(
                                 '\$${song.currentPrice.toStringAsFixed(2)}',
                                 style: const TextStyle(
@@ -889,7 +890,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
-                              const SizedBox(height: 4),
+                              const SizedBox(height: AppSpacing.xs), // Use AppSpacing.xs
                               Row(
                                 children: [
                                   Icon(
@@ -897,7 +898,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                     color: song.isPriceUp ? Colors.green : Colors.red,
                                     size: 14,
                                   ),
-                                  const SizedBox(width: 4),
+                                  const SizedBox(width: AppSpacing.xs), // Use AppSpacing.xs
                                   Text(
                                     '${song.isPriceUp ? "+" : ""}${song.priceChangePercent.toStringAsFixed(2)}%',
                                     style: TextStyle(
@@ -919,7 +920,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   fontSize: 14,
                                 ),
                               ),
-                              const SizedBox(height: 4),
+                              const SizedBox(height: AppSpacing.xs), // Use AppSpacing.xs
                               Text(
                                 '${item.quantity} ${item.quantity == 1 ? 'share' : 'shares'}',
                                 style: const TextStyle(
@@ -927,7 +928,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
-                              const SizedBox(height: 4),
+                              const SizedBox(height: AppSpacing.xs), // Use AppSpacing.xs
                               Text(
                                 'Avg. Price: \$${item.purchasePrice.toStringAsFixed(2)}',
                                 style: TextStyle(
@@ -944,7 +945,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     // Portfolio value and profit/loss
                     Container(
                       color: Colors.grey[900],
-                      padding: const EdgeInsets.all(16.0),
+                      padding: const EdgeInsets.all(AppSpacing.l), // Use AppSpacing.l
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -958,7 +959,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   fontSize: 14,
                                 ),
                               ),
-                              const SizedBox(height: 4),
+                              const SizedBox(height: AppSpacing.xs), // Use AppSpacing.xs
                               Text(
                                 '\$${currentValue.toStringAsFixed(2)}',
                                 style: const TextStyle(
@@ -978,7 +979,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   fontSize: 14,
                                 ),
                               ),
-                              const SizedBox(height: 4),
+                              const SizedBox(height: AppSpacing.xs), // Use AppSpacing.xs
                               Row(
                                 children: [
                                   Icon(
@@ -986,7 +987,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                     color: isProfit ? Colors.green : Colors.red,
                                     size: 14,
                                   ),
-                                  const SizedBox(width: 4),
+                                  const SizedBox(width: AppSpacing.xs), // Use AppSpacing.xs
                                   Text(
                                     '${isProfit ? "+" : ""}${profitLoss.toStringAsFixed(2)} (${isProfit ? "+" : ""}${profitLossPercent.toStringAsFixed(2)}%)',
                                     style: TextStyle(
@@ -1003,11 +1004,11 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                     
-                    const SizedBox(height: 16),
+                    const SizedBox(height: AppSpacing.l), // Use AppSpacing.l
                     
                     // Transaction section
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.l), // Use AppSpacing.l
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -1018,7 +1019,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: AppSpacing.l), // Use AppSpacing.l
                           
                           // Quantity input
                           Row(
@@ -1027,7 +1028,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 'Quantity:',
                                 style: TextStyle(fontSize: 16),
                               ),
-                              const SizedBox(width: 16),
+                              const SizedBox(width: AppSpacing.l), // Use AppSpacing.l
                               Expanded(
                                 child: TextField(
                                   controller: quantityController,
@@ -1046,7 +1047,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             ],
                           ),
                           
-                          const SizedBox(height: 16),
+                          const SizedBox(height: AppSpacing.l), // Use AppSpacing.l
                           
                           // Transaction value
                           Row(
@@ -1066,7 +1067,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             ],
                           ),
                           
-                          const SizedBox(height: 8),
+                          const SizedBox(height: AppSpacing.s), // Use AppSpacing.s
                           
                           // Cash balance
                           Row(
@@ -1087,7 +1088,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             ],
                           ),
                           
-                          const SizedBox(height: 24),
+                          const SizedBox(height: AppSpacing.xl), // Use AppSpacing.xl
                           
                           // Buy and sell buttons
                           Row(
@@ -1128,7 +1129,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   ),
                                 ),
                               ),
-                              const SizedBox(width: 16),
+                              const SizedBox(width: AppSpacing.l), // Use AppSpacing.l
                               Expanded(
                                 child: ElevatedButton(
                                   onPressed: canSell ? () async {
@@ -1173,7 +1174,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     
                     // Close button
                     Padding(
-                      padding: const EdgeInsets.all(16.0),
+                      padding: const EdgeInsets.all(AppSpacing.l), // Use AppSpacing.l
                       child: ElevatedButton(
                         onPressed: () {
                           Navigator.pop(context);
@@ -1201,7 +1202,7 @@ class _HomeScreenState extends State<HomeScreen> {
       context: context,
       builder: (context) => Dialog(
         backgroundColor: Colors.transparent,
-        insetPadding: const EdgeInsets.all(16),
+        insetPadding: const EdgeInsets.all(AppSpacing.l), // Use AppSpacing.l
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -1248,8 +1249,8 @@ class _HomeScreenState extends State<HomeScreen> {
             
             // Song info
             Container(
-              padding: const EdgeInsets.all(16),
-              margin: const EdgeInsets.only(top: 16),
+              padding: const EdgeInsets.all(AppSpacing.l), // Use AppSpacing.l
+              margin: const EdgeInsets.only(top: AppSpacing.l), // Use AppSpacing.l
               decoration: BoxDecoration(
                 color: Colors.black.withOpacity(0.7),
                 borderRadius: BorderRadius.circular(12),
@@ -1265,7 +1266,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: AppSpacing.xs), // Use AppSpacing.xs
                   Text(
                     artistName,
                     style: TextStyle(
@@ -1280,7 +1281,7 @@ class _HomeScreenState extends State<HomeScreen> {
             
             // Close button
             Padding(
-              padding: const EdgeInsets.only(top: 16),
+              padding: const EdgeInsets.only(top: AppSpacing.l), // Use AppSpacing.l
               child: ElevatedButton(
                 onPressed: () => Navigator.pop(context),
                 style: ElevatedButton.styleFrom(

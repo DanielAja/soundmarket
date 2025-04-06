@@ -9,6 +9,7 @@ import '../services/music_data_api_service.dart';
 import '../screens/top_songs_list_screen.dart';
 import '../screens/search_results_screen.dart';
 import '../shared/widgets/search_bar_with_suggestions.dart';
+import '../core/theme/app_spacing.dart'; // Import AppSpacing
 
 class DiscoverScreen extends StatefulWidget {
   const DiscoverScreen({super.key});
@@ -50,7 +51,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> with TickerProviderStat
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Discover'),
+        title: const Text('Sound Market'),
         actions: [
           IconButton(
             icon: const Icon(Icons.filter_list),
@@ -105,20 +106,20 @@ class _DiscoverScreenState extends State<DiscoverScreen> with TickerProviderStat
               );
             },
             child: ListView(
-              padding: const EdgeInsets.all(16.0),
+              padding: const EdgeInsets.all(AppSpacing.l), // Use AppSpacing.l
               children: [
                 _buildSearchBar(),
-                const SizedBox(height: 16.0),
+                const SizedBox(height: AppSpacing.l), // Use AppSpacing.l
                 _buildTopSongsSection(context, topSongs, userDataProvider),
-                const SizedBox(height: 24.0),
+                const SizedBox(height: AppSpacing.xl), // Use AppSpacing.xl
                 _buildTopMoversSection(context, topMovers, userDataProvider),
-                const SizedBox(height: 24.0),
+                const SizedBox(height: AppSpacing.xl), // Use AppSpacing.xl
                 _buildRisingArtistsSection(context, risingArtists),
                 if (_selectedGenre != null) ...[
-                  const SizedBox(height: 24.0),
+                  const SizedBox(height: AppSpacing.xl), // Use AppSpacing.xl
                   _buildGenreSongsSection(context, genreSongs, userDataProvider),
                 ],
-                const SizedBox(height: 24.0),
+                const SizedBox(height: AppSpacing.xl), // Use AppSpacing.xl
                 _buildBrowseByGenreSection(context, userDataProvider),
               ],
             ),
@@ -208,7 +209,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> with TickerProviderStat
           borderRadius: BorderRadius.circular(30.0),
         ),
         filled: true,
-        contentPadding: const EdgeInsets.symmetric(vertical: 4.0),
+        contentPadding: const EdgeInsets.symmetric(vertical: AppSpacing.xs), // Use AppSpacing.xs
       ),
       onSubmitted: (value) {
         if (value.isNotEmpty) {
@@ -255,15 +256,15 @@ class _DiscoverScreenState extends State<DiscoverScreen> with TickerProviderStat
             ),
           ],
         ),
-        const SizedBox(height: 12.0),
-        SizedBox(
-          height: 220.0,
+        const SizedBox(height: AppSpacing.m), // Use AppSpacing.m
+        SizedBox( 
+          height: 260.0, // Height for the horizontal list container
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             itemCount: songs.length,
             itemBuilder: (context, index) {
               final song = songs[index];
-              return _buildSongCard(context, song, userDataProvider);
+              return _buildSongCard(context, song, userDataProvider); 
             },
           ),
         ),
@@ -301,15 +302,15 @@ class _DiscoverScreenState extends State<DiscoverScreen> with TickerProviderStat
             ),
           ],
         ),
-        const SizedBox(height: 12.0),
-        SizedBox(
-          height: 220.0,
+        const SizedBox(height: AppSpacing.m), // Use AppSpacing.m
+        SizedBox( 
+          height: 260.0, // Height for the horizontal list container
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             itemCount: songs.length,
             itemBuilder: (context, index) {
               final song = songs[index];
-              return _buildSongCard(context, song, userDataProvider, showPriceChange: true);
+              return _buildSongCard(context, song, userDataProvider, showPriceChange: true); // Pass showPriceChange here
             },
           ),
         ),
@@ -328,9 +329,9 @@ class _DiscoverScreenState extends State<DiscoverScreen> with TickerProviderStat
             fontWeight: FontWeight.bold,
           ),
         ),
-        const SizedBox(height: 12.0),
-        SizedBox(
-          height: 220.0,
+        const SizedBox(height: AppSpacing.m), // Use AppSpacing.m
+        SizedBox( 
+          height: 260.0, // Height for the horizontal list container
           child: songs.isEmpty
               ? Center(
                   child: Text(
@@ -364,10 +365,10 @@ class _DiscoverScreenState extends State<DiscoverScreen> with TickerProviderStat
             fontWeight: FontWeight.bold,
           ),
         ),
-        const SizedBox(height: 12.0),
+        const SizedBox(height: AppSpacing.m), // Use AppSpacing.m
         Wrap(
-          spacing: 8.0,
-          runSpacing: 8.0,
+          spacing: AppSpacing.s, // Use AppSpacing.s
+          runSpacing: AppSpacing.s, // Use AppSpacing.s
           children: genres.map((genre) {
             final isSelected = _selectedGenre == genre;
             return InkWell(
@@ -401,7 +402,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> with TickerProviderStat
             fontWeight: FontWeight.bold,
           ),
         ),
-        const SizedBox(height: 12.0),
+        const SizedBox(height: AppSpacing.m), // Use AppSpacing.m
         SizedBox(
           height: 120.0,
           child: artists.isEmpty
@@ -417,9 +418,9 @@ class _DiscoverScreenState extends State<DiscoverScreen> with TickerProviderStat
                   itemBuilder: (context, index) {
                     final artist = artists[index];
                     return Card(
-                      margin: const EdgeInsets.only(right: 12.0),
+                      margin: const EdgeInsets.only(right: AppSpacing.m), // Use AppSpacing.m
                       child: Padding(
-                        padding: const EdgeInsets.all(12.0),
+                        padding: const EdgeInsets.all(AppSpacing.m), // Use AppSpacing.m
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
@@ -434,7 +435,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> with TickerProviderStat
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 8.0),
+                            const SizedBox(height: AppSpacing.s), // Use AppSpacing.s
                             Text(
                               artist,
                               style: const TextStyle(fontWeight: FontWeight.bold),
@@ -470,131 +471,169 @@ class _DiscoverScreenState extends State<DiscoverScreen> with TickerProviderStat
     return GestureDetector(
       onTap: () => _showSongActions(context, song, userDataProvider),
       child: Card(
-        margin: const EdgeInsets.only(right: 16.0),
-        child: SizedBox(
-          width: 160.0,
-          height: 200.0,
+        margin: const EdgeInsets.only(right: AppSpacing.l), // Use AppSpacing.l
+        child: SizedBox( 
+          width: 120.0, 
           child: Padding(
-            padding: const EdgeInsets.all(8.0),
+            padding: const EdgeInsets.all(AppSpacing.s), // Use AppSpacing.s
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
+              // Removed mainAxisSize: MainAxisSize.min
               children: [
-                Container(
-                  height: 90.0,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[800],
-                    borderRadius: BorderRadius.circular(4.0),
-                  ),
-                  child: Center(
-                    child: Icon(
-                      Icons.music_note,
-                      size: 40.0,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8.0),
-                Text(
-                  song.name,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14.0,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  song.artist,
-                  style: TextStyle(
-                    color: Colors.grey[400],
-                    fontSize: 12.0,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 8.0),
-                hasAnimation
-                    ? AnimatedBuilder(
-                        animation: _priceAnimations[song.id]!,
-                        builder: (context, child) {
-                          return Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                '\$${_priceAnimations[song.id]!.value.toStringAsFixed(2)}',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16.0,
+                ClipRRect( // Use ClipRRect to ensure the image respects the border radius
+                  borderRadius: BorderRadius.circular(AppSpacing.xs), // Use AppSpacing.xs
+                  child: SizedBox( // Use SizedBox to constrain the image size
+                    height: 120.0, // Increased from 90.0
+                    width: 120.0, // Increased from 90.0
+                    child: song.albumArtUrl != null && song.albumArtUrl!.isNotEmpty
+                        ? Image.network(
+                            song.albumArtUrl!,
+                            fit: BoxFit.cover,
+                            loadingBuilder: (context, child, loadingProgress) {
+                              if (loadingProgress == null) return child;
+                              return Center(
+                                child: CircularProgressIndicator(
+                                  value: loadingProgress.expectedTotalBytes != null
+                                      ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                                      : null,
+                                  strokeWidth: AppSpacing.xxs, // Use AppSpacing.xxs
                                 ),
+                              );
+                            },
+                            errorBuilder: (context, error, stackTrace) {
+                              // Fallback to placeholder icon on error
+                              return Container(
+                                color: Colors.grey[800],
+                                child: Center(
+                                  child: Icon(
+                                    Icons.music_note,
+                                    size: 40.0,
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
+                              );
+                            },
+                          )
+                        : Container( // Fallback for null/empty URL
+                            color: Colors.grey[800],
+                            child: Center(
+                              child: Icon(
+                                Icons.music_note,
+                                size: 40.0,
+                                color: Colors.grey[600],
                               ),
-                              if (showPriceChange && song.previousPrice > 0)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 6.0,
-                                    vertical: 2.0,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: priceChangeColor.withOpacity(0.2),
-                                    borderRadius: BorderRadius.circular(4.0),
-                                  ),
-                                  child: Text(
-                                    '${priceChangePercent >= 0 ? '+' : ''}${priceChangePercent.toStringAsFixed(1)}%',
-                                    style: TextStyle(
-                                      color: priceChangeColor,
-                                      fontSize: 12.0,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          );
-                        },
-                      )
-                    : Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            '\$${song.currentPrice.toStringAsFixed(2)}',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16.0,
                             ),
                           ),
-                          if (showPriceChange && song.previousPrice > 0)
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6.0,
-                                vertical: 2.0,
-                              ),
-                              decoration: BoxDecoration(
-                                color: priceChangeColor.withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(4.0),
-                              ),
-                              child: Text(
-                                '${priceChangePercent >= 0 ? '+' : ''}${priceChangePercent.toStringAsFixed(1)}%',
-                                style: TextStyle(
-                                  color: priceChangeColor,
-                                  fontSize: 12.0,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                        ],
+                  ),
+                ),
+                Expanded( // Wrap the text content below the image with Expanded
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly, // Adjust alignment if needed
+                    children: [
+                      Text(
+                        song.name,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14.0,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                
-                if (ownsSong)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4.0),
-                    child: Text(
-                      'Owned: $quantityOwned',
-                      style: TextStyle(
-                        fontSize: 12.0,
-                        color: Colors.blue[400],
-                        fontWeight: FontWeight.bold,
+                      Text(
+                        song.artist,
+                        style: TextStyle(
+                          color: Colors.grey[400],
+                          fontSize: 12.0,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      hasAnimation
+                          ? AnimatedBuilder(
+                              animation: _priceAnimations[song.id]!,
+                              builder: (context, child) {
+                                return Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      '\$${_priceAnimations[song.id]!.value.toStringAsFixed(2)}',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16.0,
+                                      ),
+                                    ),
+                                    if (showPriceChange && song.previousPrice > 0)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: AppSpacing.xs, // Use AppSpacing.xs
+                                          vertical: AppSpacing.xxs, // Use AppSpacing.xxs
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: priceChangeColor.withOpacity(0.2),
+                                          borderRadius: BorderRadius.circular(AppSpacing.xs), // Use AppSpacing.xs
+                                        ),
+                                        child: Text(
+                                          '${priceChangePercent >= 0 ? '+' : ''}${priceChangePercent.toStringAsFixed(1)}%',
+                                          style: TextStyle(
+                                            color: priceChangeColor,
+                                            fontSize: 12.0,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                );
+                              },
+                            )
+                          : Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  '\$${song.currentPrice.toStringAsFixed(2)}',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16.0,
+                                  ),
+                                ),
+                                if (showPriceChange && song.previousPrice > 0)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: AppSpacing.xs, // Use AppSpacing.xs
+                                      vertical: AppSpacing.xxs, // Use AppSpacing.xxs
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: priceChangeColor.withOpacity(0.2),
+                                      borderRadius: BorderRadius.circular(AppSpacing.xs), // Use AppSpacing.xs
+                                    ),
+                                    child: Text(
+                                      '${priceChangePercent >= 0 ? '+' : ''}${priceChangePercent.toStringAsFixed(1)}%',
+                                      style: TextStyle(
+                                        color: priceChangeColor,
+                                        fontSize: 12.0,
+                                        fontWeight: FontWeight.bold,
                       ),
                     ),
                   ),
+                 Spacer(), // Add Spacer to push content up
+              ],
+            ),
+                      
+                      if (ownsSong)
+                        Padding(
+                          padding: const EdgeInsets.only(top: AppSpacing.xs), // Use AppSpacing.xs
+                          child: Text(
+                            'Owned: $quantityOwned',
+                            style: TextStyle(
+                              fontSize: 12.0,
+                              color: Colors.blue[400],
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
@@ -612,7 +651,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> with TickerProviderStat
       backgroundColor: Colors.grey[900],
       builder: (context) {
         return Padding(
-          padding: const EdgeInsets.all(16.0),
+          padding: const EdgeInsets.all(AppSpacing.l), // Use AppSpacing.l
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -623,9 +662,9 @@ class _DiscoverScreenState extends State<DiscoverScreen> with TickerProviderStat
                     backgroundColor: Colors.grey[800],
                     backgroundImage: song.albumArtUrl != null ? NetworkImage(song.albumArtUrl!) : null,
                     child: song.albumArtUrl == null ? const Icon(Icons.music_note) : null,
-                    radius: 30.0,
+                    radius: 60.0, // Increased from 45.0 (to match 120x120)
                   ),
-                  const SizedBox(width: 16.0),
+                  const SizedBox(width: AppSpacing.l), // Use AppSpacing.l
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -643,7 +682,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> with TickerProviderStat
                             color: Colors.grey[400],
                           ),
                         ),
-                        const SizedBox(height: 4.0),
+                        const SizedBox(height: AppSpacing.xs), // Use AppSpacing.xs
                         Row(
                           children: [
                             Text(
@@ -652,7 +691,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> with TickerProviderStat
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                            const SizedBox(width: 8.0),
+                            const SizedBox(width: AppSpacing.s), // Use AppSpacing.s
                             Icon(
                               song.isPriceUp ? Icons.arrow_upward : Icons.arrow_downward,
                               color: song.isPriceUp ? Colors.green : Colors.red,
@@ -673,7 +712,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> with TickerProviderStat
                   ),
                 ],
               ),
-              const SizedBox(height: 16.0),
+              const SizedBox(height: AppSpacing.l), // Use AppSpacing.l
               const Text(
                 'Song Details',
                 style: TextStyle(
@@ -681,11 +720,11 @@ class _DiscoverScreenState extends State<DiscoverScreen> with TickerProviderStat
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              const SizedBox(height: 8.0),
+              const SizedBox(height: AppSpacing.s), // Use AppSpacing.s
               Text('Genre: ${song.genre}'),
-              const SizedBox(height: 4.0),
+              const SizedBox(height: AppSpacing.xs), // Use AppSpacing.xs
               Text('Previous Price: \$${song.previousPrice.toStringAsFixed(2)}'),
-              const SizedBox(height: 16.0),
+              const SizedBox(height: AppSpacing.l), // Use AppSpacing.l
               if (ownsSong)
                 Text(
                   'You own: $quantityOwned ${quantityOwned == 1 ? 'share' : 'shares'}',
@@ -693,7 +732,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> with TickerProviderStat
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-              const SizedBox(height: 16.0),
+              const SizedBox(height: AppSpacing.l), // Use AppSpacing.l
               Row(
                 children: [
                   Expanded(
@@ -709,7 +748,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> with TickerProviderStat
                     ),
                   ),
                   if (ownsSong) ...[
-                    const SizedBox(width: 16.0),
+                    const SizedBox(width: AppSpacing.l), // Use AppSpacing.l
                     Expanded(
                       child: ElevatedButton(
                         onPressed: () {
@@ -762,11 +801,11 @@ class _DiscoverScreenState extends State<DiscoverScreen> with TickerProviderStat
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text('Artist: ${song.artist}'),
-                  const SizedBox(height: 8.0),
+                  const SizedBox(height: AppSpacing.s), // Use AppSpacing.s
                   Text('Current Price: \$${song.currentPrice.toStringAsFixed(2)}'),
-                  const SizedBox(height: 8.0),
+                  const SizedBox(height: AppSpacing.s), // Use AppSpacing.s
                   Text('Cash Balance: \$${cashBalance.toStringAsFixed(2)}'),
-                  const SizedBox(height: 16.0),
+                  const SizedBox(height: AppSpacing.l), // Use AppSpacing.l
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -786,7 +825,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> with TickerProviderStat
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8.0),
+                  const SizedBox(height: AppSpacing.s), // Use AppSpacing.s
                   Text(
                     'Total Cost: \$${totalCost.toStringAsFixed(2)}',
                     style: const TextStyle(fontWeight: FontWeight.bold),
@@ -844,11 +883,11 @@ class _DiscoverScreenState extends State<DiscoverScreen> with TickerProviderStat
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text('Artist: ${song.artist}'),
-                  const SizedBox(height: 8.0),
+                  const SizedBox(height: AppSpacing.s), // Use AppSpacing.s
                   Text('Current Price: \$${song.currentPrice.toStringAsFixed(2)}'),
-                  const SizedBox(height: 8.0),
+                  const SizedBox(height: AppSpacing.s), // Use AppSpacing.s
                   Text('You Own: $quantityOwned ${quantityOwned == 1 ? 'share' : 'shares'}'),
-                  const SizedBox(height: 16.0),
+                  const SizedBox(height: AppSpacing.l), // Use AppSpacing.l
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -868,7 +907,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> with TickerProviderStat
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8.0),
+                  const SizedBox(height: AppSpacing.s), // Use AppSpacing.s
                   Text(
                     'Total Value: \$${totalValue.toStringAsFixed(2)}',
                     style: const TextStyle(fontWeight: FontWeight.bold),

@@ -46,10 +46,19 @@ class AppTheme {
       textTheme: GoogleFonts.poppinsTextTheme(
         ThemeData.light().textTheme,
       ).copyWith(
+        displayLarge: AppTextStyles.heading1,
+        displayMedium: AppTextStyles.heading2,
+        displaySmall: AppTextStyles.heading3,
+        headlineMedium: AppTextStyles.heading4,
         titleLarge: AppTextStyles.titleLarge,
         titleMedium: AppTextStyles.titleMedium,
+        titleSmall: AppTextStyles.titleSmall,
         bodyLarge: AppTextStyles.bodyLarge,
         bodyMedium: AppTextStyles.bodyMedium,
+        bodySmall: AppTextStyles.bodySmall,
+        labelLarge: AppTextStyles.labelLarge,
+        labelMedium: AppTextStyles.labelMedium,
+        labelSmall: AppTextStyles.labelSmall,
       ),
       // App bar theme
       appBarTheme: AppBarTheme(
@@ -144,18 +153,19 @@ class AppTheme {
       textTheme: GoogleFonts.poppinsTextTheme(
         ThemeData.dark().textTheme,
       ).copyWith(
-        titleLarge: AppTextStyles.titleLarge.copyWith(
-          color: ColorPalette.onBackgroundDark,
-        ),
-        titleMedium: AppTextStyles.titleMedium.copyWith(
-          color: ColorPalette.onBackgroundDark,
-        ),
-        bodyLarge: AppTextStyles.bodyLarge.copyWith(
-          color: ColorPalette.onBackgroundDark,
-        ),
-        bodyMedium: AppTextStyles.bodyMedium.copyWith(
-          color: ColorPalette.onBackgroundDark,
-        ),
+        displayLarge: AppTextStyles.withDarkColor(AppTextStyles.heading1),
+        displayMedium: AppTextStyles.withDarkColor(AppTextStyles.heading2),
+        displaySmall: AppTextStyles.withDarkColor(AppTextStyles.heading3),
+        headlineMedium: AppTextStyles.withDarkColor(AppTextStyles.heading4),
+        titleLarge: AppTextStyles.withDarkColor(AppTextStyles.titleLarge),
+        titleMedium: AppTextStyles.withDarkColor(AppTextStyles.titleMedium),
+        titleSmall: AppTextStyles.withDarkColor(AppTextStyles.titleSmall),
+        bodyLarge: AppTextStyles.withDarkColor(AppTextStyles.bodyLarge),
+        bodyMedium: AppTextStyles.withDarkColor(AppTextStyles.bodyMedium),
+        bodySmall: AppTextStyles.withDarkColor(AppTextStyles.bodySmall),
+        labelLarge: AppTextStyles.withDarkColor(AppTextStyles.labelLarge),
+        labelMedium: AppTextStyles.withDarkColor(AppTextStyles.labelMedium),
+        labelSmall: AppTextStyles.withDarkColor(AppTextStyles.labelSmall),
       ),
       // App bar theme
       appBarTheme: AppBarTheme(
