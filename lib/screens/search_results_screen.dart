@@ -331,14 +331,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                     child: ElevatedButton(
                       onPressed: () {
                         Navigator.pop(context);
-                        // Call buy dialog
-                        // This would typically call a method like _showBuySongDialog
-                        // but we'll just show a snackbar for simplicity
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Buy ${song.name} functionality would be shown here'),
-                          ),
-                        );
+                        _showBuySongDialog(context, song, userDataProvider);
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.green,
@@ -352,14 +345,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                       child: ElevatedButton(
                         onPressed: () {
                           Navigator.pop(context);
-                          // Call sell dialog
-                          // This would typically call a method like _showSellSongDialog
-                          // but we'll just show a snackbar for simplicity
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Sell ${song.name} functionality would be shown here'),
-                            ),
-                          );
+                          _showSellSongDialog(context, song, userDataProvider, ownedQuantity);
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.red,
@@ -372,6 +358,209 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
               ),
             ],
           ),
+        );
+      },
+    );
+  }
+  
+  // Show dialog to buy a song
+  void _showBuySongDialog(BuildContext context, Song song, UserDataProvider provider) {
+    int quantity = 1;
+    final cashBalance = provider.userProfile?.cashBalance ?? 0.0;
+    final maxAffordable = (cashBalance / song.currentPrice).floor();
+    
+    if (maxAffordable < 1) {
+      // Show insufficient funds message
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Insufficient funds to buy this song'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            final totalCost = quantity * song.currentPrice;
+            final canAfford = totalCost <= cashBalance;
+            
+            return AlertDialog(
+              backgroundColor: Colors.grey[900],
+              title: Text('Buy ${song.name}'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Artist: ${song.artist}'),
+                  const SizedBox(height: 8.0),
+                  Text('Current Price: \$${song.currentPrice.toStringAsFixed(2)}'),
+                  const SizedBox(height: 8.0),
+                  Text('Cash Balance: \$${cashBalance.toStringAsFixed(2)}'),
+                  const SizedBox(height: 16.0),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text('Quantity: '),
+                      IconButton(
+                        icon: const Icon(Icons.remove),
+                        onPressed: quantity > 1
+                            ? () => setState(() => quantity--)
+                            : null,
+                      ),
+                      Text('$quantity'),
+                      IconButton(
+                        icon: const Icon(Icons.add),
+                        onPressed: quantity < maxAffordable
+                            ? () => setState(() => quantity++)
+                            : null,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8.0),
+                  Text(
+                    'Total Cost: \$${totalCost.toStringAsFixed(2)}',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  if (!canAfford)
+                    const Text(
+                      'Insufficient funds',
+                      style: TextStyle(color: Colors.red),
+                    ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: canAfford
+                      ? () async {
+                          final success = await provider.buySong(song.id, quantity);
+                          Navigator.pop(context);
+                          
+                          if (success) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Successfully purchased $quantity ${quantity == 1 ? 'share' : 'shares'} of ${song.name}'),
+                                backgroundColor: Colors.green,
+                              ),
+                            );
+                            // Refresh search results to show updated ownership status
+                            setState(() {});
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Failed to buy shares'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
+                        }
+                      : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                  ),
+                  child: const Text('Buy'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+  
+  // Show dialog to sell a song
+  void _showSellSongDialog(BuildContext context, Song song, UserDataProvider provider, int quantityOwned) {
+    int quantity = 1;
+    
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            final totalValue = quantity * song.currentPrice;
+            
+            return AlertDialog(
+              backgroundColor: Colors.grey[900],
+              title: Text('Sell ${song.name}'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Artist: ${song.artist}'),
+                  const SizedBox(height: 8.0),
+                  Text('Current Price: \$${song.currentPrice.toStringAsFixed(2)}'),
+                  const SizedBox(height: 8.0),
+                  Text('You Own: $quantityOwned ${quantityOwned == 1 ? 'share' : 'shares'}'),
+                  const SizedBox(height: 16.0),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text('Quantity to Sell: '),
+                      IconButton(
+                        icon: const Icon(Icons.remove),
+                        onPressed: quantity > 1
+                            ? () => setState(() => quantity--)
+                            : null,
+                      ),
+                      Text('$quantity'),
+                      IconButton(
+                        icon: const Icon(Icons.add),
+                        onPressed: quantity < quantityOwned
+                            ? () => setState(() => quantity++)
+                            : null,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8.0),
+                  Text(
+                    'Total Value: \$${totalValue.toStringAsFixed(2)}',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    final success = await provider.sellSong(song.id, quantity);
+                    Navigator.pop(context);
+                    
+                    if (success) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Successfully sold $quantity ${quantity == 1 ? 'share' : 'shares'} of ${song.name}'),
+                          backgroundColor: Colors.green,
+                        ),
+                      );
+                      // Refresh search results to show updated ownership status
+                      setState(() {});
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Failed to sell shares'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                  ),
+                  child: const Text('Sell'),
+                ),
+              ],
+            );
+          },
         );
       },
     );

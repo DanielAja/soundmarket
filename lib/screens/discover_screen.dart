@@ -18,50 +18,31 @@ class DiscoverScreen extends StatefulWidget {
 }
 
 class _DiscoverScreenState extends State<DiscoverScreen> with TickerProviderStateMixin {
-  // Map to store the previous prices for comparison
   final Map<String, double> _previousPrices = {};
-  
-  // Map to store animation controllers for each song
   final Map<String, AnimationController> _priceAnimationControllers = {};
-  
-  // Map to store animations for each song
   final Map<String, Animation<double>> _priceAnimations = {};
-  
-  // Reference to the MusicDataApiService
   late final MusicDataApiService _musicDataApi;
-
-  // Selected genre for filtering
   String? _selectedGenre;
   
   @override
   void initState() {
     super.initState();
-    // Initialize the MusicDataApiService
     _musicDataApi = MusicDataApiService();
-    
-    // Set discover tab as active to enable price updates
     _musicDataApi.setDiscoverTabActive(true);
     
-    // Start a timer to refresh the UI every second to show real-time price changes
     Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) {
-        setState(() {
-          // This will trigger a rebuild to show updated prices
-        });
+        setState(() {});
       }
     });
   }
 
   @override
   void dispose() {
-    // Dispose all animation controllers
     for (final controller in _priceAnimationControllers.values) {
       controller.dispose();
     }
-    
-    // Set discover tab as inactive when leaving the screen
     _musicDataApi.setDiscoverTabActive(false);
-        
     super.dispose();
   }
   
@@ -81,7 +62,6 @@ class _DiscoverScreenState extends State<DiscoverScreen> with TickerProviderStat
       ),
       body: Consumer<UserDataProvider>(
         builder: (context, userDataProvider, child) {
-          // Show loading indicator when refreshing data
           if (userDataProvider.isLoading) {
             return const Center(
               child: CircularProgressIndicator(),
@@ -91,13 +71,10 @@ class _DiscoverScreenState extends State<DiscoverScreen> with TickerProviderStat
           final topSongs = userDataProvider.getTopSongs(limit: 50);
           final topMovers = userDataProvider.getTopMovers(limit: 50);
           final risingArtists = userDataProvider.risingArtists;
-          
-          // Get songs by genre if a genre is selected
           final genreSongs = _selectedGenre != null 
               ? userDataProvider.getSongsByGenre(_selectedGenre!)
               : <Song>[];
           
-          // Initialize previous prices for new songs
           for (final song in [...topSongs, ...topMovers, ...genreSongs]) {
             if (!_previousPrices.containsKey(song.id)) {
               _previousPrices[song.id] = song.currentPrice;
@@ -106,22 +83,16 @@ class _DiscoverScreenState extends State<DiscoverScreen> with TickerProviderStat
           
           return RefreshIndicator(
             onRefresh: () async {
-              // Simulate a refresh by triggering price updates
-              // In a real app, this would fetch new data from the API
               final random = Random();
               for (final song in [...topSongs, ...topMovers, ...genreSongs]) {
-                // Only update some songs to simulate market changes
                 if (random.nextBool()) {
                   final oldPrice = song.currentPrice;
-                  // Simulate a price change (±5%)
                   final change = oldPrice * (0.05 * (random.nextDouble() * 2 - 1));
                   final newPrice = max(0.01, oldPrice + change);
                   
-                  // Update the song price
                   song.previousPrice = oldPrice;
                   song.currentPrice = double.parse(newPrice.toStringAsFixed(2));
                   
-                  // Trigger animation if the price changed
                   if (_previousPrices.containsKey(song.id) && _previousPrices[song.id] != song.currentPrice) {
                     _initOrUpdatePriceAnimation(song.id, _previousPrices[song.id]!, song.currentPrice);
                     _previousPrices[song.id] = song.currentPrice;
@@ -157,9 +128,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> with TickerProviderStat
     );
   }
   
-  // Initialize or update animation for a song
   void _initOrUpdatePriceAnimation(String songId, double oldPrice, double newPrice) {
-    // If we don't have a controller for this song yet, create one
     if (!_priceAnimationControllers.containsKey(songId)) {
       _priceAnimationControllers[songId] = AnimationController(
         duration: const Duration(milliseconds: 500),
@@ -174,7 +143,6 @@ class _DiscoverScreenState extends State<DiscoverScreen> with TickerProviderStat
         curve: Curves.easeInOut,
       ));
     } else {
-      // Update the existing animation
       _priceAnimations[songId] = Tween<double>(
         begin: oldPrice,
         end: newPrice,
@@ -183,11 +151,9 @@ class _DiscoverScreenState extends State<DiscoverScreen> with TickerProviderStat
         curve: Curves.easeInOut,
       ));
       
-      // Reset and start the animation
       _priceAnimationControllers[songId]!.reset();
     }
     
-    // Start the animation
     _priceAnimationControllers[songId]!.forward();
   }
   
@@ -485,77 +451,111 @@ class _DiscoverScreenState extends State<DiscoverScreen> with TickerProviderStat
   }
   
   Widget _buildSongCard(BuildContext context, Song song, UserDataProvider userDataProvider, {bool showPriceChange = false}) {
-    // Get the animation controller and animation for this song if available
     final hasAnimation = _priceAnimationControllers.containsKey(song.id) && 
                          _priceAnimations.containsKey(song.id);
     
-    // Calculate price change percentage
     final priceChangePercent = song.previousPrice > 0 
         ? ((song.currentPrice - song.previousPrice) / song.previousPrice) * 100
         : 0.0;
     
-    // Determine color based on price change
     final priceChangeColor = priceChangePercent > 0 
         ? Colors.green 
         : priceChangePercent < 0 
             ? Colors.red 
             : Colors.grey;
     
-    return Card(
-      margin: const EdgeInsets.only(right: 16.0),
-      child: Container(
-        width: 160.0,
-        padding: const EdgeInsets.all(12.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Album art placeholder
-            Container(
-              height: 100.0,
-              decoration: BoxDecoration(
-                color: Colors.grey[800],
-                borderRadius: BorderRadius.circular(4.0),
-              ),
-              child: Center(
-                child: Icon(
-                  Icons.music_note,
-                  size: 40.0,
-                  color: Colors.grey[600],
+    final quantityOwned = userDataProvider.getQuantityOwned(song.id);
+    final ownsSong = quantityOwned > 0;
+    
+    return GestureDetector(
+      onTap: () => _showSongActions(context, song, userDataProvider),
+      child: Card(
+        margin: const EdgeInsets.only(right: 16.0),
+        child: SizedBox(
+          width: 160.0,
+          height: 200.0,
+          child: Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  height: 90.0,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[800],
+                    borderRadius: BorderRadius.circular(4.0),
+                  ),
+                  child: Center(
+                    child: Icon(
+                      Icons.music_note,
+                      size: 40.0,
+                      color: Colors.grey[600],
+                    ),
+                  ),
                 ),
-              ),
-            ),
-            const SizedBox(height: 8.0),
-            // Song title
-            Text(
-              song.name,
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 14.0,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            // Artist name
-            Text(
-              song.artist,
-              style: TextStyle(
-                color: Colors.grey[400],
-                fontSize: 12.0,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 8.0),
-            // Price with animation if available
-            hasAnimation
-                ? AnimatedBuilder(
-                    animation: _priceAnimations[song.id]!,
-                    builder: (context, child) {
-                      return Row(
+                const SizedBox(height: 8.0),
+                Text(
+                  song.name,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14.0,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  song.artist,
+                  style: TextStyle(
+                    color: Colors.grey[400],
+                    fontSize: 12.0,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 8.0),
+                hasAnimation
+                    ? AnimatedBuilder(
+                        animation: _priceAnimations[song.id]!,
+                        builder: (context, child) {
+                          return Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                '\$${_priceAnimations[song.id]!.value.toStringAsFixed(2)}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16.0,
+                                ),
+                              ),
+                              if (showPriceChange && song.previousPrice > 0)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6.0,
+                                    vertical: 2.0,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: priceChangeColor.withOpacity(0.2),
+                                    borderRadius: BorderRadius.circular(4.0),
+                                  ),
+                                  child: Text(
+                                    '${priceChangePercent >= 0 ? '+' : ''}${priceChangePercent.toStringAsFixed(1)}%',
+                                    style: TextStyle(
+                                      color: priceChangeColor,
+                                      fontSize: 12.0,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          );
+                        },
+                      )
+                    : Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            '\$${_priceAnimations[song.id]!.value.toStringAsFixed(2)}',
+                            '\$${song.currentPrice.toStringAsFixed(2)}',
                             style: const TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 16.0,
@@ -581,43 +581,324 @@ class _DiscoverScreenState extends State<DiscoverScreen> with TickerProviderStat
                               ),
                             ),
                         ],
-                      );
-                    },
-                  )
-                : Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        '\$${song.currentPrice.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16.0,
-                        ),
                       ),
-                      if (showPriceChange && song.previousPrice > 0)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6.0,
-                            vertical: 2.0,
-                          ),
-                          decoration: BoxDecoration(
-                            color: priceChangeColor.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(4.0),
-                          ),
-                          child: Text(
-                            '${priceChangePercent >= 0 ? '+' : ''}${priceChangePercent.toStringAsFixed(1)}%',
-                            style: TextStyle(
-                              color: priceChangeColor,
-                              fontSize: 12.0,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                    ],
+                
+                if (ownsSong)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4.0),
+                    child: Text(
+                      'Owned: $quantityOwned',
+                      style: TextStyle(
+                        fontSize: 12.0,
+                        color: Colors.blue[400],
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
-          ],
+              ],
+            ),
+          ),
         ),
       ),
+    );
+  }
+  
+  void _showSongActions(BuildContext context, Song song, UserDataProvider userDataProvider) {
+    final quantityOwned = userDataProvider.getQuantityOwned(song.id);
+    final ownsSong = quantityOwned > 0;
+    
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.grey[900],
+      builder: (context) {
+        return Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  CircleAvatar(
+                    backgroundColor: Colors.grey[800],
+                    backgroundImage: song.albumArtUrl != null ? NetworkImage(song.albumArtUrl!) : null,
+                    child: song.albumArtUrl == null ? const Icon(Icons.music_note) : null,
+                    radius: 30.0,
+                  ),
+                  const SizedBox(width: 16.0),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          song.name,
+                          style: const TextStyle(
+                            fontSize: 18.0,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          song.artist,
+                          style: TextStyle(
+                            color: Colors.grey[400],
+                          ),
+                        ),
+                        const SizedBox(height: 4.0),
+                        Row(
+                          children: [
+                            Text(
+                              'Current Price: \$${song.currentPrice.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(width: 8.0),
+                            Icon(
+                              song.isPriceUp ? Icons.arrow_upward : Icons.arrow_downward,
+                              color: song.isPriceUp ? Colors.green : Colors.red,
+                              size: 14.0,
+                            ),
+                            Text(
+                              '${song.priceChangePercent.toStringAsFixed(1)}%',
+                              style: TextStyle(
+                                fontSize: 12.0,
+                                color: song.isPriceUp ? Colors.green : Colors.red,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16.0),
+              const Text(
+                'Song Details',
+                style: TextStyle(
+                  fontSize: 16.0,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8.0),
+              Text('Genre: ${song.genre}'),
+              const SizedBox(height: 4.0),
+              Text('Previous Price: \$${song.previousPrice.toStringAsFixed(2)}'),
+              const SizedBox(height: 16.0),
+              if (ownsSong)
+                Text(
+                  'You own: $quantityOwned ${quantityOwned == 1 ? 'share' : 'shares'}',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              const SizedBox(height: 16.0),
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _showBuyDialog(context, song, userDataProvider);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                      ),
+                      child: Text(ownsSong ? 'Buy More' : 'Buy'),
+                    ),
+                  ),
+                  if (ownsSong) ...[
+                    const SizedBox(width: 16.0),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _showSellDialog(context, song, userDataProvider, quantityOwned);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red,
+                        ),
+                        child: const Text('Sell'),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+  
+  void _showBuyDialog(BuildContext context, Song song, UserDataProvider provider) {
+    int quantity = 1;
+    final cashBalance = provider.userProfile?.cashBalance ?? 0.0;
+    final maxAffordable = (cashBalance / song.currentPrice).floor();
+    
+    if (maxAffordable < 1) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Insufficient funds to buy this song'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            final totalCost = quantity * song.currentPrice;
+            final canAfford = totalCost <= cashBalance;
+            
+            return AlertDialog(
+              title: Text('Buy ${song.name}'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Artist: ${song.artist}'),
+                  const SizedBox(height: 8.0),
+                  Text('Current Price: \$${song.currentPrice.toStringAsFixed(2)}'),
+                  const SizedBox(height: 8.0),
+                  Text('Cash Balance: \$${cashBalance.toStringAsFixed(2)}'),
+                  const SizedBox(height: 16.0),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text('Quantity: '),
+                      IconButton(
+                        icon: const Icon(Icons.remove),
+                        onPressed: quantity > 1
+                            ? () => setState(() => quantity--)
+                            : null,
+                      ),
+                      Text('$quantity'),
+                      IconButton(
+                        icon: const Icon(Icons.add),
+                        onPressed: quantity < maxAffordable
+                            ? () => setState(() => quantity++)
+                            : null,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8.0),
+                  Text(
+                    'Total Cost: \$${totalCost.toStringAsFixed(2)}',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  if (!canAfford)
+                    const Text(
+                      'Insufficient funds',
+                      style: TextStyle(color: Colors.red),
+                    ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: canAfford
+                      ? () {
+                          provider.buySong(song.id, quantity);
+                          Navigator.pop(context);
+                          
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Successfully purchased $quantity ${quantity == 1 ? 'share' : 'shares'} of ${song.name}'),
+                              backgroundColor: Colors.green,
+                            ),
+                          );
+                        }
+                      : null,
+                  child: const Text('Buy'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+  
+  void _showSellDialog(BuildContext context, Song song, UserDataProvider provider, int quantityOwned) {
+    int quantity = 1;
+    
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            final totalValue = quantity * song.currentPrice;
+            
+            return AlertDialog(
+              title: Text('Sell ${song.name}'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Artist: ${song.artist}'),
+                  const SizedBox(height: 8.0),
+                  Text('Current Price: \$${song.currentPrice.toStringAsFixed(2)}'),
+                  const SizedBox(height: 8.0),
+                  Text('You Own: $quantityOwned ${quantityOwned == 1 ? 'share' : 'shares'}'),
+                  const SizedBox(height: 16.0),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text('Quantity to Sell: '),
+                      IconButton(
+                        icon: const Icon(Icons.remove),
+                        onPressed: quantity > 1
+                            ? () => setState(() => quantity--)
+                            : null,
+                      ),
+                      Text('$quantity'),
+                      IconButton(
+                        icon: const Icon(Icons.add),
+                        onPressed: quantity < quantityOwned
+                            ? () => setState(() => quantity++)
+                            : null,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8.0),
+                  Text(
+                    'Total Value: \$${totalValue.toStringAsFixed(2)}',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    provider.sellSong(song.id, quantity);
+                    Navigator.pop(context);
+                    
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Successfully sold $quantity ${quantity == 1 ? 'share' : 'shares'} of ${song.name}'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  },
+                  child: const Text('Sell'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 }

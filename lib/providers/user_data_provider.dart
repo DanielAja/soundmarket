@@ -7,6 +7,7 @@ import '../models/song.dart';
 import '../models/transaction.dart';
 import '../services/storage_service.dart';
 import '../services/song_service.dart';
+import '../services/portfolio_update_service.dart';
 
 class UserDataProvider with ChangeNotifier {
   UserProfile? _userProfile;
@@ -19,8 +20,15 @@ class UserDataProvider with ChangeNotifier {
   // Loading state
   bool _isLoading = false;
   
-  // Subscription to song updates
+  // Subscriptions
   StreamSubscription? _songUpdateSubscription;
+  StreamSubscription? _portfolioUpdateSubscription;
+  
+  // Portfolio update service
+  final PortfolioUpdateService _portfolioUpdateService = PortfolioUpdateService();
+  
+  // Price change indicators
+  final Map<String, PriceChange> _priceChangeIndicators = {};
   
   // Getters
   UserProfile? get userProfile => _userProfile;
@@ -76,20 +84,51 @@ class UserDataProvider with ChangeNotifier {
   UserDataProvider() {
     _loadData();
     _listenToSongUpdates();
+    _listenToPortfolioUpdates();
   }
   
   // Listen to song updates from the SongService
   void _listenToSongUpdates() {
-    _songUpdateSubscription = _songService.songUpdates.listen((_) {
-      // When songs are updated, notify listeners to update the UI
+    _songUpdateSubscription = _songService.songUpdates.listen((songs) {
+      // When songs are updated, update the portfolio service with new data
+      _portfolioUpdateService.updatePortfolioData(_portfolio, songs);
+      // Notify listeners to update the UI
       notifyListeners();
+    });
+  }
+  
+  // Listen to portfolio updates from the PortfolioUpdateService
+  void _listenToPortfolioUpdates() {
+    _portfolioUpdateSubscription = _portfolioUpdateService.portfolioUpdates.listen((data) {
+      // Update price change indicators
+      final updates = data['updates'] as Map<String, Map<String, dynamic>>;
+      
+      updates.forEach((songId, update) {
+        final priceChange = update['priceChange'] as double;
+        if (priceChange > 0) {
+          _priceChangeIndicators[songId] = PriceChange.increase;
+        } else if (priceChange < 0) {
+          _priceChangeIndicators[songId] = PriceChange.decrease;
+        }
+      });
+      
+      // Notify listeners to update the UI
+      notifyListeners();
+      
+      // Clear indicators after a delay
+      Future.delayed(const Duration(seconds: 3), () {
+        _priceChangeIndicators.clear();
+        notifyListeners();
+      });
     });
   }
   
   @override
   void dispose() {
-    // Cancel the subscription when the provider is disposed
+    // Cancel subscriptions when the provider is disposed
     _songUpdateSubscription?.cancel();
+    _portfolioUpdateSubscription?.cancel();
+    _portfolioUpdateService.dispose();
     super.dispose();
   }
 
@@ -108,6 +147,9 @@ class UserDataProvider with ChangeNotifier {
         displayName: 'New Investor',
       );
       
+      // Initialize portfolio update service with loaded data
+      _portfolioUpdateService.initialize(_portfolio, _songService.getAllSongs());
+      
       notifyListeners();
     } catch (e) {
       print('Error loading data: $e');
@@ -119,6 +161,10 @@ class UserDataProvider with ChangeNotifier {
       );
       _portfolio = [];
       _transactions = [];
+      
+      // Initialize portfolio update service with default data
+      _portfolioUpdateService.initialize(_portfolio, _songService.getAllSongs());
+      
       notifyListeners();
     }
   }
@@ -218,6 +264,9 @@ class UserDataProvider with ChangeNotifier {
       song.albumArtUrl,
     );
     
+    // Update portfolio service with new data
+    _portfolioUpdateService.updatePortfolioData(_portfolio, _songService.getAllSongs());
+    
     // Save data
     await _saveData();
     notifyListeners();
@@ -270,6 +319,9 @@ class UserDataProvider with ChangeNotifier {
       currentPrice,
       item.albumArtUrl,
     );
+    
+    // Update portfolio service with new data
+    _portfolioUpdateService.updatePortfolioData(_portfolio, _songService.getAllSongs());
     
     // Save data
     await _saveData();
@@ -349,6 +401,30 @@ class UserDataProvider with ChangeNotifier {
     return _songService.getFormattedStreamCount(songId);
   }
   
+  // Get total stream count for all songs in portfolio
+  int getTotalPortfolioStreamCount() {
+    int total = 0;
+    for (var item in _portfolio) {
+      total += _songService.getStreamCount(item.songId);
+    }
+    return total;
+  }
+  
+  // Get formatted total stream count for all songs in portfolio
+  String getFormattedTotalPortfolioStreamCount() {
+    final count = getTotalPortfolioStreamCount();
+    
+    if (count >= 1000000000) {
+      return '${(count / 1000000000).toStringAsFixed(1)}B';
+    } else if (count >= 1000000) {
+      return '${(count / 1000000).toStringAsFixed(1)}M';
+    } else if (count >= 1000) {
+      return '${(count / 1000).toStringAsFixed(1)}K';
+    } else {
+      return count.toString();
+    }
+  }
+  
   // Refresh data to update prices in real-time and reload portfolio data
   Future<void> refreshData() async {
     // Set loading state
@@ -361,6 +437,9 @@ class UserDataProvider with ChangeNotifier {
       
       // Trigger a manual update of song prices
       _songService.triggerPriceUpdate();
+      
+      // Force portfolio update
+      _portfolioUpdateService.forceUpdate();
     } catch (e) {
       print('Error refreshing data: $e');
     } finally {
@@ -368,5 +447,10 @@ class UserDataProvider with ChangeNotifier {
       _isLoading = false;
       notifyListeners();
     }
+  }
+  
+  // Get price change indicator for a song
+  PriceChange getPriceChangeIndicator(String songId) {
+    return _priceChangeIndicators[songId] ?? PriceChange.none;
   }
 }

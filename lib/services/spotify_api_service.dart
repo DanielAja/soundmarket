@@ -89,71 +89,81 @@ class SpotifyApiService {
     }
   }
   
-  // Get top tracks using recommendations API
+  // Get top tracks using search API with a simpler approach
   Future<List<Song>> getTopTracks({int limit = 50}) async {
     try {
-      // First get some seed genres
-      final genresData = await _makeRequest(
-        '${ApiConstants.spotifyBaseUrl}/recommendations/available-genre-seeds'
-      );
+      // Use a simple search for popular music instead of artist-specific search
+      print('Using simplified search API to get top tracks...');
       
-      final List<dynamic> genres = genresData['genres'];
-      final seedGenres = genres.take(5).join(','); // Take up to 5 genres as seeds
-      
-      // Get recommendations based on seed genres
-      final data = await _makeRequest(
-        ApiConstants.spotifyRecommendations,
+      // Search for popular tracks using a generic term
+      final searchData = await _makeRequest(
+        ApiConstants.spotifySearch,
         queryParams: {
-          'seed_genres': seedGenres,
+          'q': 'year:2023-2024', // Recent tracks
+          'type': 'track',
           'limit': limit.toString(),
-          'min_popularity': '50', // Only get popular tracks
         },
       );
       
-      final List<dynamic> tracks = data['tracks'];
-      return tracks.map((track) => Song(
-        id: track['id'],
-        name: track['name'],
-        artist: track['artists'][0]['name'],
-        genre: _getGenreFromPopularity(track['popularity']), // Assign genre based on popularity
-        currentPrice: _calculatePrice(track['popularity']),
-        previousPrice: 0.0, // Will be updated on subsequent fetches
-        albumArtUrl: track['album']['images'][0]['url'],
-      )).toList();
-    } catch (e) {
-      print('Error fetching top tracks: $e');
-      
-      // Try an alternative approach - search for popular artists
-      try {
-        print('Trying alternative approach to get tracks...');
-        final popularArtists = ['Taylor Swift', 'Drake', 'The Weeknd', 'Billie Eilish', 'Ariana Grande'];
-        final randomArtist = popularArtists[DateTime.now().millisecond % popularArtists.length];
-        
-        final searchData = await _makeRequest(
+      // If we get no results, try a different approach
+      if (searchData['tracks']['items'].isEmpty) {
+        print('No tracks found with year search, trying popular term...');
+        final fallbackData = await _makeRequest(
           ApiConstants.spotifySearch,
           queryParams: {
-            'q': randomArtist,
+            'q': 'popular', // Generic term that should return results
             'type': 'track',
             'limit': limit.toString(),
           },
         );
         
-        final List<dynamic> items = searchData['tracks']['items'];
-        return items.map((track) => Song(
-          id: track['id'],
-          name: track['name'],
-          artist: track['artists'][0]['name'],
-          genre: _getGenreFromPopularity(track['popularity']),
-          currentPrice: _calculatePrice(track['popularity']),
-          previousPrice: 0.0,
-          albumArtUrl: track['album']['images'][0]['url'],
-        )).toList();
-      } catch (searchError) {
-        print('Error with alternative approach: $searchError');
-        // Return empty list if all approaches fail
+        return _processTrackResults(fallbackData);
+      }
+      
+      return _processTrackResults(searchData);
+    } catch (e) {
+      print('Error fetching top tracks: $e');
+      
+      // Try an even simpler approach as last resort
+      try {
+        print('Trying last resort approach to get tracks...');
+        final lastResortData = await _makeRequest(
+          ApiConstants.spotifySearch,
+          queryParams: {
+            'q': 'a', // Very generic search that should return something
+            'type': 'track',
+            'limit': limit.toString(),
+          },
+        );
+        
+        return _processTrackResults(lastResortData);
+      } catch (finalError) {
+        print('All approaches failed: $finalError');
         return [];
       }
     }
+  }
+  
+  // Helper method to process track results
+  List<Song> _processTrackResults(Map<String, dynamic> data) {
+    final List<dynamic> items = data['tracks']['items'];
+    
+    if (items.isEmpty) {
+      print('Warning: Received empty items list from Spotify API');
+      return [];
+    }
+    
+    print('Successfully retrieved ${items.length} tracks from Spotify API');
+    
+    return items.map((track) => Song(
+      id: track['id'],
+      name: track['name'],
+      artist: track['artists'][0]['name'],
+      genre: _getGenreFromPopularity(track['popularity']),
+      currentPrice: _calculatePrice(track['popularity']),
+      previousPrice: 0.0,
+      albumArtUrl: track['album']['images'][0]['url'],
+    )).toList();
   }
   
   // Search for tracks
@@ -168,16 +178,7 @@ class SpotifyApiService {
         },
       );
       
-      final List<dynamic> items = data['tracks']['items'];
-      return items.map((track) => Song(
-        id: track['id'],
-        name: track['name'],
-        artist: track['artists'][0]['name'],
-        genre: _getGenreFromPopularity(track['popularity']),
-        currentPrice: _calculatePrice(track['popularity']),
-        previousPrice: 0.0,
-        albumArtUrl: track['album']['images'][0]['url'],
-      )).toList();
+      return _processTrackResults(data);
     } catch (e) {
       print('Error searching tracks: $e');
       return [];

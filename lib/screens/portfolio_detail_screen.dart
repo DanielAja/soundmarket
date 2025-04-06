@@ -1,11 +1,56 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/portfolio_item.dart';
 import '../models/song.dart';
 import '../providers/user_data_provider.dart';
+import '../services/portfolio_update_service.dart';
 
-class PortfolioDetailScreen extends StatelessWidget {
+class PortfolioDetailScreen extends StatefulWidget {
   const PortfolioDetailScreen({Key? key}) : super(key: key);
+
+  @override
+  State<PortfolioDetailScreen> createState() => _PortfolioDetailScreenState();
+}
+
+class _PortfolioDetailScreenState extends State<PortfolioDetailScreen> {
+  // Auto-refresh state
+  bool _autoRefreshEnabled = true;
+  
+  // Auto-refresh timer
+  Timer? _refreshTimer;
+  
+  @override
+  void initState() {
+    super.initState();
+    // Start auto-refresh when screen loads
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _startAutoRefresh(context);
+    });
+  }
+  
+  @override
+  void dispose() {
+    _stopAutoRefresh();
+    super.dispose();
+  }
+  
+  void _startAutoRefresh(BuildContext context) {
+    // Cancel any existing timer
+    _refreshTimer?.cancel();
+    
+    // Create a new timer that refreshes data every 30 seconds
+    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (_autoRefreshEnabled && mounted) {
+        context.read<UserDataProvider>().refreshData();
+      }
+    });
+  }
+  
+  void _stopAutoRefresh() {
+    _refreshTimer?.cancel();
+    _refreshTimer = null;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -50,12 +95,19 @@ class PortfolioDetailScreen extends StatelessWidget {
               children: [
                 _buildPortfolioSummary(context, provider),
                 const SizedBox(height: 24),
-                const Text(
-                  'Your Songs',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Your Songs',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    // Auto-refresh toggle
+                    _buildAutoRefreshToggle(context),
+                  ],
                 ),
                 const SizedBox(height: 16),
                 ...portfolio.map((item) => _buildPortfolioItemCard(context, item, provider)),
@@ -64,6 +116,30 @@ class PortfolioDetailScreen extends StatelessWidget {
           );
         },
       ),
+    );
+  }
+  
+  Widget _buildAutoRefreshToggle(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Text('Auto-refresh'),
+        Switch(
+          value: _autoRefreshEnabled,
+          onChanged: (value) {
+            setState(() {
+              _autoRefreshEnabled = value;
+            });
+            
+            // Start or stop auto-refresh timer
+            if (_autoRefreshEnabled) {
+              _startAutoRefresh(context);
+            } else {
+              _stopAutoRefresh();
+            }
+          },
+        ),
+      ],
     );
   }
   
@@ -78,12 +154,25 @@ class PortfolioDetailScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Portfolio Summary',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Portfolio Summary',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                // Last updated indicator
+                Text(
+                  'Updated: ${_getFormattedTime()}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 16),
             _buildSummaryRow('Total Portfolio Value', '\$${totalValue.toStringAsFixed(2)}'),
@@ -99,6 +188,11 @@ class PortfolioDetailScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+  
+  String _getFormattedTime() {
+    final now = DateTime.now();
+    return '${now.hour}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}';
   }
   
   Widget _buildSummaryRow(String label, String value, {bool isBold = false}) {
@@ -152,121 +246,150 @@ class PortfolioDetailScreen extends StatelessWidget {
     // Get stream count
     final streamCount = provider.getSongStreamCount(item.songId);
     
-    return Card(
+    // Get price change indicator
+    final priceChange = provider.getPriceChangeIndicator(item.songId);
+    
+    // Determine card color based on price change
+    Color? cardColor;
+    if (priceChange == PriceChange.increase) {
+      cardColor = Colors.green[50]; // Light green for price increase
+    } else if (priceChange == PriceChange.decrease) {
+      cardColor = Colors.red[50]; // Light red for price decrease
+    }
+    
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 500),
       margin: const EdgeInsets.only(bottom: 16),
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Album art or placeholder
-                Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(8),
-                    image: item.albumArtUrl != null
-                        ? DecorationImage(
-                            image: NetworkImage(item.albumArtUrl!),
-                            fit: BoxFit.cover,
-                          )
+      child: Card(
+        elevation: 2,
+        color: cardColor,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Album art or placeholder
+                  Container(
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(8),
+                      image: item.albumArtUrl != null
+                          ? DecorationImage(
+                              image: NetworkImage(item.albumArtUrl!),
+                              fit: BoxFit.cover,
+                            )
+                          : null,
+                    ),
+                    child: item.albumArtUrl == null
+                        ? const Icon(Icons.music_note, size: 40, color: Colors.grey)
                         : null,
                   ),
-                  child: item.albumArtUrl == null
-                      ? const Icon(Icons.music_note, size: 40, color: Colors.grey)
-                      : null,
-                ),
-                const SizedBox(width: 16),
-                // Song details
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        item.songName,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
+                  const SizedBox(width: 16),
+                  // Song details
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          item.songName,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        item.artistName,
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.grey[700],
+                        const SizedBox(height: 4),
+                        Text(
+                          item.artistName,
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey[700],
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Genre: ${song.genre}',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey[600],
+                        const SizedBox(height: 4),
+                        Text(
+                          'Genre: ${song.genre}',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[600],
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Streams: $streamCount',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey[600],
+                        const SizedBox(height: 4),
+                        Text(
+                          'Streams: $streamCount',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[600],
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            const Divider(),
-            // Financial details
-            _buildDetailRow('Quantity', '${item.quantity}'),
-            _buildDetailRow('Purchase Price', '\$${item.purchasePrice.toStringAsFixed(2)}'),
-            _buildDetailRow('Current Price', '\$${song.currentPrice.toStringAsFixed(2)}'),
-            _buildDetailRow('Total Purchase Value', '\$${purchaseValue.toStringAsFixed(2)}'),
-            _buildDetailRow('Current Value', '\$${currentValue.toStringAsFixed(2)}'),
-            _buildDetailRow(
-              'Profit/Loss', 
-              '\$${profitLoss.toStringAsFixed(2)} (${profitLossPercent.toStringAsFixed(2)}%)',
-              textColor: profitLoss >= 0 ? Colors.green : Colors.red,
-            ),
-            const SizedBox(height: 16),
-            // Action buttons
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                OutlinedButton(
-                  onPressed: () {
-                    _showSellDialog(context, item, song, provider);
-                  },
-                  child: const Text('Sell'),
-                ),
-                const SizedBox(width: 16),
-                ElevatedButton(
-                  onPressed: () {
-                    _showBuyDialog(context, item, song, provider);
-                  },
-                  child: const Text('Buy More'),
-                ),
-              ],
-            ),
-          ],
+                ],
+              ),
+              const SizedBox(height: 16),
+              const Divider(),
+              // Financial details
+              _buildDetailRow('Quantity', '${item.quantity}'),
+              _buildDetailRow('Purchase Price', '\$${item.purchasePrice.toStringAsFixed(2)}'),
+              _buildDetailRow(
+                'Current Price', 
+                '\$${song.currentPrice.toStringAsFixed(2)}',
+                suffix: _buildPriceChangeIndicator(priceChange),
+              ),
+              _buildDetailRow('Total Purchase Value', '\$${purchaseValue.toStringAsFixed(2)}'),
+              _buildDetailRow('Current Value', '\$${currentValue.toStringAsFixed(2)}'),
+              _buildDetailRow(
+                'Profit/Loss', 
+                '\$${profitLoss.toStringAsFixed(2)} (${profitLossPercent.toStringAsFixed(2)}%)',
+                textColor: profitLoss >= 0 ? Colors.green : Colors.red,
+              ),
+              const SizedBox(height: 16),
+              // Action buttons
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  OutlinedButton(
+                    onPressed: () {
+                      _showSellDialog(context, item, song, provider);
+                    },
+                    child: const Text('Sell'),
+                  ),
+                  const SizedBox(width: 16),
+                  ElevatedButton(
+                    onPressed: () {
+                      _showBuyDialog(context, item, song, provider);
+                    },
+                    child: const Text('Buy More'),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
   
-  Widget _buildDetailRow(String label, String value, {Color? textColor}) {
+  Widget _buildPriceChangeIndicator(PriceChange priceChange) {
+    if (priceChange == PriceChange.increase) {
+      return const Icon(Icons.arrow_upward, color: Colors.green, size: 16);
+    } else if (priceChange == PriceChange.decrease) {
+      return const Icon(Icons.arrow_downward, color: Colors.red, size: 16);
+    } else {
+      return const SizedBox.shrink();
+    }
+  }
+  
+  Widget _buildDetailRow(String label, String value, {Color? textColor, Widget? suffix}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -276,13 +399,21 @@ class PortfolioDetailScreen extends StatelessWidget {
             label,
             style: const TextStyle(fontSize: 14),
           ),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: textColor,
-            ),
+          Row(
+            children: [
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: textColor,
+                ),
+              ),
+              if (suffix != null) ...[
+                const SizedBox(width: 4),
+                suffix,
+              ],
+            ],
           ),
         ],
       ),
