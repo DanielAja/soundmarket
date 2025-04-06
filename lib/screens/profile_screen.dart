@@ -57,8 +57,6 @@ class ProfileScreen extends StatelessWidget {
                 const SizedBox(height: 24.0),
                 _buildStatisticsSection(context),
                 const SizedBox(height: 24.0),
-                _buildPortfolioSection(context, userDataProvider),
-                const SizedBox(height: 24.0),
                 _buildActionButtons(context, userDataProvider),
               ],
             ),
@@ -685,6 +683,16 @@ class ProfileScreen extends StatelessWidget {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('Add funds coming soon!')),
             );
+          },
+        ),
+        const Divider(),
+        ListTile(
+          leading: const Icon(Icons.pie_chart),
+          title: const Text('View Portfolio'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () {
+            // Navigate to portfolio details screen
+            Navigator.pushNamed(context, RouteConstants.portfolioDetails);
           },
         ),
         const Divider(),
