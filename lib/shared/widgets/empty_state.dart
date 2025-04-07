@@ -98,7 +98,7 @@ class EmptyPortfolioState extends StatelessWidget {
       message: 'Your portfolio is empty',
       subMessage: 'Start investing in songs you love',
       icon: Icons.library_music,
-      iconColor: ColorPalette.primary.withOpacity(0.7),
+      iconColor: ColorPalette.primary.withAlpha((255 * 0.7).round()), // Replaced withOpacity
       onActionPressed: onExplorePressed,
       actionLabel: 'Explore Songs',
     );

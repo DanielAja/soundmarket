@@ -4,7 +4,7 @@ import '../../features/portfolio/screens/home_screen.dart';
 import '../../features/market/screens/discover_screen.dart';
 import '../../features/profile/screens/profile_screen.dart';
 import '../../features/transactions/screens/transaction_history_screen.dart';
-import '../../screens/portfolio_detail_screen.dart';
+import '../../features/portfolio/screens/portfolio_detail_screen.dart'; // Corrected path
 
 /// Route definitions and navigation logic
 class AppRouter {

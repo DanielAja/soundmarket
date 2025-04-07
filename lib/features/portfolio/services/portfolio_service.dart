@@ -1,12 +1,12 @@
 import 'dart:async';
-import '../models/portfolio_item.dart';
-import '../models/song.dart';
+import '../../../shared/models/portfolio_item.dart'; // Corrected relative path again
+import '../../../shared/models/song.dart'; // Corrected relative path again
 
-class PortfolioUpdateService {
+class PortfolioService { // Renamed class
   // Singleton pattern
-  static final PortfolioUpdateService _instance = PortfolioUpdateService._internal();
-  factory PortfolioUpdateService() => _instance;
-  PortfolioUpdateService._internal();
+  static final PortfolioService _instance = PortfolioService._internal(); // Renamed class
+  factory PortfolioService() => _instance; // Renamed class
+  PortfolioService._internal(); // Renamed constructor
 
   // Stream controller for portfolio updates
   final _portfolioUpdateController = StreamController<Map<String, dynamic>>.broadcast();

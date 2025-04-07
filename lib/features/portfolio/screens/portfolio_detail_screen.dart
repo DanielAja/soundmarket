@@ -1,13 +1,13 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../models/portfolio_item.dart';
-import '../models/song.dart';
-import '../providers/user_data_provider.dart';
-import '../services/portfolio_update_service.dart';
+import '../../../shared/models/portfolio_item.dart'; // Corrected path
+import '../../../shared/models/song.dart'; // Corrected path
+import '../../../shared/providers/user_data_provider.dart'; // Corrected path
+import '../services/portfolio_service.dart'; // Corrected path to new service location
 
 class PortfolioDetailScreen extends StatefulWidget {
-  const PortfolioDetailScreen({Key? key}) : super(key: key);
+  const PortfolioDetailScreen({super.key}); // Use super parameter
 
   @override
   State<PortfolioDetailScreen> createState() => _PortfolioDetailScreenState();

@@ -14,12 +14,12 @@ class AppTheme {
       colorScheme: ColorScheme.light(
         primary: ColorPalette.primary,
         secondary: ColorPalette.secondary,
-        background: ColorPalette.background,
-        surface: ColorPalette.surface,
+        surface: ColorPalette.background, // Use background color for surface (replacing deprecated background)
+        // surface: ColorPalette.surface, // Keep original surface if needed, or remove if background is the intended surface
         onPrimary: ColorPalette.onPrimary,
         onSecondary: ColorPalette.onSecondary,
-        onBackground: ColorPalette.onBackground,
-        onSurface: ColorPalette.onSurface,
+        onSurface: ColorPalette.onBackground, // Use onBackground color for onSurface (replacing deprecated onBackground)
+        // onSurface: ColorPalette.onSurface, // Keep original onSurface if needed, or remove if onBackground is the intended onSurface
         error: ColorPalette.error,
         onError: ColorPalette.onError,
       ),
@@ -121,12 +121,12 @@ class AppTheme {
       colorScheme: ColorScheme.dark(
         primary: ColorPalette.primary,
         secondary: ColorPalette.secondary,
-        background: ColorPalette.backgroundDark,
-        surface: ColorPalette.surfaceDark,
+        surface: ColorPalette.backgroundDark, // Use background color for surface (replacing deprecated background)
+        // surface: ColorPalette.surfaceDark, // Keep original surface if needed, or remove if background is the intended surface
         onPrimary: ColorPalette.onPrimary,
         onSecondary: ColorPalette.onSecondary,
-        onBackground: ColorPalette.onBackgroundDark,
-        onSurface: ColorPalette.onSurfaceDark,
+        onSurface: ColorPalette.onBackgroundDark, // Use onBackground color for onSurface (replacing deprecated onBackground)
+        // onSurface: ColorPalette.onSurfaceDark, // Keep original onSurface if needed, or remove if onBackground is the intended onSurface
         error: ColorPalette.error,
         onError: ColorPalette.onError,
       ),

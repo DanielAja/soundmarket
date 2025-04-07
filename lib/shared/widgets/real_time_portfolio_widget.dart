@@ -1,18 +1,18 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../models/portfolio_item.dart';
-import '../models/song.dart';
-import '../providers/user_data_provider.dart';
-import '../services/portfolio_update_service.dart';
+import '../models/portfolio_item.dart'; // Corrected path
+import '../models/song.dart'; // Corrected path
+import '../providers/user_data_provider.dart'; // Corrected path
+import '../../features/portfolio/services/portfolio_service.dart'; // Corrected path
 
 class RealTimePortfolioWidget extends StatefulWidget {
   final Function(PortfolioItem, Song)? onItemTap;
   
   const RealTimePortfolioWidget({
-    Key? key, 
+    super.key, // Use super parameter
     this.onItemTap,
-  }) : super(key: key);
+  });
 
   @override
   State<RealTimePortfolioWidget> createState() => _RealTimePortfolioWidgetState();
@@ -128,12 +128,14 @@ class _RealTimePortfolioWidgetState extends State<RealTimePortfolioWidget> {
     final currentValue = item.quantity * song.currentPrice;
     
     // Get price change indicator
+    // Assuming PriceChange enum is now accessible via PortfolioService import
     final priceChange = provider.getPriceChangeIndicator(item.songId);
     
     // Determine indicator color
     Color indicatorColor = Colors.transparent;
     IconData indicatorIcon = Icons.remove;
     
+    // Use the PriceChange enum from the imported PortfolioService
     if (priceChange == PriceChange.increase) {
       indicatorColor = Colors.green;
       indicatorIcon = Icons.arrow_upward;
@@ -205,6 +207,7 @@ class _RealTimePortfolioWidgetState extends State<RealTimePortfolioWidget> {
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      // Use the PriceChange enum from the imported PortfolioService
                       if (priceChange != PriceChange.none)
                         Icon(
                           indicatorIcon,
@@ -216,8 +219,9 @@ class _RealTimePortfolioWidgetState extends State<RealTimePortfolioWidget> {
                         '\$${song.currentPrice.toStringAsFixed(2)}',
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
-                          color: priceChange == PriceChange.none 
-                              ? Colors.white 
+                          // Use the PriceChange enum from the imported PortfolioService
+                          color: priceChange == PriceChange.none
+                              ? Theme.of(context).textTheme.bodyLarge?.color // Use theme color for 'none'
                               : indicatorColor,
                         ),
                       ),

@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'dart:math';
-import '../providers/user_data_provider.dart';
-import '../models/portfolio_item.dart';
-import '../models/song.dart';
+import '../../../shared/providers/user_data_provider.dart'; // Corrected path
+import '../../../shared/models/portfolio_item.dart'; // Corrected path
+import '../../../shared/models/song.dart'; // Corrected path
+import '../../../shared/models/transaction.dart'; // Corrected path
+import '../../../shared/widgets/real_time_portfolio_widget.dart'; // Corrected path
+import '../../../core/theme/app_spacing.dart'; // Corrected path
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -25,7 +28,10 @@ class _HomeScreenState extends State<HomeScreen> {
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () {
-              // Refresh data (for demo purposes)
+              // Trigger a manual refresh of the song service
+              final userDataProvider = Provider.of<UserDataProvider>(context, listen: false);
+              userDataProvider.refreshData();
+              
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Refreshed market data')),
               );
@@ -35,24 +41,36 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       body: Consumer<UserDataProvider>(
         builder: (context, userDataProvider, child) {
-          final portfolio = userDataProvider.portfolio;
-          final portfolioValue = userDataProvider.totalPortfolioValue;
+          // Show loading indicator when refreshing data
+          if (userDataProvider.isLoading) {
+            return const Center(
+              child: CircularProgressIndicator(),
+            );
+          }
+          
+          // Removed unused variable: final portfolio = userDataProvider.portfolio;
+          // Removed unused variable: final portfolioValue = userDataProvider.totalPortfolioValue;
           
           return RefreshIndicator(
             onRefresh: () async {
-              // Pull to refresh functionality
+              // Pull to refresh functionality - actually refresh the data
+              await userDataProvider.refreshData();
+              
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Refreshed market data')),
               );
             },
             child: ListView(
-              padding: const EdgeInsets.all(16.0),
+              padding: const EdgeInsets.all(AppSpacing.l), // Use AppSpacing.l
               children: [
                 _buildPortfolioChart(context),
-                const SizedBox(height: 24.0),
+                const SizedBox(height: AppSpacing.xl), // Use AppSpacing.xl
                 _buildPortfolioSummary(context, userDataProvider),
-                const SizedBox(height: 24.0),
-                _buildPortfolioList(context, portfolio, userDataProvider),
+                const SizedBox(height: AppSpacing.l), // Use AppSpacing.l
+                // Add real-time portfolio widget with buy/sell functionality
+                RealTimePortfolioWidget(
+                  onItemTap: (item, song) => _showPortfolioItemDetails(context, item, song),
+                ),
               ],
             ),
           );
@@ -61,8 +79,9 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // Helper method to build detail items
-  Widget _buildDetailItem(String label, String value, IconData icon) {
+  // Removed unused method: _buildDetailItem
+  /*
+  Widget _buildDetailItem(String label, String value, IconData icon) { // This method is unused
     return Column(
       children: [
         Icon(
@@ -70,7 +89,7 @@ class _HomeScreenState extends State<HomeScreen> {
           color: Colors.grey[400],
           size: 24.0,
         ),
-        const SizedBox(height: 8.0),
+        const SizedBox(height: AppSpacing.s), // Use AppSpacing.s
         Text(
           value,
           style: const TextStyle(
@@ -78,7 +97,7 @@ class _HomeScreenState extends State<HomeScreen> {
             fontSize: 16.0,
           ),
         ),
-        const SizedBox(height: 4.0),
+        const SizedBox(height: AppSpacing.xs), // Use AppSpacing.xs
         Text(
           label,
           style: TextStyle(
@@ -89,6 +108,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ],
     );
   }
+  */
 
   Widget _buildPortfolioSummary(BuildContext context, UserDataProvider userDataProvider) {
     final portfolioValue = userDataProvider.totalPortfolioValue;
@@ -102,7 +122,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Card(
       elevation: 4.0,
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(AppSpacing.l), // Use AppSpacing.l
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -113,18 +133,32 @@ class _HomeScreenState extends State<HomeScreen> {
                 fontWeight: FontWeight.bold,
               ),
             ),
-            const SizedBox(height: 16.0),
+            const SizedBox(height: AppSpacing.l), // Use AppSpacing.l
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Portfolio Value',
-                      style: TextStyle(
-                        color: Colors.grey[400],
-                      ),
+                    Row(
+                      children: [
+                        Text(
+                          'Portfolio Value',
+                          style: TextStyle(
+                            color: Colors.grey[400],
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.s), // Use AppSpacing.s
+                        Icon(Icons.headphones, size: 14, color: Colors.grey[400]),
+                        const SizedBox(width: AppSpacing.xxs), // Use AppSpacing.xxs
+                        Text(
+                          userDataProvider.getFormattedTotalPortfolioStreamCount(),
+                          style: TextStyle(
+                            color: Colors.grey[400],
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
                     ),
                     AnimatedSwitcher(
                       duration: const Duration(milliseconds: 500),
@@ -149,7 +183,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 4.0),
+                    const SizedBox(height: AppSpacing.xs), // Use AppSpacing.xs
                     Row(
                       children: [
                         Icon(
@@ -157,7 +191,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           color: isPositive ? Colors.green : Colors.red,
                           size: 16.0,
                         ),
-                        const SizedBox(width: 4.0),
+                        const SizedBox(width: AppSpacing.xs), // Use AppSpacing.xs
                         Text(
                           '${isPositive ? "+" : ""}${dailyChange.toStringAsFixed(2)} (${(dailyChange / (portfolioValue - dailyChange) * 100).toStringAsFixed(2)}%)',
                           style: TextStyle(
@@ -204,9 +238,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 16.0),
+            const SizedBox(height: AppSpacing.l), // Use AppSpacing.l
             const Divider(),
-            const SizedBox(height: 8.0),
+            const SizedBox(height: AppSpacing.s), // Use AppSpacing.s
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -248,98 +282,145 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // Generate chart data based on the selected time filter
+  // Generate chart data based on the selected time filter and user transactions
   List<FlSpot> _generateChartData(
     String timeFilter, 
-    double baseValue, 
-    double currentValue, 
-    double variance
+    UserDataProvider userDataProvider
   ) {
-    // Reduce variance to make prices more stable
-    variance = variance * 0.3; // Reduce variance by 70%
-    
-    final random = Random();
     final spots = <FlSpot>[];
+    final now = DateTime.now();
+    final transactions = userDataProvider.transactions;
+    // Removed unused variable: final currentPortfolioValue = userDataProvider.totalPortfolioValue;
+    // Removed unused variable: final currentCashBalance = userDataProvider.userProfile?.cashBalance ?? 0.0;
+    final currentTotalBalance = userDataProvider.totalBalance;
     
-    // Number of data points based on time filter
+    // Determine start date based on time filter
+    DateTime startDate;
     int numPoints;
+    
     switch (timeFilter) {
       case '1D':
+        startDate = DateTime(now.year, now.month, now.day).subtract(const Duration(days: 1));
         numPoints = 24; // Hourly data for 1 day
         break;
       case '1W':
+        startDate = now.subtract(const Duration(days: 7));
         numPoints = 7; // Daily data for 1 week
         break;
       case '1M':
+        startDate = DateTime(now.year, now.month - 1, now.day);
         numPoints = 30; // Daily data for 1 month
         break;
       case '3M':
+        startDate = DateTime(now.year, now.month - 3, now.day);
         numPoints = 12; // Weekly data for 3 months
         break;
       case '1Y':
+        startDate = DateTime(now.year - 1, now.month, now.day);
         numPoints = 12; // Monthly data for 1 year
         break;
       case 'All':
-        numPoints = 24; // Monthly data for 2 years
+        // Use the earliest transaction date or 2 years ago, whichever is earlier
+        startDate = transactions.isNotEmpty 
+            ? transactions.map((t) => t.timestamp).reduce((a, b) => a.isBefore(b) ? a : b)
+            : DateTime(now.year - 2, now.month, now.day);
+        numPoints = 24; // Monthly data for all time
         break;
       default:
+        startDate = now.subtract(const Duration(days: 7));
         numPoints = 7; // Default to 1 week
     }
     
-    // Generate different patterns based on time filter
+    // Filter transactions that occurred after the start date
+    final relevantTransactions = transactions
+        .where((t) => t.timestamp.isAfter(startDate))
+        .toList();
+    
+    // If there are no transactions in the selected time period, use a simple linear progression
+    if (relevantTransactions.isEmpty) {
+      // Start with 80% of current value as a baseline
+      final baseValue = currentTotalBalance * 0.8;
+      
+      for (int i = 0; i < numPoints; i++) {
+        final progress = i / (numPoints - 1);
+        final value = baseValue + (currentTotalBalance - baseValue) * progress;
+        spots.add(FlSpot(i.toDouble(), value));
+      }
+      
+      return spots;
+    }
+    
+    // Sort transactions by timestamp (oldest first)
+    relevantTransactions.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+    
+    // Calculate time intervals for data points
+    final timeRange = now.difference(startDate).inMilliseconds;
+    final intervalMs = timeRange / (numPoints - 1);
+    
+    // Initialize with starting balance (assume 80% of current if no transactions)
+    double runningBalance = currentTotalBalance * 0.8;
+    
+    // If we have transactions, calculate a more accurate starting balance
+    if (relevantTransactions.isNotEmpty) {
+      // Start with current balance and work backwards through transactions
+      runningBalance = currentTotalBalance;
+      
+      for (final transaction in transactions.reversed) {
+        if (transaction.timestamp.isBefore(startDate)) {
+          // Stop once we reach transactions before our start date
+          break;
+        }
+        
+        // Reverse the transaction effect
+        if (transaction.type == TransactionType.buy) {
+          // For buy: add the cost back to balance, remove the shares value
+          runningBalance += transaction.totalValue;
+          // We don't have historical prices, so use purchase price as an approximation
+          runningBalance -= transaction.price * transaction.quantity;
+        } else {
+          // For sell: remove the proceeds, add the shares value
+          runningBalance -= transaction.totalValue;
+          // We don't have historical prices, so use sale price as an approximation
+          runningBalance += transaction.price * transaction.quantity;
+        }
+      }
+      
+      // Ensure we don't go negative or too low
+      runningBalance = runningBalance.clamp(currentTotalBalance * 0.5, double.infinity);
+    }
+    
+    // Generate data points at regular intervals
     for (int i = 0; i < numPoints; i++) {
-      double value;
+      final pointTime = startDate.add(Duration(milliseconds: (intervalMs * i).round()));
+      double balance = runningBalance;
       
-      // Calculate progress (0 to 1)
-      final progress = i / (numPoints - 1);
-      
-      // Base linear interpolation from start to end value
-      value = baseValue + (currentValue - baseValue) * progress;
-      
-      // Add smaller, more stable fluctuations
-      switch (timeFilter) {
-        case '1D':
-          // Less volatile intraday pattern
-          value += (random.nextDouble() * 2 - 1) * variance * 0.2;
-          break;
-        case '1W':
-          // Gradual increase with minimal fluctuation
-          value += (random.nextDouble() * 2 - 1) * variance * 0.3;
-          break;
-        case '1M':
-          // Gentle ups and downs
-          // Add a smaller sine wave pattern
-          value += sin(progress * 2 * pi) * variance * 0.5;
-          // Add minimal randomness
-          value += (random.nextDouble() * 2 - 1) * variance * 0.2;
-          break;
-        case '3M':
-          // Smoother trend
-          value += sin(progress * 1.5 * pi) * variance * 0.7;
-          value += (random.nextDouble() * 2 - 1) * variance * 0.3;
-          break;
-        case '1Y':
-          // Gentle seasonal effects
-          value += sin(progress * pi) * variance;
-          value += (random.nextDouble() * 2 - 1) * variance * 0.4;
-          break;
-        case 'All':
-          // Smoother long-term growth
-          value = baseValue * pow(1.08, progress); // Reduced compound growth
-          value += sin(progress * 2 * pi) * variance;
-          value += (random.nextDouble() * 2 - 1) * variance * 0.5;
-          break;
-        default:
-          // Default pattern (1W) - very stable
-          value += (random.nextDouble() * 2 - 1) * variance * 0.3;
+      // Apply all transactions that happened before this point
+      for (final transaction in relevantTransactions) {
+        if (transaction.timestamp.isAfter(pointTime)) {
+          // Skip transactions that haven't happened yet at this point
+          continue;
+        }
+        
+        // Apply transaction effect
+        if (transaction.type == TransactionType.buy) {
+          // For buy: subtract the cost, add the shares value
+          balance -= transaction.totalValue;
+          // We don't have historical prices, so use purchase price as an approximation
+          balance += transaction.price * transaction.quantity;
+        } else {
+          // For sell: add the proceeds, remove the shares value
+          balance += transaction.totalValue;
+          // We don't have historical prices, so use sale price as an approximation
+          balance -= transaction.price * transaction.quantity;
+        }
       }
       
-      // Ensure the last point matches the current value
+      // Ensure the last point matches the current total balance
       if (i == numPoints - 1) {
-        value = currentValue;
+        balance = currentTotalBalance;
       }
       
-      spots.add(FlSpot(i.toDouble(), value));
+      spots.add(FlSpot(i.toDouble(), balance));
     }
     
     return spots;
@@ -348,22 +429,17 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildPortfolioChart(BuildContext context) {
     return Consumer<UserDataProvider>(
       builder: (context, userDataProvider, child) {
-        // Generate chart data based on portfolio value
-        final portfolioValue = userDataProvider.totalPortfolioValue;
-        final cashBalance = userDataProvider.userProfile?.cashBalance ?? 0.0;
-        final totalBalance = userDataProvider.totalBalance;
+        // Get portfolio data
+        // Removed unused variable: final portfolioValue = userDataProvider.totalPortfolioValue; // Unused
+        // Removed unused variable: final cashBalance = userDataProvider.userProfile?.cashBalance ?? 0.0; // Unused
+        // Removed unused variable: final totalBalance = userDataProvider.totalBalance; // Unused
+        // Removed unused variable: final currentPortfolioValue = userDataProvider.totalPortfolioValue; // Unused - Removing again
+        // Removed unused variable: final currentCashBalance = userDataProvider.userProfile?.cashBalance ?? 0.0; // Unused - Removing again
         
-        // Create a more realistic chart with some variation
-        // This simulates historical data for the portfolio
-        final baseValue = totalBalance * 0.8; // Starting at 80% of current value
-        final variance = totalBalance * 0.05; // 5% variance for fluctuations
-        
-        // Generate chart data based on selected time filter
+        // Generate chart data based on user transactions and selected time filter
         final spots = _generateChartData(
-          _selectedTimeFilter, 
-          baseValue, 
-          totalBalance, 
-          variance
+          _selectedTimeFilter,
+          userDataProvider
         );
         
         // Calculate min and max values for the chart
@@ -379,30 +455,33 @@ class _HomeScreenState extends State<HomeScreen> {
         final chartColor = isPositive ? Colors.green : Colors.red;
         
         return Card(
-          elevation: 4.0,
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      elevation: 4.0,
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.l), // Use AppSpacing.l
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      'Portfolio Performance',
-                      style: TextStyle(
-                        fontSize: 18.0,
-                        fontWeight: FontWeight.bold,
+                    const Expanded(
+                      child: Text(
+                        'Portfolio Performance',
+                        style: TextStyle(
+                          fontSize: 18.0,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
                           isPositive ? Icons.arrow_upward : Icons.arrow_downward,
                           color: chartColor,
                           size: 16.0,
                         ),
-                        const SizedBox(width: 4.0),
+                        const SizedBox(width: AppSpacing.xs), // Use AppSpacing.xs
                         Text(
                           '${isPositive ? "+" : ""}${((spots.last.y / spots.first.y - 1) * 100).toStringAsFixed(2)}%',
                           style: TextStyle(
@@ -414,7 +493,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 16.0),
+                const SizedBox(height: AppSpacing.l), // Use AppSpacing.l
                 SizedBox(
                   height: 200.0,
                   child: LineChart(
@@ -498,7 +577,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               }
                               
                               return Padding(
-                                padding: const EdgeInsets.only(top: 8.0),
+                                padding: const EdgeInsets.only(top: AppSpacing.s), // Use AppSpacing.s
                                 child: Text(
                                   label,
                                   style: TextStyle(
@@ -517,7 +596,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             reservedSize: 40,
                             getTitlesWidget: (value, meta) {
                               return Padding(
-                                padding: const EdgeInsets.only(right: 8.0),
+                                padding: const EdgeInsets.only(right: AppSpacing.s), // Use AppSpacing.s
                                 child: Text(
                                   '\$${value.toInt()}',
                                   style: TextStyle(
@@ -555,12 +634,12 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                           belowBarData: BarAreaData(
                             show: true,
-                            color: chartColor.withOpacity(0.2),
+                            color: chartColor.withAlpha((255 * 0.2).round()), // Replaced withOpacity
                             gradient: LinearGradient(
                               colors: [
-                                chartColor.withOpacity(0.4),
-                                chartColor.withOpacity(0.1),
-                                chartColor.withOpacity(0.0),
+                                chartColor.withAlpha((255 * 0.4).round()), // Replaced withOpacity
+                                chartColor.withAlpha((255 * 0.1).round()), // Replaced withOpacity
+                                chartColor.withAlpha(0), // Replaced withOpacity
                               ],
                               begin: Alignment.topCenter,
                               end: Alignment.bottomCenter,
@@ -587,7 +666,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 16.0),
+                const SizedBox(height: AppSpacing.l), // Use AppSpacing.l
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
@@ -612,7 +691,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildTimeFilterChip(String label, bool isSelected) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4.0),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs), // Use AppSpacing.xs
       child: ChoiceChip(
         label: Text(label),
         selected: isSelected,
@@ -642,215 +721,583 @@ class _HomeScreenState extends State<HomeScreen> {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16.0),
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.m, vertical: AppSpacing.s), // Use AppSpacing.m and AppSpacing.s
       ),
     );
   }
 
-  Widget _buildPortfolioList(BuildContext context, List<PortfolioItem> portfolio, UserDataProvider userDataProvider) {
-    if (portfolio.isEmpty) {
-      return Card(
-        elevation: 4.0,
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Your Portfolio',
-                style: TextStyle(
-                  fontSize: 18.0,
-                  fontWeight: FontWeight.bold,
+  // Show portfolio item details in a bottom sheet with buy/sell options
+  void _showPortfolioItemDetails(BuildContext context, PortfolioItem item, Song song) {
+    final userDataProvider = Provider.of<UserDataProvider>(context, listen: false);
+    
+    // Calculate current value and profit/loss
+    final currentValue = song.currentPrice * item.quantity;
+    final purchaseValue = item.purchasePrice * item.quantity;
+    final profitLoss = currentValue - purchaseValue;
+    final profitLossPercent = (profitLoss / purchaseValue) * 100;
+    final isProfit = profitLoss >= 0;
+    
+    // Controller for quantity input
+    final TextEditingController quantityController = TextEditingController(text: '1');
+    
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            // Parse quantity from controller
+            int quantity = int.tryParse(quantityController.text) ?? 1;
+            if (quantity < 1) quantity = 1;
+            
+            // Calculate transaction values
+            final transactionValue = song.currentPrice * quantity;
+            final cashBalance = userDataProvider.userProfile?.cashBalance ?? 0.0;
+            final canBuy = cashBalance >= transactionValue;
+            final canSell = item.quantity >= quantity;
+            
+            return Container(
+              height: MediaQuery.of(context).size.height * 0.85,
+              decoration: BoxDecoration(
+                color: Theme.of(context).scaffoldBackgroundColor,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(20),
+                  topRight: Radius.circular(20),
                 ),
               ),
-              const SizedBox(height: 16.0),
-              Center(
+              child: SingleChildScrollView(
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Icon(
-                      Icons.music_note,
-                      size: 48.0,
-                      color: Colors.grey[600],
-                    ),
-                    const SizedBox(height: 16.0),
-                    const Text(
-                      'Your portfolio is empty',
-                      style: TextStyle(
-                        fontSize: 16.0,
-                        fontWeight: FontWeight.bold,
+                    // Handle bar
+                    Center(
+                      child: Container(
+                        margin: const EdgeInsets.only(top: AppSpacing.m, bottom: AppSpacing.s), // Use AppSpacing.m and AppSpacing.s
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[600],
+                          borderRadius: BorderRadius.circular(2),
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 8.0),
-                    const Text(
-                      'Start investing in songs to build your portfolio',
-                      style: TextStyle(
-                        color: Colors.grey,
+                    
+                    // Header with song info
+                    Padding(
+                      padding: const EdgeInsets.all(AppSpacing.l), // Use AppSpacing.l
+                      child: Row(
+                        children: [
+                          GestureDetector(
+                            onTap: () {
+                              if (item.albumArtUrl != null) {
+                                _showFullAlbumArt(context, item.albumArtUrl!, item.songName, item.artistName);
+                              }
+                            },
+                            child: CircleAvatar(
+                              radius: 30,
+                              backgroundColor: Colors.grey[800],
+                              backgroundImage: item.albumArtUrl != null ? NetworkImage(item.albumArtUrl!) : null,
+                              child: item.albumArtUrl == null ? const Icon(Icons.music_note, size: 30) : null,
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.l), // Use AppSpacing.l
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  item.songName,
+                                  style: const TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                Text(
+                                  item.artistName,
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    color: Colors.grey[400],
+                                  ),
+                                ),
+                                const SizedBox(height: AppSpacing.xs), // Use AppSpacing.xs
+                                Row(
+                                  children: [
+                                    Icon(Icons.headphones, size: 14, color: Colors.grey[400]),
+                                    const SizedBox(width: AppSpacing.xs), // Use AppSpacing.xs
+                                    Text(
+                                      userDataProvider.getSongStreamCount(item.songId),
+                                      style: TextStyle(color: Colors.grey[400], fontSize: 12),
+                                    ),
+                                    const SizedBox(width: AppSpacing.m), // Use AppSpacing.m
+                                    Icon(Icons.category, size: 14, color: Colors.grey[400]),
+                                    const SizedBox(width: AppSpacing.xs), // Use AppSpacing.xs
+                                    Text(
+                                      song.genre,
+                                      style: TextStyle(color: Colors.grey[400], fontSize: 12),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
-                      textAlign: TextAlign.center,
                     ),
-                    const SizedBox(height: 16.0),
-                    ElevatedButton(
-                      onPressed: () {
-                        // Navigate to Discover tab
-                        DefaultTabController.of(context)?.animateTo(1);
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Theme.of(context).colorScheme.primary,
+                    
+                    // Listen button
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.l), // Use AppSpacing.l
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          // Launch music player or streaming service with this song
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Opening ${item.songName} in music player...'),
+                              duration: const Duration(seconds: 2),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.play_circle_filled, color: Colors.white),
+                        label: const Text('LISTEN TO SONG'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.purple,
+                          foregroundColor: Colors.white,
+                          minimumSize: const Size(double.infinity, 48),
+                        ),
                       ),
-                      child: const Text('Discover Songs'),
+                    ),
+                    
+                    const Divider(),
+                    
+                    // Current price and performance
+                    Padding(
+                      padding: const EdgeInsets.all(AppSpacing.l), // Use AppSpacing.l
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Current Price',
+                                style: TextStyle(
+                                  color: Colors.grey[400],
+                                  fontSize: 14,
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.xs), // Use AppSpacing.xs
+                              Text(
+                                '\$${song.currentPrice.toStringAsFixed(2)}',
+                                style: const TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.xs), // Use AppSpacing.xs
+                              Row(
+                                children: [
+                                  Icon(
+                                    song.isPriceUp ? Icons.arrow_upward : Icons.arrow_downward,
+                                    color: song.isPriceUp ? Colors.green : Colors.red,
+                                    size: 14,
+                                  ),
+                                  const SizedBox(width: AppSpacing.xs), // Use AppSpacing.xs
+                                  Text(
+                                    '${song.isPriceUp ? "+" : ""}${song.priceChangePercent.toStringAsFixed(2)}%',
+                                    style: TextStyle(
+                                      color: song.isPriceUp ? Colors.green : Colors.red,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                'Your Position',
+                                style: TextStyle(
+                                  color: Colors.grey[400],
+                                  fontSize: 14,
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.xs), // Use AppSpacing.xs
+                              Text(
+                                '${item.quantity} ${item.quantity == 1 ? 'share' : 'shares'}',
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.xs), // Use AppSpacing.xs
+                              Text(
+                                'Avg. Price: \$${item.purchasePrice.toStringAsFixed(2)}',
+                                style: TextStyle(
+                                  color: Colors.grey[400],
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    
+                    // Portfolio value and profit/loss
+                    Container(
+                      color: Colors.grey[900],
+                      padding: const EdgeInsets.all(AppSpacing.l), // Use AppSpacing.l
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Current Value',
+                                style: TextStyle(
+                                  color: Colors.grey[400],
+                                  fontSize: 14,
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.xs), // Use AppSpacing.xs
+                              Text(
+                                '\$${currentValue.toStringAsFixed(2)}',
+                                style: const TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                'Profit/Loss',
+                                style: TextStyle(
+                                  color: Colors.grey[400],
+                                  fontSize: 14,
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.xs), // Use AppSpacing.xs
+                              Row(
+                                children: [
+                                  Icon(
+                                    isProfit ? Icons.arrow_upward : Icons.arrow_downward,
+                                    color: isProfit ? Colors.green : Colors.red,
+                                    size: 14,
+                                  ),
+                                  const SizedBox(width: AppSpacing.xs), // Use AppSpacing.xs
+                                  Text(
+                                    '${isProfit ? "+" : ""}${profitLoss.toStringAsFixed(2)} (${isProfit ? "+" : ""}${profitLossPercent.toStringAsFixed(2)}%)',
+                                    style: TextStyle(
+                                      color: isProfit ? Colors.green : Colors.red,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    
+                    const SizedBox(height: AppSpacing.l), // Use AppSpacing.l
+                    
+                    // Transaction section
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.l), // Use AppSpacing.l
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Trade',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.l), // Use AppSpacing.l
+                          
+                          // Quantity input
+                          Row(
+                            children: [
+                              const Text(
+                                'Quantity:',
+                                style: TextStyle(fontSize: 16),
+                              ),
+                              const SizedBox(width: AppSpacing.l), // Use AppSpacing.l
+                              Expanded(
+                                child: TextField(
+                                  controller: quantityController,
+                                  keyboardType: TextInputType.number,
+                                  decoration: const InputDecoration(
+                                    border: OutlineInputBorder(),
+                                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  ),
+                                  onChanged: (value) {
+                                    setState(() {
+                                      // Update UI when quantity changes
+                                    });
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                          
+                          const SizedBox(height: AppSpacing.l), // Use AppSpacing.l
+                          
+                          // Transaction value
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text(
+                                'Transaction Value:',
+                                style: TextStyle(fontSize: 16),
+                              ),
+                              Text(
+                                '\$${transactionValue.toStringAsFixed(2)}',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                          
+                          const SizedBox(height: AppSpacing.s), // Use AppSpacing.s
+                          
+                          // Cash balance
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text(
+                                'Cash Balance:',
+                                style: TextStyle(fontSize: 16),
+                              ),
+                              Text(
+                                '\$${cashBalance.toStringAsFixed(2)}',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: canBuy ? Colors.white : Colors.red,
+                                ),
+                              ),
+                            ],
+                          ),
+                          
+                          const SizedBox(height: AppSpacing.xl), // Use AppSpacing.xl
+                          
+                          // Buy and sell buttons
+                          Row(
+                            children: [
+                              Expanded(
+                                child: ElevatedButton(
+                                  onPressed: canBuy ? () async {
+                                    // Buy the song
+                                    final success = await userDataProvider.buySong(song.id, quantity);
+                                    
+                                    if (success) {
+                                      Navigator.pop(context);
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text('Successfully bought $quantity ${quantity == 1 ? 'share' : 'shares'} of ${song.name}'),
+                                          backgroundColor: Colors.green,
+                                        ),
+                                      );
+                                    } else {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Failed to buy shares. Insufficient funds.'),
+                                          backgroundColor: Colors.red,
+                                        ),
+                                      );
+                                    }
+                                  } : null,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.green,
+                                    padding: const EdgeInsets.symmetric(vertical: 16),
+                                  ),
+                                  child: const Text(
+                                    'BUY',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: AppSpacing.l), // Use AppSpacing.l
+                              Expanded(
+                                child: ElevatedButton(
+                                  onPressed: canSell ? () async {
+                                    // Sell the song
+                                    final success = await userDataProvider.sellSong(song.id, quantity);
+                                    
+                                    if (success) {
+                                      Navigator.pop(context);
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text('Successfully sold $quantity ${quantity == 1 ? 'share' : 'shares'} of ${song.name}'),
+                                          backgroundColor: Colors.blue,
+                                        ),
+                                      );
+                                    } else {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Failed to sell shares. Insufficient shares.'),
+                                          backgroundColor: Colors.red,
+                                        ),
+                                      );
+                                    }
+                                  } : null,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.red,
+                                    padding: const EdgeInsets.symmetric(vertical: 16),
+                                  ),
+                                  child: const Text(
+                                    'SELL',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    
+                    // Close button
+                    Padding(
+                      padding: const EdgeInsets.all(AppSpacing.l), // Use AppSpacing.l
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.pop(context);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.grey[800],
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                        ),
+                        child: const Text('CLOSE'),
+                      ),
                     ),
                   ],
                 ),
               ),
-            ],
-          ),
-        ),
-      );
-    }
-    
-    return Card(
-      elevation: 4.0,
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // Show full album art in a dialog
+  void _showFullAlbumArt(BuildContext context, String albumArtUrl, String songName, String artistName) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(AppSpacing.l), // Use AppSpacing.l
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Your Portfolio',
-                  style: TextStyle(
-                    fontSize: 18.0,
-                    fontWeight: FontWeight.bold,
-                  ),
+            // Album art container with rounded corners
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                constraints: BoxConstraints(
+                  maxWidth: MediaQuery.of(context).size.width * 0.9,
+                  maxHeight: MediaQuery.of(context).size.height * 0.6,
                 ),
-                Text(
-                  '${portfolio.length} ${portfolio.length == 1 ? 'Song' : 'Songs'}',
-                  style: TextStyle(
-                    color: Colors.grey[400],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16.0),
-            ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: portfolio.length,
-              separatorBuilder: (context, index) => const Divider(),
-              itemBuilder: (context, index) {
-                final item = portfolio[index];
-                final song = userDataProvider.allSongs.firstWhere(
-                  (s) => s.id == item.songId,
-                  orElse: () => Song(
-                    id: item.songId,
-                    name: item.songName,
-                    artist: item.artistName,
-                    genre: 'Unknown',
-                    currentPrice: item.purchasePrice,
-                  ),
-                );
-                
-                final currentValue = song.currentPrice * item.quantity;
-                final purchaseValue = item.purchasePrice * item.quantity;
-                final profitLoss = currentValue - purchaseValue;
-                final profitLossPercent = (profitLoss / purchaseValue) * 100;
-                final isProfit = profitLoss >= 0;
-                
-                return ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: CircleAvatar(
-                    backgroundColor: Colors.grey[800],
-                    backgroundImage: item.albumArtUrl != null ? NetworkImage(item.albumArtUrl!) : null,
-                    child: item.albumArtUrl == null ? const Icon(Icons.music_note) : null,
-                  ),
-                  title: Text(
-                    item.songName,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('${item.artistName}'),
-                      Row(
-                        children: [
-                          Text('${item.quantity} ${item.quantity == 1 ? 'share' : 'shares'}'),
-                          const SizedBox(width: 8),
-                          Icon(Icons.headphones, size: 14, color: Colors.grey[400]),
-                          const SizedBox(width: 2),
-                          Text(
-                            userDataProvider.getSongStreamCount(item.songId),
-                            style: TextStyle(color: Colors.grey[400], fontSize: 12),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  trailing: Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 500),
-                        transitionBuilder: (Widget child, Animation<double> animation) {
-                          return FadeTransition(
-                            opacity: animation,
-                            child: SlideTransition(
-                              position: Tween<Offset>(
-                                begin: const Offset(0.0, 0.5),
-                                end: Offset.zero,
-                              ).animate(animation),
-                              child: child,
-                            ),
-                          );
-                        },
-                        child: Text(
-                          '\$${currentValue.toStringAsFixed(2)}',
-                          key: ValueKey<String>(currentValue.toStringAsFixed(2)),
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                          ),
+                child: Image.network(
+                  albumArtUrl,
+                  fit: BoxFit.contain,
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return Container(
+                      width: MediaQuery.of(context).size.width * 0.9,
+                      height: MediaQuery.of(context).size.width * 0.9,
+                      color: Colors.grey[900],
+                      child: Center(
+                        child: CircularProgressIndicator(
+                          value: loadingProgress.expectedTotalBytes != null
+                              ? loadingProgress.cumulativeBytesLoaded / 
+                                loadingProgress.expectedTotalBytes!
+                              : null,
                         ),
-                      ),
-                      AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 500),
-                        transitionBuilder: (Widget child, Animation<double> animation) {
-                          return FadeTransition(
-                            opacity: animation,
-                            child: SlideTransition(
-                              position: Tween<Offset>(
-                                begin: const Offset(0.0, 0.5),
-                                end: Offset.zero,
-                              ).animate(animation),
-                              child: child,
-                            ),
-                          );
-                        },
-                        child: Text(
-                          '${isProfit ? '+' : ''}${profitLoss.toStringAsFixed(2)} (${isProfit ? '+' : ''}${profitLossPercent.toStringAsFixed(2)}%)',
-                          key: ValueKey<String>(profitLoss.toStringAsFixed(2)),
-                          style: TextStyle(
-                            color: isProfit ? Colors.green : Colors.red,
-                            fontSize: 12.0,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  onTap: () {
-                    // For now, just show a snackbar
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Viewing details for ${song.name}'),
-                        duration: const Duration(seconds: 1),
                       ),
                     );
                   },
-                );
-              },
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      width: MediaQuery.of(context).size.width * 0.9,
+                      height: MediaQuery.of(context).size.width * 0.9,
+                      color: Colors.grey[900],
+                      child: const Center(
+                        child: Icon(Icons.error_outline, size: 50, color: Colors.white),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+            
+            // Song info
+            Container(
+              padding: const EdgeInsets.all(AppSpacing.l), // Use AppSpacing.l
+              margin: const EdgeInsets.only(top: AppSpacing.l), // Use AppSpacing.l
+              decoration: BoxDecoration(
+                color: Colors.black.withAlpha((255 * 0.7).round()), // Replaced withOpacity
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                children: [
+                  Text(
+                    songName,
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: AppSpacing.xs), // Use AppSpacing.xs
+                  Text(
+                    artistName,
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.grey[300],
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+            
+            // Close button
+            Padding(
+              padding: const EdgeInsets.only(top: AppSpacing.l), // Use AppSpacing.l
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(context),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.grey[800],
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                ),
+                child: const Text('CLOSE'),
+              ),
             ),
           ],
         ),

@@ -12,22 +12,19 @@ class AppException implements Exception {
 
 /// Network-related exceptions
 class NetworkException extends AppException {
-  NetworkException(String message, {String? code, dynamic details})
-      : super(message, code: code, details: details);
+  NetworkException(super.message, {super.code, super.details});
 }
 
 /// Authentication-related exceptions
 class AuthException extends AppException {
-  AuthException(String message, {String? code, dynamic details})
-      : super(message, code: code, details: details);
+  AuthException(super.message, {super.code, super.details});
 }
 
 /// Server-related exceptions
 class ServerException extends AppException {
   final int? statusCode;
 
-  ServerException(String message, {this.statusCode, String? code, dynamic details})
-      : super(message, code: code, details: details);
+  ServerException(super.message, {this.statusCode, super.code, super.details});
 
   @override
   String toString() => 'ServerException: $message (Status: $statusCode, Code: $code)';
@@ -35,22 +32,19 @@ class ServerException extends AppException {
 
 /// Data-related exceptions
 class DataException extends AppException {
-  DataException(String message, {String? code, dynamic details})
-      : super(message, code: code, details: details);
+  DataException(super.message, {super.code, super.details});
 }
 
 /// Cache-related exceptions
 class CacheException extends AppException {
-  CacheException(String message, {String? code, dynamic details})
-      : super(message, code: code, details: details);
+  CacheException(super.message, {super.code, super.details});
 }
 
 /// Validation-related exceptions
 class ValidationException extends AppException {
   final Map<String, String>? fieldErrors;
 
-  ValidationException(String message, {this.fieldErrors, String? code, dynamic details})
-      : super(message, code: code, details: details);
+  ValidationException(super.message, {this.fieldErrors, super.code, super.details});
 
   @override
   String toString() {
@@ -63,24 +57,20 @@ class ValidationException extends AppException {
 
 /// Business logic exceptions
 class BusinessException extends AppException {
-  BusinessException(String message, {String? code, dynamic details})
-      : super(message, code: code, details: details);
+  BusinessException(super.message, {super.code, super.details});
 }
 
 /// Permission-related exceptions
 class PermissionException extends AppException {
-  PermissionException(String message, {String? code, dynamic details})
-      : super(message, code: code, details: details);
+  PermissionException(super.message, {super.code, super.details});
 }
 
 /// Resource not found exceptions
 class NotFoundException extends AppException {
-  NotFoundException(String message, {String? code, dynamic details})
-      : super(message, code: code, details: details);
+  NotFoundException(super.message, {super.code, super.details});
 }
 
 /// Timeout exceptions
 class TimeoutException extends AppException {
-  TimeoutException(String message, {String? code, dynamic details})
-      : super(message, code: code, details: details);
+  TimeoutException(super.message, {super.code, super.details});
 }

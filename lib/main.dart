@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'providers/user_data_provider.dart';
-import 'screens/home_screen.dart';
-import 'screens/discover_screen.dart';
-import 'screens/profile_screen.dart';
-import 'screens/transaction_history_screen.dart';
-import 'services/music_data_api_service.dart';
+import 'shared/providers/user_data_provider.dart'; // Corrected path
+import 'features/portfolio/screens/home_screen.dart'; // Corrected path
+import 'features/market/screens/discover_screen.dart'; // Corrected path
+import 'features/profile/screens/profile_screen.dart'; // Corrected path
+// transaction_history_screen was moved but not used directly here, so removing import
+import 'shared/services/music_data_api_service.dart'; // Corrected path
 
 void main() {
   // Ensure Flutter bindings are initialized for services like shared_preferences
@@ -35,12 +35,12 @@ class SoundMarketApp extends StatelessWidget {
         colorScheme: ColorScheme.dark(
           primary: const Color(0xFF00D632),    // Cash App green
           secondary: const Color(0xFF00C2FF),  // Cash App blue accent
-          background: Colors.black,
-          surface: const Color(0xFF121212),    // Dark surface
+          surface: Colors.black, // Use background color for surface (replacing deprecated background)
+          // surface: const Color(0xFF121212),    // Removed duplicate Dark surface
           onPrimary: Colors.black,
           onSecondary: Colors.black,
-          onBackground: Colors.white,
-          onSurface: Colors.white,
+          onSurface: Colors.white, // Use onBackground color for onSurface (replacing deprecated onBackground)
+          // onSurface: Colors.white, // Removed duplicate onSurface
         ),
         // Card theme
         cardTheme: CardTheme(

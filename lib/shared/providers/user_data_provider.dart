@@ -6,29 +6,43 @@ import '../models/portfolio_item.dart';
 import '../models/song.dart';
 import '../models/transaction.dart';
 import '../services/storage_service.dart';
-import '../services/song_service.dart';
+import '../../features/market/services/market_service.dart'; // Correct path for market service
+// Import the new portfolio service to potentially use its PriceChange enum if needed elsewhere
+import '../../features/portfolio/services/portfolio_service.dart';
+
 
 class UserDataProvider with ChangeNotifier {
   UserProfile? _userProfile;
   List<PortfolioItem> _portfolio = [];
   List<Transaction> _transactions = [];
   final StorageService _storageService = StorageService();
-  final SongService _songService = SongService();
+  final MarketService _marketService = MarketService(); // Renamed class and variable
   final _uuid = const Uuid();
-  
-  // Subscription to song updates
+
+  // Loading state
+  bool _isLoading = false;
+
+  // Subscriptions
   StreamSubscription? _songUpdateSubscription;
-  
+  StreamSubscription? _portfolioUpdateSubscription;
+
+  // Portfolio service (renamed from PortfolioUpdateService)
+  final PortfolioService _portfolioService = PortfolioService(); // Renamed class and variable
+
+  // Price change indicators
+  final Map<String, PriceChange> _priceChangeIndicators = {};
+
   // Getters
   UserProfile? get userProfile => _userProfile;
   List<PortfolioItem> get portfolio => _portfolio;
   List<Transaction> get transactions => _transactions;
-  
+  bool get isLoading => _isLoading;
+
   // Calculate total portfolio value based on current song prices
   double get totalPortfolioValue {
     double total = 0.0;
     for (var item in _portfolio) {
-      final song = _songService.getSongById(item.songId);
+      final song = _marketService.getSongById(item.songId); // Renamed variable
       if (song != null) {
         total += item.quantity * song.currentPrice;
       } else {
@@ -38,39 +52,85 @@ class UserDataProvider with ChangeNotifier {
     }
     return total;
   }
-  
+
   // Calculate total balance (cash + portfolio value)
   double get totalBalance => (_userProfile?.cashBalance ?? 0.0) + totalPortfolioValue;
-  
+
   // Get all available songs
-  List<Song> get allSongs => _songService.getAllSongs();
-  
+  List<Song> get allSongs => _marketService.getAllSongs(); // Renamed variable
+
   // Get top songs
-  List<Song> get topSongs => _songService.getTopSongs();
-  
+  List<Song> get topSongs => _marketService.getTopSongs(); // Renamed variable
+
+  // Get top songs with custom limit
+  List<Song> getTopSongs({int limit = 10}) => _marketService.getTopSongs(limit: limit); // Renamed variable
+
   // Get top movers
-  List<Song> get topMovers => _songService.getTopMovers();
-  
+  List<Song> get topMovers => _marketService.getTopMovers(); // Renamed variable
+
+  // Get top movers with custom limit
+  List<Song> getTopMovers({int limit = 10}) => _marketService.getTopMovers(limit: limit); // Renamed variable
+
   // Get rising artists
-  List<String> get risingArtists => _songService.getRisingArtists();
+  List<String> get risingArtists => _marketService.getRisingArtists(); // Renamed variable
+
+  // Get songs by genre
+  List<Song> getSongsByGenre(String genre) => _marketService.getSongsByGenre(genre); // Renamed variable
+
+  // Get all genres
+  List<String> get allGenres => _marketService.getAllGenres(); // Renamed variable
+
+  // Get songs by artist
+  List<Song> getSongsByArtist(String artist) => _marketService.getSongsByArtist(artist); // Renamed variable
 
   UserDataProvider() {
     _loadData();
     _listenToSongUpdates();
+    _listenToPortfolioUpdates();
   }
-  
-  // Listen to song updates from the SongService
+
+  // Listen to song updates from the MarketService (formerly SongService)
   void _listenToSongUpdates() {
-    _songUpdateSubscription = _songService.songUpdates.listen((_) {
-      // When songs are updated, notify listeners to update the UI
+    _songUpdateSubscription = _marketService.songUpdates.listen((songs) { // Renamed variable
+      // When songs are updated, update the portfolio service with new data
+      _portfolioService.updatePortfolioData(_portfolio, songs); // Renamed variable
+      // Notify listeners to update the UI
       notifyListeners();
     });
   }
-  
+
+  // Listen to portfolio updates from the PortfolioService
+  void _listenToPortfolioUpdates() {
+    _portfolioUpdateSubscription = _portfolioService.portfolioUpdates.listen((data) { // Renamed variable
+      // Update price change indicators
+      final updates = data['updates'] as Map<String, Map<String, dynamic>>;
+
+      updates.forEach((songId, update) {
+        final priceChange = update['priceChange'] as double;
+        if (priceChange > 0) {
+          _priceChangeIndicators[songId] = PriceChange.increase;
+        } else if (priceChange < 0) {
+          _priceChangeIndicators[songId] = PriceChange.decrease;
+        }
+      });
+
+      // Notify listeners to update the UI
+      notifyListeners();
+
+      // Clear indicators after a delay
+      Future.delayed(const Duration(seconds: 3), () {
+        _priceChangeIndicators.clear();
+        notifyListeners();
+      });
+    });
+  }
+
   @override
   void dispose() {
-    // Cancel the subscription when the provider is disposed
+    // Cancel subscriptions when the provider is disposed
     _songUpdateSubscription?.cancel();
+    _portfolioUpdateSubscription?.cancel();
+    _portfolioService.dispose(); // Renamed variable
     super.dispose();
   }
 
@@ -81,17 +141,20 @@ class UserDataProvider with ChangeNotifier {
       _userProfile = data['profile'] as UserProfile?;
       _portfolio = (data['portfolio'] as List<PortfolioItem>?) ?? [];
       _transactions = (data['transactions'] as List<Transaction>?) ?? [];
-      
+
       // Initialize with default data if nothing is loaded
       _userProfile ??= UserProfile(
         userId: 'defaultUser',
         cashBalance: 1000.0,
         displayName: 'New Investor',
       );
-      
+
+      // Initialize portfolio service with loaded data
+      _portfolioService.initialize(_portfolio, _marketService.getAllSongs()); // Renamed variable
+
       notifyListeners();
     } catch (e) {
-      print('Error loading data: $e');
+      // print('Error loading data: $e'); // Removed print
       // Initialize with default data on error
       _userProfile = UserProfile(
         userId: 'defaultUser',
@@ -100,6 +163,10 @@ class UserDataProvider with ChangeNotifier {
       );
       _portfolio = [];
       _transactions = [];
+
+      // Initialize portfolio service with default data
+      _portfolioService.initialize(_portfolio, _marketService.getAllSongs()); // Renamed variable
+
       notifyListeners();
     }
   }
@@ -111,17 +178,17 @@ class UserDataProvider with ChangeNotifier {
         await _storageService.saveUserData(_userProfile!, _portfolio, _transactions);
       }
     } catch (e) {
-      print('Error saving data: $e');
+      // print('Error saving data: $e'); // Removed print
     }
   }
 
   // Add a transaction to history
   void _addTransaction(
-    String songId, 
-    String songName, 
-    String artistName, 
-    TransactionType type, 
-    int quantity, 
+    String songId,
+    String songName,
+    String artistName,
+    TransactionType type,
+    int quantity,
     double price,
     String? albumArtUrl,
   ) {
@@ -136,9 +203,9 @@ class UserDataProvider with ChangeNotifier {
       timestamp: DateTime.now(),
       albumArtUrl: albumArtUrl,
     );
-    
+
     _transactions.add(transaction);
-    
+
     // Sort transactions by timestamp (newest first)
     _transactions.sort((a, b) => b.timestamp.compareTo(a.timestamp));
   }
@@ -146,32 +213,32 @@ class UserDataProvider with ChangeNotifier {
   // Buy a song
   Future<bool> buySong(String songId, int quantity) async {
     // Get the song
-    final song = _songService.getSongById(songId);
+    final song = _marketService.getSongById(songId); // Renamed variable
     if (song == null) return false;
-    
+
     // Calculate total cost
     final totalCost = song.currentPrice * quantity;
-    
+
     // Check if user has enough balance
     if ((_userProfile?.cashBalance ?? 0) < totalCost) return false;
-    
+
     // Update user balance
     if (_userProfile != null) {
       _userProfile = _userProfile!.copyWith(
         cashBalance: _userProfile!.cashBalance - totalCost
       );
     }
-    
+
     // Check if user already owns this song
     final existingItemIndex = _portfolio.indexWhere((item) => item.songId == songId);
-    
+
     if (existingItemIndex >= 0) {
       // Update existing portfolio item
       final existingItem = _portfolio[existingItemIndex];
       final newQuantity = existingItem.quantity + quantity;
-      final newAvgPrice = ((existingItem.quantity * existingItem.purchasePrice) + 
+      final newAvgPrice = ((existingItem.quantity * existingItem.purchasePrice) +
                           (quantity * song.currentPrice)) / newQuantity;
-      
+
       _portfolio[existingItemIndex] = existingItem.copyWith(
         quantity: newQuantity,
         purchasePrice: newAvgPrice
@@ -187,7 +254,7 @@ class UserDataProvider with ChangeNotifier {
         albumArtUrl: song.albumArtUrl,
       ));
     }
-    
+
     // Add transaction to history
     _addTransaction(
       song.id,
@@ -198,7 +265,10 @@ class UserDataProvider with ChangeNotifier {
       song.currentPrice,
       song.albumArtUrl,
     );
-    
+
+    // Update portfolio service with new data
+    _portfolioService.updatePortfolioData(_portfolio, _marketService.getAllSongs()); // Renamed variable
+
     // Save data
     await _saveData();
     notifyListeners();
@@ -210,26 +280,26 @@ class UserDataProvider with ChangeNotifier {
     // Find the portfolio item
     final itemIndex = _portfolio.indexWhere((item) => item.songId == songId);
     if (itemIndex < 0) return false;
-    
+
     final item = _portfolio[itemIndex];
-    
+
     // Check if user has enough quantity to sell
     if (item.quantity < quantity) return false;
-    
+
     // Get current song price
-    final song = _songService.getSongById(songId);
+    final song = _marketService.getSongById(songId); // Renamed variable
     final currentPrice = song?.currentPrice ?? item.purchasePrice;
-    
+
     // Calculate sale proceeds
     final proceeds = currentPrice * quantity;
-    
+
     // Update user balance
     if (_userProfile != null) {
       _userProfile = _userProfile!.copyWith(
         cashBalance: _userProfile!.cashBalance + proceeds
       );
     }
-    
+
     // Update portfolio
     if (item.quantity == quantity) {
       // Remove item if selling all
@@ -240,7 +310,7 @@ class UserDataProvider with ChangeNotifier {
         quantity: item.quantity - quantity
       );
     }
-    
+
     // Add transaction to history
     _addTransaction(
       item.songId,
@@ -251,7 +321,10 @@ class UserDataProvider with ChangeNotifier {
       currentPrice,
       item.albumArtUrl,
     );
-    
+
+    // Update portfolio service with new data
+    _portfolioService.updatePortfolioData(_portfolio, _marketService.getAllSongs()); // Renamed variable
+
     // Save data
     await _saveData();
     notifyListeners();
@@ -267,12 +340,12 @@ class UserDataProvider with ChangeNotifier {
     );
     _portfolio = [];
     _transactions = [];
-    
+
     // Clear saved data
     await _storageService.clearAllData();
     notifyListeners();
   }
-  
+
   // Get portfolio item by song ID
   PortfolioItem? getPortfolioItemBySongId(String songId) {
     try {
@@ -281,52 +354,111 @@ class UserDataProvider with ChangeNotifier {
       return null;
     }
   }
-  
+
   // Check if user owns a song
   bool ownsSong(String songId) {
     return _portfolio.any((item) => item.songId == songId && item.quantity > 0);
   }
-  
+
   // Get quantity owned of a song
   int getQuantityOwned(String songId) {
     final item = getPortfolioItemBySongId(songId);
     return item?.quantity ?? 0;
   }
-  
+
   // Get transactions for a specific song
   List<Transaction> getTransactionsForSong(String songId) {
     return _transactions.where((t) => t.songId == songId).toList();
   }
-  
+
   // Get transactions by type (buy or sell)
   List<Transaction> getTransactionsByType(TransactionType type) {
     return _transactions.where((t) => t.type == type).toList();
   }
-  
+
   // Get transactions within a date range
   List<Transaction> getTransactionsInDateRange(DateTime start, DateTime end) {
-    return _transactions.where((t) => 
-      t.timestamp.isAfter(start) && 
+    return _transactions.where((t) =>
+      t.timestamp.isAfter(start) &&
       t.timestamp.isBefore(end.add(const Duration(days: 1)))
     ).toList();
   }
-  
+
   // Calculate total spent on purchases
   double getTotalSpent() {
     return _transactions
         .where((t) => t.type == TransactionType.buy)
         .fold(0.0, (sum, t) => sum + t.totalValue);
   }
-  
+
   // Calculate total earned from sales
   double getTotalEarned() {
     return _transactions
         .where((t) => t.type == TransactionType.sell)
         .fold(0.0, (sum, t) => sum + t.totalValue);
   }
-  
+
   // Get formatted stream count for a song
   String getSongStreamCount(String songId) {
-    return _songService.getFormattedStreamCount(songId);
+    return _marketService.getFormattedStreamCount(songId); // Renamed variable
+  }
+
+  // Get total stream count for all songs in portfolio
+  int getTotalPortfolioStreamCount() {
+    int total = 0;
+    for (var item in _portfolio) {
+      total += _marketService.getStreamCount(item.songId); // Renamed variable
+    }
+    return total;
+  }
+
+  // Get formatted total stream count for all songs in portfolio
+  String getFormattedTotalPortfolioStreamCount() {
+    final count = getTotalPortfolioStreamCount();
+
+    if (count >= 1000000000) {
+      return '${(count / 1000000000).toStringAsFixed(1)}B';
+    } else if (count >= 1000000) {
+      return '${(count / 1000000).toStringAsFixed(1)}M';
+    } else if (count >= 1000) {
+      return '${(count / 1000).toStringAsFixed(1)}K';
+    } else {
+      return count.toString();
+    }
+  }
+
+  // Refresh data to update prices in real-time and reload portfolio data
+  Future<void> refreshData() async {
+    // Set loading state
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      // Reload portfolio data from storage
+      await _loadData();
+
+      // Trigger a manual update of song prices
+      _marketService.triggerPriceUpdate(); // Renamed variable
+
+      // Force portfolio update
+      _portfolioService.forceUpdate(); // Renamed variable
+    } catch (e) {
+      // print('Error refreshing data: $e'); // Removed print
+    } finally {
+      // Clear loading state
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  // Get price change indicator for a song
+  // Note: This now relies on the PriceChange enum defined in PortfolioService
+  // If PortfolioService is not directly used here, consider moving the enum to a shared location
+  // or importing PortfolioService just for the enum type.
+  // For now, assuming the type check works due to the import above.
+  PriceChange getPriceChangeIndicator(String songId) {
+    return _priceChangeIndicators[songId] ?? PriceChange.none;
   }
 }
+
+// Removed duplicate PriceChange enum definition from here

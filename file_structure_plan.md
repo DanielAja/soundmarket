@@ -104,7 +104,8 @@ lib/
 │   │   ├── api_service.dart
 │   │   ├── music_data_api_service.dart
 │   │   ├── storage_service.dart
-│   │   └── analytics_service.dart
+│   │   ├── analytics_service.dart
+│   │   └── spotify_api_service.dart
 │   ├── widgets/
 │   │   ├── app_bar.dart
 │   │   ├── loading_indicator.dart
@@ -143,6 +144,10 @@ lib/
 - Providers: State management
 - Screens: UI composition
 - Widgets: Reusable UI components
+
+### 5. Testing and Mocking Strategy
+- Unit and widget tests should reside in the `test/` directory, mirroring the `lib/` structure (e.g., `test/features/portfolio/services/portfolio_service_test.dart`).
+- Mock data and services used purely for testing should be placed in `test/mocks/`. Mocks needed for development builds can be managed via environment configuration.
 
 ## Implementation Benefits
 
@@ -197,7 +202,7 @@ Each feature module should follow a similar structure:
 - Full pages/screens for the feature
 
 #### Services
-- Business logic and data operations for the feature
+- Business logic and data operations for the feature (e.g., `portfolio_service.dart` handles portfolio management including buy/sell logic, `market_service.dart` handles song data retrieval and pricing models).
 
 #### Widgets
 - UI components specific to the feature
@@ -215,9 +220,10 @@ Each feature module should follow a similar structure:
 
 #### Services
 - **api_service.dart**: Base API service with common functionality
-- **music_data_api_service.dart**: Music data API interactions
-- **storage_service.dart**: Local storage operations
+- **music_data_api_service.dart**: Music data API interactions (e.g., fetching song details, charts)
+- **storage_service.dart**: Local storage operations (e.g., saving/loading user data, preferences)
 - **analytics_service.dart**: Analytics tracking
+- **spotify_api_service.dart**: Interactions with the Spotify API (if used directly, e.g., for richer song data or playback features)
 
 #### Widgets
 - **app_bar.dart**: Common app bar
@@ -251,6 +257,7 @@ Each feature module should follow a similar structure:
 | lib/screens/discover_screen.dart | lib/features/market/screens/discover_screen.dart |
 | lib/screens/profile_screen.dart | lib/features/profile/screens/profile_screen.dart |
 | lib/screens/transaction_history_screen.dart | lib/features/transactions/screens/transaction_history_screen.dart |
+| lib/services/spotify_api_service.dart | lib/shared/services/spotify_api_service.dart |
 | lib/main.dart | lib/main.dart (unchanged) |
 
 This architecture provides a solid foundation for the SoundMarket app while allowing for future growth and feature additions.

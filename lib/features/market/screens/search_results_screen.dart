@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../models/song.dart';
-import '../providers/user_data_provider.dart';
-import '../shared/widgets/search_bar_with_suggestions.dart';
+import '../../../shared/models/song.dart'; // Corrected path
+import '../../../shared/providers/user_data_provider.dart'; // Corrected path
+import '../../../shared/widgets/search_bar_with_suggestions.dart'; // Corrected path
 
 class SearchResultsScreen extends StatefulWidget {
   final String initialQuery;

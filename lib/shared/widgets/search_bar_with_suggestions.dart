@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../models/song.dart';
-import '../../providers/user_data_provider.dart';
+import '../models/song.dart'; // Corrected path
+import '../providers/user_data_provider.dart'; // Corrected path
 
 class SearchBarWithSuggestions extends StatefulWidget {
   final Function(Song) onSongSelected;
@@ -151,7 +151,7 @@ class _SearchBarWithSuggestionsState extends State<SearchBarWithSuggestions> {
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.2),
+              color: Colors.black.withAlpha((255 * 0.2).round()), // Replaced withOpacity
               blurRadius: 5.0,
               offset: const Offset(0, 2),
             ),
@@ -168,12 +168,12 @@ class _SearchBarWithSuggestionsState extends State<SearchBarWithSuggestions> {
         borderRadius: const BorderRadius.only(
           bottomLeft: Radius.circular(8.0),
           bottomRight: Radius.circular(8.0),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.2),
-            blurRadius: 5.0,
-            offset: const Offset(0, 2),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withAlpha((255 * 0.2).round()), // Replaced withOpacity
+              blurRadius: 5.0,
+              offset: const Offset(0, 2),
           ),
         ],
       ),

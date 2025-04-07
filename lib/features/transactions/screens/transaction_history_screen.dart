@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
-import '../providers/user_data_provider.dart';
-import '../models/transaction.dart';
+import '../../../shared/providers/user_data_provider.dart'; // Corrected path
+import '../../../shared/models/transaction.dart'; // Corrected path
 
 class TransactionHistoryScreen extends StatefulWidget {
   const TransactionHistoryScreen({super.key});
@@ -58,6 +58,13 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> wit
       ),
       body: Consumer<UserDataProvider>(
         builder: (context, userDataProvider, child) {
+          // Show loading indicator when refreshing data
+          if (userDataProvider.isLoading) {
+            return const Center(
+              child: CircularProgressIndicator(),
+            );
+          }
+          
           final transactions = _getFilteredTransactions(userDataProvider);
           
           if (transactions.isEmpty) {
@@ -90,12 +97,15 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> wit
             );
           }
           
-          return ListView.builder(
-            itemCount: transactions.length,
-            itemBuilder: (context, index) {
-              final transaction = transactions[index];
-              return _buildTransactionItem(transaction);
-            },
+          return RefreshIndicator(
+            onRefresh: () => userDataProvider.refreshData(),
+            child: ListView.builder(
+              itemCount: transactions.length,
+              itemBuilder: (context, index) {
+                final transaction = transactions[index];
+                return _buildTransactionItem(transaction);
+              },
+            ),
           );
         },
       ),
@@ -112,7 +122,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> wit
               color: Theme.of(context).colorScheme.surface,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
+                  color: Colors.black.withAlpha((255 * 0.1).round()), // Replaced withOpacity
                   blurRadius: 4.0,
                   offset: const Offset(0, -2),
                 ),
@@ -252,7 +262,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> wit
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
                   decoration: BoxDecoration(
-                    color: isBuy ? Colors.green.withOpacity(0.2) : Colors.red.withOpacity(0.2),
+                    color: isBuy ? Colors.green.withAlpha((255 * 0.2).round()) : Colors.red.withAlpha((255 * 0.2).round()), // Replaced withOpacity
                     borderRadius: BorderRadius.circular(4.0),
                   ),
                   child: Text(

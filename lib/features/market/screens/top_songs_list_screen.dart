@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../models/song.dart';
-import '../providers/user_data_provider.dart';
+import '../../../shared/models/song.dart'; // Corrected path
+import '../../../shared/providers/user_data_provider.dart'; // Corrected path
 
 enum ListType {
   topSongs,
@@ -68,7 +68,7 @@ class TopSongsListScreen extends StatelessWidget {
               itemCount: songs.length,
               itemBuilder: (context, index) {
                 final song = songs[index];
-                final isOwned = userDataProvider.ownsSong(song.id);
+                // Removed unused variable: final isOwned = userDataProvider.ownsSong(song.id);
                 
                 return Card(
                   margin: const EdgeInsets.only(bottom: 12.0),
