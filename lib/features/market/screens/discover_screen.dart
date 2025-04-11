@@ -473,20 +473,16 @@ class _DiscoverScreenState extends State<DiscoverScreen> with TickerProviderStat
       onTap: () => _showSongActions(context, song, userDataProvider),
       child: Card(
         margin: const EdgeInsets.only(right: AppSpacing.l), // Use AppSpacing.l
-        child: SizedBox( 
-          width: 120.0, 
-          child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.s), // Use AppSpacing.s
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              // Removed mainAxisSize: MainAxisSize.min
+        clipBehavior: Clip.antiAlias, // Add this to clip the image to the card's shape
+        child: SizedBox(
+          width: 120.0,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                ClipRRect( // Use ClipRRect to ensure the image respects the border radius
-                  borderRadius: BorderRadius.circular(AppSpacing.xs), // Use AppSpacing.xs
-                  child: SizedBox( // Use SizedBox to constrain the image size
-                    height: 120.0, // Increased from 90.0
-                    width: 120.0, // Increased from 90.0
-                    child: song.albumArtUrl != null && song.albumArtUrl!.isNotEmpty
+                SizedBox( // Use SizedBox to constrain the image size
+                  height: 120.0, // Increased from 90.0
+                  width: 120.0, // Increased from 90.0
+                  child: song.albumArtUrl != null && song.albumArtUrl!.isNotEmpty
                         ? Image.network(
                             song.albumArtUrl!,
                             fit: BoxFit.cover,
@@ -525,12 +521,13 @@ class _DiscoverScreenState extends State<DiscoverScreen> with TickerProviderStat
                               ),
                             ),
                           ),
-                  ),
                 ),
                 Expanded( // Wrap the text content below the image with Expanded
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly, // Adjust alignment if needed
+                  child: Padding( // Add padding only around the text content
+                    padding: const EdgeInsets.all(AppSpacing.s), // Use AppSpacing.s
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly, // Adjust alignment if needed
                     children: [
                       Text(
                         song.name,
@@ -634,10 +631,11 @@ class _DiscoverScreenState extends State<DiscoverScreen> with TickerProviderStat
                         ),
                     ],
                   ),
+                  ), // Close Padding
                 ),
               ],
             ),
-          ),
+          // Removed Padding wrapper
         ),
       ),
     );
