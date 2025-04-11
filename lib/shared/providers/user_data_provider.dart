@@ -5,8 +5,9 @@ import '../models/user_profile.dart';
 import '../models/portfolio_item.dart';
 import '../models/song.dart';
 import '../models/transaction.dart';
+import '../models/portfolio_snapshot.dart'; // Import the snapshot model
 import '../services/storage_service.dart';
-import '../../features/market/services/market_service.dart'; // Correct path for market service
+import '../../features/market/services/market_service.dart';
 // Import the new portfolio service to potentially use its PriceChange enum if needed elsewhere
 import '../../features/portfolio/services/portfolio_service.dart';
 
@@ -15,16 +16,21 @@ class UserDataProvider with ChangeNotifier {
   UserProfile? _userProfile;
   List<PortfolioItem> _portfolio = [];
   List<Transaction> _transactions = [];
+  List<PortfolioSnapshot> _portfolioHistory = []; // Add state for history
   final StorageService _storageService = StorageService();
-  final MarketService _marketService = MarketService(); // Renamed class and variable
+  final MarketService _marketService = MarketService();
   final _uuid = const Uuid();
 
   // Loading state
   bool _isLoading = false;
+  // Removed _portfolioValueAtSessionStart as it's replaced by history
 
   // Subscriptions
   StreamSubscription? _songUpdateSubscription;
   StreamSubscription? _portfolioUpdateSubscription;
+
+  // Timer for periodic history snapshots
+  Timer? _snapshotTimer;
 
   // Portfolio service (renamed from PortfolioUpdateService)
   final PortfolioService _portfolioService = PortfolioService(); // Renamed class and variable
@@ -36,13 +42,14 @@ class UserDataProvider with ChangeNotifier {
   UserProfile? get userProfile => _userProfile;
   List<PortfolioItem> get portfolio => _portfolio;
   List<Transaction> get transactions => _transactions;
+  List<PortfolioSnapshot> get portfolioHistory => _portfolioHistory; // Getter for history
   bool get isLoading => _isLoading;
 
-  // Calculate total portfolio value based on current song prices
-  double get totalPortfolioValue {
+  // Helper to calculate portfolio value
+  double _calculatePortfolioValue() {
     double total = 0.0;
     for (var item in _portfolio) {
-      final song = _marketService.getSongById(item.songId); // Renamed variable
+      final song = _marketService.getSongById(item.songId);
       if (song != null) {
         total += item.quantity * song.currentPrice;
       } else {
@@ -51,6 +58,12 @@ class UserDataProvider with ChangeNotifier {
       }
     }
     return total;
+  }
+
+  // Calculate total portfolio value based on current song prices
+  double get totalPortfolioValue {
+    // Use the helper method
+    return _calculatePortfolioValue();
   }
 
   // Calculate total balance (cash + portfolio value)
@@ -87,6 +100,22 @@ class UserDataProvider with ChangeNotifier {
     _loadData();
     _listenToSongUpdates();
     _listenToPortfolioUpdates();
+    _startSnapshotTimer(); // Start the snapshot timer
+  }
+
+  // Start the timer for periodic portfolio snapshots
+  void _startSnapshotTimer() {
+    _snapshotTimer?.cancel(); // Cancel existing timer if any
+    // Increased frequency for more chart data points
+    _snapshotTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
+      // Add a snapshot periodically, only if data is loaded
+      if (_userProfile != null && !_isLoading) {
+         _addPortfolioSnapshot();
+         // We might notify listeners here if we want the graph to update
+         // based *only* on new snapshots, but current logic updates on price changes anyway.
+         // notifyListeners();
+      }
+    });
   }
 
   // Listen to song updates from the MarketService (formerly SongService)
@@ -130,6 +159,7 @@ class UserDataProvider with ChangeNotifier {
     // Cancel subscriptions when the provider is disposed
     _songUpdateSubscription?.cancel();
     _portfolioUpdateSubscription?.cancel();
+    _snapshotTimer?.cancel(); // Cancel the snapshot timer
     _portfolioService.dispose(); // Renamed variable
     super.dispose();
   }
@@ -141,6 +171,7 @@ class UserDataProvider with ChangeNotifier {
       _userProfile = data['profile'] as UserProfile?;
       _portfolio = (data['portfolio'] as List<PortfolioItem>?) ?? [];
       _transactions = (data['transactions'] as List<Transaction>?) ?? [];
+      _portfolioHistory = (data['history'] as List<PortfolioSnapshot>?) ?? []; // Load history
 
       // Initialize with default data if nothing is loaded
       _userProfile ??= UserProfile(
@@ -163,9 +194,10 @@ class UserDataProvider with ChangeNotifier {
       );
       _portfolio = [];
       _transactions = [];
+      _portfolioHistory = []; // Reset history on error too
 
       // Initialize portfolio service with default data
-      _portfolioService.initialize(_portfolio, _marketService.getAllSongs()); // Renamed variable
+      _portfolioService.initialize(_portfolio, _marketService.getAllSongs());
 
       notifyListeners();
     }
@@ -175,7 +207,13 @@ class UserDataProvider with ChangeNotifier {
   Future<void> _saveData() async {
     try {
       if (_userProfile != null) {
-        await _storageService.saveUserData(_userProfile!, _portfolio, _transactions);
+        // Save all data including history
+        await _storageService.saveUserData(
+          profile: _userProfile!,
+          portfolio: _portfolio,
+          transactions: _transactions,
+          history: _portfolioHistory, // Pass history to save method
+        );
       }
     } catch (e) {
       // print('Error saving data: $e'); // Removed print
@@ -266,10 +304,13 @@ class UserDataProvider with ChangeNotifier {
       song.albumArtUrl,
     );
 
-    // Update portfolio service with new data
-    _portfolioService.updatePortfolioData(_portfolio, _marketService.getAllSongs()); // Renamed variable
+    // Add a snapshot of the portfolio value *after* the transaction
+    _addPortfolioSnapshot();
 
-    // Save data
+    // Update portfolio service with new data
+    _portfolioService.updatePortfolioData(_portfolio, _marketService.getAllSongs());
+
+    // Save data (which now includes history)
     await _saveData();
     notifyListeners();
     return true;
@@ -322,10 +363,13 @@ class UserDataProvider with ChangeNotifier {
       item.albumArtUrl,
     );
 
-    // Update portfolio service with new data
-    _portfolioService.updatePortfolioData(_portfolio, _marketService.getAllSongs()); // Renamed variable
+    // Add a snapshot of the portfolio value *after* the transaction
+    _addPortfolioSnapshot();
 
-    // Save data
+    // Update portfolio service with new data
+    _portfolioService.updatePortfolioData(_portfolio, _marketService.getAllSongs());
+
+    // Save data (which now includes history)
     await _saveData();
     notifyListeners();
     return true;
@@ -340,10 +384,34 @@ class UserDataProvider with ChangeNotifier {
     );
     _portfolio = [];
     _transactions = [];
+    _portfolioHistory = []; // Clear history on reset
 
     // Clear saved data
     await _storageService.clearAllData();
     notifyListeners();
+  }
+
+  // Helper method to add a portfolio snapshot
+  void _addPortfolioSnapshot() {
+    final currentPortfolioValue = _calculatePortfolioValue();
+    final now = DateTime.now();
+
+    // Avoid adding snapshot if timestamp is identical to the last one
+    if (_portfolioHistory.isNotEmpty && _portfolioHistory.last.timestamp == now) {
+      return;
+    }
+
+    // Optional: Add logic to avoid saving if value hasn't changed significantly
+    // if (_portfolioHistory.isNotEmpty && (_portfolioHistory.last.value - currentPortfolioValue).abs() < 0.01) {
+    //   return;
+    // }
+
+    _portfolioHistory.add(
+      PortfolioSnapshot(timestamp: now, value: currentPortfolioValue),
+    );
+
+    // Optional: Keep history sorted (though load sorts it)
+    // _portfolioHistory.sort((a, b) => a.timestamp.compareTo(b.timestamp));
   }
 
   // Get portfolio item by song ID

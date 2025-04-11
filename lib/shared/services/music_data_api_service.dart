@@ -106,7 +106,8 @@ class MusicDataApiService {
     _updateTimer?.cancel();
     
     // Create a new timer that fires periodically
-    _updateTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+    // Update more frequently for a real-time feel
+    _updateTimer = Timer.periodic(const Duration(seconds: 2), (_) {
       _updateStreamCounts();
       _updatePrices();
     });

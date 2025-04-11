@@ -114,11 +114,29 @@ class _HomeScreenState extends State<HomeScreen> {
     final portfolioValue = userDataProvider.totalPortfolioValue;
     final cashBalance = userDataProvider.userProfile?.cashBalance ?? 0.0;
     final totalBalance = userDataProvider.totalBalance;
-    
-    // Calculate a mock daily change (would be calculated from real data)
-    final dailyChange = portfolioValue * 0.02; // 2% daily change for demo
-    final isPositive = dailyChange >= 0;
-    
+    final history = userDataProvider.portfolioHistory;
+
+    // Calculate cumulative statistics from history
+    double totalGainLoss = 0.0;
+    double totalGainLossPercent = 0.0;
+    double highestValue = portfolioValue; // Start with current
+    double lowestValue = portfolioValue; // Start with current
+
+    if (history.isNotEmpty) {
+      final initialValue = history.first.value;
+      totalGainLoss = portfolioValue - initialValue;
+      if (initialValue != 0) {
+        totalGainLossPercent = (totalGainLoss / initialValue) * 100;
+      }
+      // Find highest and lowest from history, including current value
+      highestValue = history.map((s) => s.value).reduce(max);
+      highestValue = max(highestValue, portfolioValue);
+      lowestValue = history.map((s) => s.value).reduce(min);
+      lowestValue = min(lowestValue, portfolioValue);
+    }
+
+    final isPositiveGain = totalGainLoss >= 0;
+
     return Card(
       elevation: 4.0,
       child: Padding(
@@ -187,15 +205,16 @@ class _HomeScreenState extends State<HomeScreen> {
                     Row(
                       children: [
                         Icon(
-                          isPositive ? Icons.arrow_upward : Icons.arrow_downward,
-                          color: isPositive ? Colors.green : Colors.red,
+                          isPositiveGain ? Icons.arrow_upward : Icons.arrow_downward,
+                          color: isPositiveGain ? Colors.green : Colors.red,
                           size: 16.0,
                         ),
                         const SizedBox(width: AppSpacing.xs), // Use AppSpacing.xs
                         Text(
-                          '${isPositive ? "+" : ""}${dailyChange.toStringAsFixed(2)} (${(dailyChange / (portfolioValue - dailyChange) * 100).toStringAsFixed(2)}%)',
+                          // Display total gain/loss since beginning
+                          '${isPositiveGain ? "+" : ""}${totalGainLoss.toStringAsFixed(2)} (${isPositiveGain ? "+" : ""}${totalGainLossPercent.toStringAsFixed(2)}%) All Time',
                           style: TextStyle(
-                            color: isPositive ? Colors.green : Colors.red,
+                            color: isPositiveGain ? Colors.green : Colors.red,
                           ),
                         ),
                       ],
@@ -282,147 +301,104 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // Generate chart data based on the selected time filter and user transactions
+  // Generate chart data based on the selected time filter and portfolio history
   List<FlSpot> _generateChartData(
-    String timeFilter, 
-    UserDataProvider userDataProvider
+    String timeFilter,
+    UserDataProvider userDataProvider,
   ) {
-    final spots = <FlSpot>[];
     final now = DateTime.now();
-    final transactions = userDataProvider.transactions;
-    // Removed unused variable: final currentPortfolioValue = userDataProvider.totalPortfolioValue;
-    // Removed unused variable: final currentCashBalance = userDataProvider.userProfile?.cashBalance ?? 0.0;
-    final currentTotalBalance = userDataProvider.totalBalance;
-    
+    final history = userDataProvider.portfolioHistory;
+    final currentPortfolioValue = userDataProvider.totalPortfolioValue; // Get current value
+
+    if (history.isEmpty) {
+      // If no history, show a flat line at the current value (or starting value if available)
+      final startValue = history.isNotEmpty ? history.first.value : currentPortfolioValue;
+      return [
+        FlSpot(0, startValue),
+        FlSpot(1, currentPortfolioValue), // Show current value as the end point
+      ];
+    }
+
     // Determine start date based on time filter
     DateTime startDate;
-    int numPoints;
-    
+
     switch (timeFilter) {
       case '1D':
-        startDate = DateTime(now.year, now.month, now.day).subtract(const Duration(days: 1));
-        numPoints = 24; // Hourly data for 1 day
+        startDate = now.subtract(const Duration(days: 1));
         break;
       case '1W':
         startDate = now.subtract(const Duration(days: 7));
-        numPoints = 7; // Daily data for 1 week
         break;
       case '1M':
-        startDate = DateTime(now.year, now.month - 1, now.day);
-        numPoints = 30; // Daily data for 1 month
+        startDate = now.subtract(const Duration(days: 30)); // Approx
         break;
       case '3M':
-        startDate = DateTime(now.year, now.month - 3, now.day);
-        numPoints = 12; // Weekly data for 3 months
+        startDate = now.subtract(const Duration(days: 90)); // Approx
         break;
       case '1Y':
-        startDate = DateTime(now.year - 1, now.month, now.day);
-        numPoints = 12; // Monthly data for 1 year
+        startDate = now.subtract(const Duration(days: 365)); // Approx
         break;
       case 'All':
-        // Use the earliest transaction date or 2 years ago, whichever is earlier
-        startDate = transactions.isNotEmpty 
-            ? transactions.map((t) => t.timestamp).reduce((a, b) => a.isBefore(b) ? a : b)
-            : DateTime(now.year - 2, now.month, now.day);
-        numPoints = 24; // Monthly data for all time
-        break;
       default:
-        startDate = now.subtract(const Duration(days: 7));
-        numPoints = 7; // Default to 1 week
+        startDate = history.first.timestamp; // Use the earliest record
+        break;
     }
-    
-    // Filter transactions that occurred after the start date
-    final relevantTransactions = transactions
-        .where((t) => t.timestamp.isAfter(startDate))
+
+    // Find the snapshot just before the start date to anchor the graph start
+    final startSnapshotIndex = history.lastIndexWhere((s) => s.timestamp.isBefore(startDate));
+    final startSnapshot = startSnapshotIndex >= 0 ? history[startSnapshotIndex] : history.first;
+
+    // Filter history to the relevant period, including the start snapshot
+    final relevantHistory = history
+        .where((s) => s.timestamp.isAfter(startSnapshot.timestamp) || s.timestamp == startSnapshot.timestamp)
         .toList();
-    
-    // If there are no transactions in the selected time period, use a simple linear progression
-    if (relevantTransactions.isEmpty) {
-      // Start with 80% of current value as a baseline
-      final baseValue = currentTotalBalance * 0.8;
-      
-      for (int i = 0; i < numPoints; i++) {
-        final progress = i / (numPoints - 1);
-        final value = baseValue + (currentTotalBalance - baseValue) * progress;
-        spots.add(FlSpot(i.toDouble(), value));
-      }
-      
-      return spots;
+
+    // If only the start snapshot exists in the relevant period, add the current value
+    if (relevantHistory.length <= 1) {
+       return [
+         FlSpot(0, startSnapshot.value),
+         FlSpot(1, currentPortfolioValue), // Show current value as the end point
+       ];
     }
-    
-    // Sort transactions by timestamp (oldest first)
-    relevantTransactions.sort((a, b) => a.timestamp.compareTo(b.timestamp));
-    
-    // Calculate time intervals for data points
-    final timeRange = now.difference(startDate).inMilliseconds;
-    final intervalMs = timeRange / (numPoints - 1);
-    
-    // Initialize with starting balance (assume 80% of current if no transactions)
-    double runningBalance = currentTotalBalance * 0.8;
-    
-    // If we have transactions, calculate a more accurate starting balance
-    if (relevantTransactions.isNotEmpty) {
-      // Start with current balance and work backwards through transactions
-      runningBalance = currentTotalBalance;
-      
-      for (final transaction in transactions.reversed) {
-        if (transaction.timestamp.isBefore(startDate)) {
-          // Stop once we reach transactions before our start date
-          break;
-        }
-        
-        // Reverse the transaction effect
-        if (transaction.type == TransactionType.buy) {
-          // For buy: add the cost back to balance, remove the shares value
-          runningBalance += transaction.totalValue;
-          // We don't have historical prices, so use purchase price as an approximation
-          runningBalance -= transaction.price * transaction.quantity;
-        } else {
-          // For sell: remove the proceeds, add the shares value
-          runningBalance -= transaction.totalValue;
-          // We don't have historical prices, so use sale price as an approximation
-          runningBalance += transaction.price * transaction.quantity;
-        }
-      }
-      
-      // Ensure we don't go negative or too low
-      runningBalance = runningBalance.clamp(currentTotalBalance * 0.5, double.infinity);
+
+    // Generate spots
+    final spots = <FlSpot>[];
+    final totalDuration = now.difference(startSnapshot.timestamp);
+
+    for (int i = 0; i < relevantHistory.length; i++) {
+      final snapshot = relevantHistory[i];
+      // Calculate X based on time progression relative to the start snapshot
+      final timeDiff = snapshot.timestamp.difference(startSnapshot.timestamp);
+      final xValue = totalDuration.inMilliseconds > 0
+          ? (timeDiff.inMilliseconds / totalDuration.inMilliseconds) * (relevantHistory.length -1) // Scale x across the number of points
+          : i.toDouble(); // Fallback if duration is zero
+
+      spots.add(FlSpot(xValue, snapshot.value));
     }
-    
-    // Generate data points at regular intervals
-    for (int i = 0; i < numPoints; i++) {
-      final pointTime = startDate.add(Duration(milliseconds: (intervalMs * i).round()));
-      double balance = runningBalance;
-      
-      // Apply all transactions that happened before this point
-      for (final transaction in relevantTransactions) {
-        if (transaction.timestamp.isAfter(pointTime)) {
-          // Skip transactions that haven't happened yet at this point
-          continue;
-        }
-        
-        // Apply transaction effect
-        if (transaction.type == TransactionType.buy) {
-          // For buy: subtract the cost, add the shares value
-          balance -= transaction.totalValue;
-          // We don't have historical prices, so use purchase price as an approximation
-          balance += transaction.price * transaction.quantity;
-        } else {
-          // For sell: add the proceeds, remove the shares value
-          balance += transaction.totalValue;
-          // We don't have historical prices, so use sale price as an approximation
-          balance -= transaction.price * transaction.quantity;
-        }
-      }
-      
-      // Ensure the last point matches the current total balance
-      if (i == numPoints - 1) {
-        balance = currentTotalBalance;
-      }
-      
-      spots.add(FlSpot(i.toDouble(), balance));
-    }
-    
+
+     // Ensure the very last spot reflects the current portfolio value accurately
+     // Replace the last generated spot's value or add a new one if needed
+     final lastSnapshotTimeDiff = relevantHistory.last.timestamp.difference(startSnapshot.timestamp);
+     final lastXValue = totalDuration.inMilliseconds > 0
+         ? (lastSnapshotTimeDiff.inMilliseconds / totalDuration.inMilliseconds) * (relevantHistory.length -1)
+         : (relevantHistory.length - 1).toDouble();
+
+     if (spots.isNotEmpty && spots.last.x == lastXValue) {
+       spots[spots.length - 1] = FlSpot(lastXValue, currentPortfolioValue);
+     } else {
+       // Add a final spot for the current time/value if it's significantly different
+       final nowTimeDiff = now.difference(startSnapshot.timestamp);
+       final nowXValue = totalDuration.inMilliseconds > 0
+           ? (nowTimeDiff.inMilliseconds / totalDuration.inMilliseconds) * (relevantHistory.length -1)
+           : relevantHistory.length.toDouble();
+       spots.add(FlSpot(nowXValue, currentPortfolioValue));
+     }
+
+
+    // Optional: Implement data aggregation for older periods ('1Y', 'All') here
+    // to improve performance if history becomes very large.
+    // For now, we plot all points in the filtered range.
+
     return spots;
   }
 
@@ -522,60 +498,70 @@ class _HomeScreenState extends State<HomeScreen> {
                           sideTitles: SideTitles(
                             showTitles: true,
                             reservedSize: 30,
-                            interval: 1,
+                            interval: 1, // Adjust interval based on range later if needed
                             getTitlesWidget: (value, meta) {
-                              final index = value.toInt();
-                              String label = '';
-                              
-                              // Get appropriate labels based on time filter
+                              // value corresponds to the x-value of the FlSpot
+                              // We need to map this back to a timestamp from the relevant history
+                              final history = userDataProvider.portfolioHistory;
+                              if (history.isEmpty || spots.isEmpty) return const SizedBox();
+
+                              // Determine the start date based on the filter
+                              final now = DateTime.now();
+                              DateTime filterStartDate;
                               switch (_selectedTimeFilter) {
-                                case '1D':
-                                  // Hours
-                                  if (index % 4 == 0 && index < 24) {
-                                    final hour = index;
-                                    label = '${hour == 0 ? 12 : (hour > 12 ? hour - 12 : hour)}${hour >= 12 ? 'pm' : 'am'}';
-                                  }
-                                  break;
-                                case '1W':
-                                  // Days of week
-                                  const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-                                  if (index >= 0 && index < days.length) {
-                                    label = days[index];
-                                  }
-                                  break;
-                                case '1M':
-                                  // Days of month
-                                  if (index % 5 == 0) {
-                                    label = '${index + 1}';
-                                  }
-                                  break;
-                                case '3M':
-                                  // Weeks
-                                  if (index < 12) {
-                                    label = 'W${index + 1}';
-                                  }
-                                  break;
-                                case '1Y':
-                                  // Months
-                                  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-                                  if (index < months.length) {
-                                    label = months[index];
-                                  }
-                                  break;
+                                case '1D': filterStartDate = now.subtract(const Duration(days: 1)); break;
+                                case '1W': filterStartDate = now.subtract(const Duration(days: 7)); break;
+                                case '1M': filterStartDate = now.subtract(const Duration(days: 30)); break;
+                                case '3M': filterStartDate = now.subtract(const Duration(days: 90)); break;
+                                case '1Y': filterStartDate = now.subtract(const Duration(days: 365)); break;
                                 case 'All':
-                                  // Quarters over years
-                                  if (index % 4 == 0 && index < 24) {
-                                    final year = 2023 + (index ~/ 4);
-                                    final quarter = (index % 4) + 1;
-                                    label = 'Q$quarter\n$year';
-                                  }
-                                  break;
+                                default: filterStartDate = history.first.timestamp; break;
                               }
-                              
-                              if (label.isEmpty) {
-                                return const SizedBox();
+
+                              // Find the actual start snapshot used for the graph
+                              final startSnapshotIndex = history.lastIndexWhere((s) => s.timestamp.isBefore(filterStartDate));
+                              final startSnapshot = startSnapshotIndex >= 0 ? history[startSnapshotIndex] : history.first;
+                              final relevantHistory = history.where((s) => !s.timestamp.isBefore(startSnapshot.timestamp)).toList();
+
+                              if (relevantHistory.isEmpty || value < 0 || value >= spots.length) {
+                                 return const SizedBox(); // Avoid index errors
                               }
-                              
+
+                              // Find the approximate timestamp for the given spot 'value' (x-axis index)
+                              // This requires knowing how the x-values were calculated in _generateChartData
+                              // Let's approximate by finding the corresponding snapshot in relevantHistory
+                              final index = value.round().clamp(0, relevantHistory.length - 1);
+                              final timestamp = relevantHistory[index].timestamp;
+
+                              // --- Generate Label based on Filter ---
+                              String label = '';
+                              int maxLabels = 5; // Limit number of labels shown
+
+                              // Simple labeling based on index for now, needs refinement based on actual timestamps
+                              if (spots.length > 1 && value.toInt() % (spots.length ~/ maxLabels).clamp(1, spots.length) == 0) {
+                                switch (_selectedTimeFilter) {
+                                  case '1D': // Show Hour:Minute
+                                    label = '${timestamp.hour}:${timestamp.minute.toString().padLeft(2, '0')}';
+                                    break;
+                                  case '1W': // Show Day (e.g., Mon)
+                                  case '1M': // Show Day (e.g., 15)
+                                    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+                                    label = days[timestamp.weekday - 1]; // Or timestamp.day.toString(); for 1M
+                                    break;
+                                  case '3M': // Show Month/Day (e.g., 4/11)
+                                  case '1Y': // Show Month (e.g., Apr)
+                                    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                                    label = months[timestamp.month - 1];
+                                    break;
+                                  case 'All': // Show Year or Month/Year
+                                  default:
+                                    label = timestamp.year.toString(); // Simplistic, show year
+                                    break;
+                                }
+                              }
+
+                              if (label.isEmpty) return const SizedBox();
+
                               return Padding(
                                 padding: const EdgeInsets.only(top: AppSpacing.s), // Use AppSpacing.s
                                 child: Text(
