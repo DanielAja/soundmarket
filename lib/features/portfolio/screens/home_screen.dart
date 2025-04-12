@@ -324,7 +324,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
     switch (timeFilter) {
       case '1D':
-        startDate = now.subtract(const Duration(days: 1));
+        // Start from 12:00 AM of the current day
+        startDate = DateTime(now.year, now.month, now.day); 
         break;
       case '1W':
         startDate = now.subtract(const Duration(days: 7));
@@ -608,8 +609,9 @@ class _HomeScreenState extends State<HomeScreen> {
                           barWidth: 3,
                           isStrokeCapRound: true,
                           dotData: FlDotData(
-                            show: true,
+                            show: false, // Hide the dots on the line chart
                             getDotPainter: (spot, percent, barData, index) {
+                              // Painter is still defined but won't be used as show is false
                               return FlDotCirclePainter(
                                 radius: 3,
                                 color: chartColor,
