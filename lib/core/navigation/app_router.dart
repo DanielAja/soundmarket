@@ -12,7 +12,7 @@ class AppRouter {
   static Route<dynamic> generateRoute(RouteSettings settings) {
     switch (settings.name) {
       case RouteConstants.home:
-        return MaterialPageRoute(builder: (_) => const HomeScreen());
+        return MaterialPageRoute(builder: (_) => HomeScreen()); // Removed const
       
       case RouteConstants.discover:
         return MaterialPageRoute(builder: (_) => const DiscoverScreen());

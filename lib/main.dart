@@ -118,7 +118,7 @@ class _MainNavigationWrapperState extends State<MainNavigationWrapper> {
 
   // List of screens for the bottom navigation
   static final List<Widget> _widgetOptions = <Widget>[
-    const HomeScreen(),
+    HomeScreen(), // Removed const
     const DiscoverScreen(),
     const ProfileScreen(),
   ];

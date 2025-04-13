@@ -1,16 +1,57 @@
 import 'dart:convert';
+import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sqflite/sqflite.dart' as sqflite; // Add prefix
+import 'package:path/path.dart'; // Import path package
 import '../models/user_profile.dart';
 import '../models/portfolio_item.dart';
 import '../models/transaction.dart';
-import '../models/portfolio_snapshot.dart'; // Import the new model
+import '../models/portfolio_snapshot.dart';
 
 class StorageService {
-  // Keys for SharedPreferences
+  // Keys for SharedPreferences (Profile, Portfolio, Transactions)
   static const String _userProfileKey = 'user_profile';
   static const String _portfolioKey = 'portfolio';
   static const String _transactionsKey = 'transactions';
-  static const String _portfolioHistoryKey = 'portfolio_history'; // New key for snapshots
+
+  // Database instance
+  static sqflite.Database? _database; // Use prefix
+  static const String _dbName = 'soundmarket.db';
+  static const String _snapshotsTable = 'portfolio_snapshots';
+
+  // Getter for the database instance
+  Future<sqflite.Database> get database async { // Use prefix
+    if (_database != null) return _database!;
+    _database = await _initDatabase();
+    return _database!;
+  }
+
+  // Initialize the database
+  Future<sqflite.Database> _initDatabase() async { // Use prefix
+    final documentsDirectory = await getApplicationDocumentsDirectory();
+    final path = join(documentsDirectory.path, _dbName);
+
+    return await sqflite.openDatabase( // Use prefix
+      path,
+      version: 1,
+      onCreate: _onCreate,
+    );
+  }
+
+  // Create database table
+  Future<void> _onCreate(sqflite.Database db, int version) async { // Use prefix
+    await db.execute('''
+      CREATE TABLE $_snapshotsTable (
+        timestamp INTEGER PRIMARY KEY,
+        value REAL NOT NULL
+      )
+    ''');
+    // Add index for faster range queries
+    await db.execute('CREATE INDEX idx_timestamp ON $_snapshotsTable (timestamp)');
+  }
+
+
+  // --- User Profile, Portfolio, Transactions (using SharedPreferences) ---
 
   // Save user profile to local storage
   Future<void> saveUserProfile(UserProfile profile) async {
@@ -93,71 +134,110 @@ class StorageService {
     }
   }
 
-  // Save portfolio history (snapshots) to local storage
-  Future<void> savePortfolioHistory(List<PortfolioSnapshot> history) async {
-    final prefs = await SharedPreferences.getInstance();
-    final historyJsonList = history.map((snapshot) => snapshot.toJson()).toList();
-    final historyJson = jsonEncode(historyJsonList);
-    await prefs.setString(_portfolioHistoryKey, historyJson);
+  // --- Portfolio History (Snapshots using SQLite) ---
+
+  // Save a single portfolio snapshot to the database
+  Future<void> savePortfolioSnapshot(PortfolioSnapshot snapshot) async {
+    final db = await database;
+    await db.insert(
+      _snapshotsTable,
+      {
+        'timestamp': snapshot.timestamp.millisecondsSinceEpoch,
+        'value': snapshot.value,
+      },
+      conflictAlgorithm: sqflite.ConflictAlgorithm.replace, // Use prefix
+    );
   }
 
-  // Load portfolio history (snapshots) from local storage
-  Future<List<PortfolioSnapshot>> loadPortfolioHistory() async {
-    final prefs = await SharedPreferences.getInstance();
-    final historyJson = prefs.getString(_portfolioHistoryKey);
+  // Load portfolio history snapshots within a specific date range
+  Future<List<PortfolioSnapshot>> loadPortfolioHistoryRange(DateTime start, DateTime end) async {
+    final db = await database;
+    final startMillis = start.millisecondsSinceEpoch;
+    // Ensure end time includes the whole day
+    final endMillis = end.millisecondsSinceEpoch;
 
-    if (historyJson == null) {
+    final List<Map<String, dynamic>> maps = await db.query(
+      _snapshotsTable,
+      where: 'timestamp >= ? AND timestamp <= ?',
+      whereArgs: [startMillis, endMillis],
+      orderBy: 'timestamp ASC',
+    );
+
+    if (maps.isEmpty) {
       return [];
     }
 
-    try {
-      final List<dynamic> historyList = jsonDecode(historyJson);
-      // Ensure snapshots are sorted by timestamp after loading
-      final snapshots = historyList
-          .map((item) => PortfolioSnapshot.fromJson(item))
-          .toList();
-      snapshots.sort((a, b) => a.timestamp.compareTo(b.timestamp));
-      return snapshots;
-    } catch (e) {
-      print('Error loading portfolio history: $e');
-      return [];
-    }
+    return List.generate(maps.length, (i) {
+      return PortfolioSnapshot(
+        timestamp: DateTime.fromMillisecondsSinceEpoch(maps[i]['timestamp']),
+        value: maps[i]['value'],
+      );
+    });
   }
 
-  // Save user profile, portfolio, transactions, and history
+   // Get the timestamp of the earliest snapshot
+  Future<DateTime?> getEarliestTimestamp() async {
+    final db = await database;
+    final List<Map<String, dynamic>> result = await db.query(
+      _snapshotsTable,
+      columns: ['MIN(timestamp) as min_timestamp'],
+    );
+
+    if (result.isNotEmpty && result.first['min_timestamp'] != null) {
+      return DateTime.fromMillisecondsSinceEpoch(result.first['min_timestamp']);
+    }
+    return null;
+  }
+
+
+  // --- Combined Load/Save/Clear ---
+
+  // Save user profile, portfolio, and transactions (History saved separately)
   Future<void> saveUserData({
     required UserProfile profile,
     required List<PortfolioItem> portfolio,
     required List<Transaction> transactions,
-    required List<PortfolioSnapshot> history,
+    // Note: History is no longer saved in bulk here
   }) async {
     await saveUserProfile(profile);
     await savePortfolio(portfolio);
     await saveTransactions(transactions);
-    await savePortfolioHistory(history); // Save history
   }
-  
-  // Load user profile, portfolio, and transactions
+
+  // Load user profile, portfolio, and transactions (History loaded on demand)
   Future<Map<String, dynamic>> loadUserData() async {
     final profile = await loadUserProfile();
     final portfolio = await loadPortfolio();
     final transactions = await loadTransactions();
-    final history = await loadPortfolioHistory(); // Load history
+    // Note: History is not loaded here anymore
 
     return {
       'profile': profile,
       'portfolio': portfolio,
       'transactions': transactions,
-      'history': history, // Add history to the returned map
+      // 'history': history, // Removed history loading
     };
   }
-  
-  // Clear all stored data
+
+  // Clear all stored data (SharedPreferences and SQLite table)
   Future<void> clearAllData() async {
+    // Clear SharedPreferences
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_userProfileKey);
     await prefs.remove(_portfolioKey);
     await prefs.remove(_transactionsKey);
-    await prefs.remove(_portfolioHistoryKey); // Clear history
+
+    // Clear SQLite table
+    try {
+      final db = await database;
+      await db.delete(_snapshotsTable);
+    } catch (e) {
+      print('Error clearing portfolio snapshots table: $e');
+      // Optionally delete the whole database file if clearing fails consistently
+      // final documentsDirectory = await getApplicationDocumentsDirectory();
+      // final path = join(documentsDirectory.path, _dbName);
+      // await deleteDatabase(path);
+      // _database = null; // Reset database instance
+    }
   }
 }

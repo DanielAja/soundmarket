@@ -16,7 +16,7 @@ class UserDataProvider with ChangeNotifier {
   UserProfile? _userProfile;
   List<PortfolioItem> _portfolio = [];
   List<Transaction> _transactions = [];
-  List<PortfolioSnapshot> _portfolioHistory = []; // Add state for history
+  // List<PortfolioSnapshot> _portfolioHistory = []; // Removed: History is now in SQLite
   final StorageService _storageService = StorageService();
   final MarketService _marketService = MarketService();
   final _uuid = const Uuid();
@@ -42,7 +42,7 @@ class UserDataProvider with ChangeNotifier {
   UserProfile? get userProfile => _userProfile;
   List<PortfolioItem> get portfolio => _portfolio;
   List<Transaction> get transactions => _transactions;
-  List<PortfolioSnapshot> get portfolioHistory => _portfolioHistory; // Getter for history
+  // List<PortfolioSnapshot> get portfolioHistory => _portfolioHistory; // Removed getter
   bool get isLoading => _isLoading;
 
   // Helper to calculate portfolio value
@@ -171,7 +171,7 @@ class UserDataProvider with ChangeNotifier {
       _userProfile = data['profile'] as UserProfile?;
       _portfolio = (data['portfolio'] as List<PortfolioItem>?) ?? [];
       _transactions = (data['transactions'] as List<Transaction>?) ?? [];
-      _portfolioHistory = (data['history'] as List<PortfolioSnapshot>?) ?? []; // Load history
+      // _portfolioHistory = (data['history'] as List<PortfolioSnapshot>?) ?? []; // Removed history loading
 
       // Initialize with default data if nothing is loaded
       _userProfile ??= UserProfile(
@@ -194,7 +194,7 @@ class UserDataProvider with ChangeNotifier {
       );
       _portfolio = [];
       _transactions = [];
-      _portfolioHistory = []; // Reset history on error too
+      // _portfolioHistory = []; // Removed history reset
 
       // Initialize portfolio service with default data
       _portfolioService.initialize(_portfolio, _marketService.getAllSongs());
@@ -207,12 +207,12 @@ class UserDataProvider with ChangeNotifier {
   Future<void> _saveData() async {
     try {
       if (_userProfile != null) {
-        // Save all data including history
+        // Save profile, portfolio, and transactions (History saved separately via snapshots)
         await _storageService.saveUserData(
           profile: _userProfile!,
           portfolio: _portfolio,
           transactions: _transactions,
-          history: _portfolioHistory, // Pass history to save method
+          // history: _portfolioHistory, // Removed: History is saved via savePortfolioSnapshot
         );
       }
     } catch (e) {
@@ -384,35 +384,46 @@ class UserDataProvider with ChangeNotifier {
     );
     _portfolio = [];
     _transactions = [];
-    _portfolioHistory = []; // Clear history on reset
+    // _portfolioHistory = []; // Removed history clearing
 
-    // Clear saved data
+    // Clear saved data (including SQLite table)
     await _storageService.clearAllData();
     notifyListeners();
   }
 
-  // Helper method to add a portfolio snapshot
-  void _addPortfolioSnapshot() {
+  // Helper method to add a portfolio snapshot to the database
+  Future<void> _addPortfolioSnapshot() async {
     final currentPortfolioValue = _calculatePortfolioValue();
     final now = DateTime.now();
+    final snapshot = PortfolioSnapshot(timestamp: now, value: currentPortfolioValue);
 
-    // Avoid adding snapshot if timestamp is identical to the last one
-    if (_portfolioHistory.isNotEmpty && _portfolioHistory.last.timestamp == now) {
-      return;
+    try {
+      await _storageService.savePortfolioSnapshot(snapshot);
+    } catch (e) {
+      print('Error saving portfolio snapshot: $e');
     }
-
-    // Optional: Add logic to avoid saving if value hasn't changed significantly
-    // if (_portfolioHistory.isNotEmpty && (_portfolioHistory.last.value - currentPortfolioValue).abs() < 0.01) {
-    //   return;
-    // }
-
-    _portfolioHistory.add(
-      PortfolioSnapshot(timestamp: now, value: currentPortfolioValue),
-    );
-
-    // Optional: Keep history sorted (though load sorts it)
-    // _portfolioHistory.sort((a, b) => a.timestamp.compareTo(b.timestamp));
   }
+
+  // Fetch portfolio history for a given date range
+  Future<List<PortfolioSnapshot>> fetchPortfolioHistory(DateTime start, DateTime end) async {
+    try {
+      return await _storageService.loadPortfolioHistoryRange(start, end);
+    } catch (e) {
+      print('Error fetching portfolio history range: $e');
+      return [];
+    }
+  }
+
+  // Get the earliest timestamp available in history
+  Future<DateTime?> getEarliestTimestamp() async {
+     try {
+      return await _storageService.getEarliestTimestamp();
+    } catch (e) {
+      print('Error fetching earliest timestamp: $e');
+      return null;
+    }
+  }
+
 
   // Get portfolio item by song ID
   PortfolioItem? getPortfolioItemBySongId(String songId) {
