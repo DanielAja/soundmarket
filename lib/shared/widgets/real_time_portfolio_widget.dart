@@ -267,15 +267,18 @@ class _RealTimePortfolioWidgetState extends State<RealTimePortfolioWidget> {
                           final displaySong = updatedSong ?? song;
                           
                           return AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 500),
+                            duration: const Duration(milliseconds: 300), // Faster animation
                             transitionBuilder: (Widget child, Animation<double> animation) {
                               return FadeTransition(
                                 opacity: animation,
                                 child: SlideTransition(
                                   position: Tween<Offset>(
-                                    begin: const Offset(0.0, -0.5),
+                                    begin: const Offset(0.0, -0.3), // Smaller slide for faster feel
                                     end: Offset.zero,
-                                  ).animate(animation),
+                                  ).animate(CurvedAnimation(
+                                    parent: animation,
+                                    curve: Curves.easeOutQuad, // Faster curve
+                                  )),
                                   child: child,
                                 ),
                               );
@@ -285,6 +288,7 @@ class _RealTimePortfolioWidgetState extends State<RealTimePortfolioWidget> {
                               key: ValueKey<String>(displaySong.currentPrice.toStringAsFixed(2)),
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
+                                fontSize: 14, // Slightly larger price
                                 // Use the PriceChange enum from the imported PortfolioService
                                 color: priceChange == PriceChange.none
                                     ? Theme.of(context).textTheme.bodyLarge?.color // Use theme color for 'none'
@@ -296,17 +300,42 @@ class _RealTimePortfolioWidgetState extends State<RealTimePortfolioWidget> {
                       ),
                     ],
                   ),
-                  Text(
-                    '${item.quantity} ${item.quantity == 1 ? 'share' : 'shares'}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  // Total value moved above quantity for prioritization
+                  StreamBuilder<List<Song>>(
+                    stream: Provider.of<UserDataProvider>(context, listen: false).songUpdatesStream,
+                    initialData: const [],
+                    builder: (context, snapshot) {
+                      // Recalculate the current value with updated prices
+                      double updatedValue = currentValue;
+                      if (snapshot.hasData) {
+                        final updatedSong = snapshot.data!.firstWhere(
+                          (s) => s.id == song.id,
+                          orElse: () => song,
+                        );
+                        updatedValue = item.quantity * updatedSong.currentPrice;
+                      }
+                      
+                      return AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 300),
+                        child: Text(
+                          '\$${updatedValue.toStringAsFixed(2)}',
+                          key: ValueKey<String>(updatedValue.toStringAsFixed(2)),
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500, // Slightly bolder
+                            color: 
+                                priceChange == PriceChange.increase ? Colors.green[700] :
+                                priceChange == PriceChange.decrease ? Colors.red[700] :
+                                Colors.grey[600],
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      );
+                    },
                   ),
                   Text(
-                    '\$${currentValue.toStringAsFixed(2)}',
+                    '${item.quantity} ${item.quantity == 1 ? 'share' : 'shares'}',
                     style: TextStyle(
                       fontSize: 12,
                       color: Colors.grey[600],

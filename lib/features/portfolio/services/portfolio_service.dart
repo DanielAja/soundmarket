@@ -59,8 +59,8 @@ class PortfolioService { // Renamed class
     // Cancel any existing timer
     _updateTimer?.cancel();
     
-    // Create a new timer that fires every 5 seconds
-    _updateTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+    // Create a new timer that fires every 2 seconds for more responsive updates
+    _updateTimer = Timer.periodic(const Duration(seconds: 2), (_) {
       _checkForUpdates();
     });
   }

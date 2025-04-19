@@ -36,16 +36,30 @@ class Song {
     double? previousPrice,
     String? albumArtUrl,
   }) {
+    // If currentPrice is being updated, set previousPrice to the current currentPrice 
+    // if previousPrice parameter wasn't explicitly provided
+    double newPreviousPrice = previousPrice ?? 
+                             (currentPrice != null ? this.currentPrice : this.previousPrice);
+    
     return Song(
       id: id ?? this.id,
       name: name ?? this.name,
       artist: artist ?? this.artist,
       genre: genre ?? this.genre,
       currentPrice: currentPrice ?? this.currentPrice,
-      previousPrice: previousPrice ?? this.previousPrice,
+      previousPrice: newPreviousPrice,
       albumArtUrl: albumArtUrl ?? this.albumArtUrl,
     );
   }
+  
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is Song && other.id == id;
+  }
+  
+  @override
+  int get hashCode => id.hashCode;
   
   // Convert to JSON for storage
   Map<String, dynamic> toJson() {

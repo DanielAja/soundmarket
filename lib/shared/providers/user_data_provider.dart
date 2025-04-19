@@ -126,27 +126,87 @@ class UserDataProvider with ChangeNotifier {
   // Start the timer for periodic portfolio snapshots
   void _startSnapshotTimer() {
     _snapshotTimer?.cancel(); // Cancel existing timer if any
-    // Increased frequency for more chart data points
-    _snapshotTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
+    // Increased frequency for more chart data points and faster price updates
+    _snapshotTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
       // Add a snapshot periodically, only if data is loaded
       if (_userProfile != null && !_isLoading) {
         _addPortfolioSnapshot();
+        
+        // Update any songs from search results that are in the portfolio
+        _updateSearchSongPrices();
+        
+        // Force portfolio service to check for updates more aggressively
+        // This ensures more frequent price updates when on the home screen
+        _portfolioService.updatePortfolioData(
+          _portfolio,
+          [..._marketService.getAllSongs(), ..._songsFromSearches]
+        );
+        _portfolioService.forceUpdate();
+        
         // We might notify listeners here if we want the graph to update
         // based *only* on new snapshots, but current logic updates on price changes anyway.
         // notifyListeners();
       }
     });
   }
+  
+  // Helper method to update prices of songs from search results that are in portfolio
+  void _updateSearchSongPrices() {
+    if (_songsFromSearches.isEmpty || _portfolio.isEmpty) return;
+    
+    // Find portfolio items that use songs from searches
+    final searchSongIds = _songsFromSearches.map((s) => s.id).toSet();
+    final portfolioSearchSongIds = _portfolio
+        .where((item) => searchSongIds.contains(item.songId))
+        .map((item) => item.songId)
+        .toSet();
+        
+    // Skip if no portfolio items use search songs
+    if (portfolioSearchSongIds.isEmpty) return;
+    
+    bool hasUpdates = false;
+    
+    // Update prices for search songs that are in the portfolio
+    for (int i = 0; i < _songsFromSearches.length; i++) {
+      final song = _songsFromSearches[i];
+      if (portfolioSearchSongIds.contains(song.id)) {
+        // Simulate a price update for the search song
+        final randomFactor = 0.98 + (0.04 * (DateTime.now().millisecondsSinceEpoch % 10) / 10);
+        final updatedPrice = song.currentPrice * randomFactor;
+        
+        // Update the song with the new price
+        _songsFromSearches[i] = song.copyWith(currentPrice: updatedPrice);
+        hasUpdates = true;
+      }
+    }
+    
+    // Update the song stream to propagate changes to UI
+    if (hasUpdates) {
+      _updateSongStream();
+      notifyListeners();
+    }
+  }
 
   // Listen to song updates from the MarketService (formerly SongService)
   void _listenToSongUpdates() {
     _songUpdateSubscription = _marketService.songUpdates.listen((songs) {
-      // Renamed variable
-      // When songs are updated, update the portfolio service with new data
+      // Create a combined song list that includes both market songs and search songs
+      final combinedSongs = List<Song>.from(songs);
+      
+      // Add songs from searches to ensure they're included in updates
+      for (final searchSong in _songsFromSearches) {
+        // Skip if this song is already in the main catalog (avoid duplicates)
+        if (!combinedSongs.any((s) => s.id == searchSong.id)) {
+          combinedSongs.add(searchSong);
+        }
+      }
+      
+      // When songs are updated, update the portfolio service with the combined data
       _portfolioService.updatePortfolioData(
         _portfolio,
-        songs,
-      ); // Renamed variable
+        combinedSongs,
+      );
+      
       // Notify listeners to update the UI
       notifyListeners();
     });
@@ -187,7 +247,8 @@ class UserDataProvider with ChangeNotifier {
     _songUpdateSubscription?.cancel();
     _portfolioUpdateSubscription?.cancel();
     _snapshotTimer?.cancel(); // Cancel the snapshot timer
-    _portfolioService.dispose(); // Renamed variable
+    _songStreamController?.close(); // Close stream controller
+    _portfolioService.dispose();
     super.dispose();
   }
 
@@ -612,17 +673,24 @@ class UserDataProvider with ChangeNotifier {
       await _loadData();
 
       // Trigger a manual update of song prices
-      _marketService.triggerPriceUpdate(); // Renamed variable
+      _marketService.triggerPriceUpdate();
 
       // Load songs related to the user's portfolio
       if (_portfolio.isNotEmpty) {
         await _marketService.loadRelatedSongsForPortfolio(_portfolio);
       }
+      
+      // Update any songs from search results that are in the portfolio
+      _updateSearchSongPrices();
 
-      // Force portfolio update
-      _portfolioService.forceUpdate(); // Renamed variable
+      // Force portfolio update with combined songs
+      _portfolioService.updatePortfolioData(
+        _portfolio,
+        [..._marketService.getAllSongs(), ..._songsFromSearches],
+      );
+      _portfolioService.forceUpdate();
     } catch (e) {
-      // print('Error refreshing data: $e'); // Removed print
+      // Error handling
     } finally {
       // Clear loading state
       _isLoading = false;
@@ -639,27 +707,104 @@ class UserDataProvider with ChangeNotifier {
     return _priceChangeIndicators[songId] ?? PriceChange.none;
   }
 
+  // Cached stream controller to avoid memory leaks
+  StreamController<List<Song>>? _songStreamController;
+  
   // Expose the song updates stream for real-time price updates
-  Stream<List<Song>> get songUpdatesStream => _marketService.songUpdates;
+  // Creates a custom stream to include both market songs and search songs
+  Stream<List<Song>> get songUpdatesStream {
+    // Reuse existing controller if it exists and is not closed
+    if (_songStreamController == null || _songStreamController!.isClosed) {
+      // Create a StreamController to combine both sources
+      _songStreamController = StreamController<List<Song>>.broadcast(
+        onCancel: () {
+          // Clean up and close when no listeners
+          _songStreamController?.close();
+          _songStreamController = null;
+        }
+      );
+      
+      // Set up the subscription to market service updates
+      _marketService.songUpdates.listen((songs) {
+        if (_songStreamController == null || _songStreamController!.isClosed) return;
+        
+        final combinedSongs = [...songs];
+        
+        // Add any songs from searches that aren't in the main list
+        for (final searchSong in _songsFromSearches) {
+          if (!combinedSongs.any((s) => s.id == searchSong.id)) {
+            combinedSongs.add(searchSong);
+          }
+        }
+        
+        // Add to the stream controller
+        _songStreamController!.add(combinedSongs);
+      });
+    }
+    
+    return _songStreamController!.stream;
+  }
+  
+  // Manually add songs to the stream - can be called when search songs change
+  void _updateSongStream() {
+    if (_songStreamController == null || _songStreamController!.isClosed) return;
+    
+    final combinedSongs = [..._marketService.getAllSongs()];
+    
+    // Add any songs from searches that aren't in the main list
+    for (final searchSong in _songsFromSearches) {
+      if (!combinedSongs.any((s) => s.id == searchSong.id)) {
+        combinedSongs.add(searchSong);
+      }
+    }
+    
+    // Add to the stream controller
+    _songStreamController!.add(combinedSongs);
+  }
 
   // Add songs to the song pool (used after searching to add new songs from API)
   void addSongsToPool(List<Song> songs) {
     if (songs.isEmpty) return;
+    
+    bool hasNewSongs = false;
 
     // Add the songs to the song list through the market service
     for (final song in songs) {
       // Find duplicates (e.g., if a song with this ID already exists)
       final existingSong = _marketService.getSongById(song.id);
+      
       if (existingSong == null) {
-        // This is a new song not yet in our pool, so we need to add it
-        // The market service handles adding unique songs, but we need a method to add them
-        // For now, we'll keep a reference to make them available for future searches
-        _songsFromSearches.add(song);
+        // Check if song already exists in search results
+        final existingInSearches = _songsFromSearches.any((s) => s.id == song.id);
+        
+        if (!existingInSearches) {
+          // This is a new song not yet in our pool, so we need to add it
+          _songsFromSearches.add(song);
+          hasNewSongs = true;
+        } else {
+          // Update existing search song with new data (like price updates)
+          final index = _songsFromSearches.indexWhere((s) => s.id == song.id);
+          if (index >= 0) {
+            _songsFromSearches[index] = song;
+            hasNewSongs = true;
+          }
+        }
       }
     }
 
-    // Notify listeners to update the UI with the new songs
-    notifyListeners();
+    if (hasNewSongs) {
+      // Make sure the portfolio service is updated with the new song data
+      _portfolioService.updatePortfolioData(
+        _portfolio,
+        [..._marketService.getAllSongs(), ..._songsFromSearches],
+      );
+      
+      // Update the song stream to propagate changes to UI
+      _updateSongStream();
+      
+      // Notify listeners to update the UI with the new songs
+      notifyListeners();
+    }
   }
 
   // Keep track of songs added from searches (not in the main catalog)
