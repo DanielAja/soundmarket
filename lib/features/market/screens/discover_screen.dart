@@ -693,7 +693,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             const Text(
-              'Top Hip-Hop',
+              'Top Movers',
               style: TextStyle(fontSize: 20.0, fontWeight: FontWeight.bold),
             ),
             TextButton(
@@ -724,7 +724,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                     CircularProgressIndicator(),
                     SizedBox(height: 10),
                     Text(
-                      'Loading hip-hop tracks...',
+                      'Loading top movers...',
                       style: TextStyle(color: Colors.grey[400]),
                     ),
                   ],
@@ -733,7 +733,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
             : _cachedTopMovers!.isEmpty
               ? Center(
                   child: Text(
-                    'No hip-hop tracks found',
+                    'No top movers found',
                     style: TextStyle(color: Colors.grey[400]),
                   ),
                 )
