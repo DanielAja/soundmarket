@@ -115,6 +115,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
               // Update our cached lists with fresh data on manual refresh
               _cachedTopSongs = List<Song>.from(topSongs);
               _cachedTopMovers = List<Song>.from(topMovers);
+              _cachedRisingArtists = List<String>.from(risingArtists);
 
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Refreshed market data')),
@@ -602,10 +603,16 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     );
   }
 
+  // Store cached rising artists
+  List<String>? _cachedRisingArtists;
+
   Widget _buildRisingArtistsSection(
     BuildContext context,
     List<String> artists,
   ) {
+    // Initialize cache if it's empty
+    _cachedRisingArtists ??= List<String>.from(artists);
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -617,7 +624,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
         SizedBox(
           height: 120.0,
           child:
-              artists.isEmpty
+              _cachedRisingArtists!.isEmpty
                   ? Center(
                     child: Text(
                       'No rising artists found',
@@ -626,9 +633,9 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                   )
                   : ListView.builder(
                     scrollDirection: Axis.horizontal,
-                    itemCount: artists.length,
+                    itemCount: _cachedRisingArtists!.length,
                     itemBuilder: (context, index) {
-                      final artist = artists[index];
+                      final artist = _cachedRisingArtists![index];
                       return Card(
                         margin: const EdgeInsets.only(
                           right: AppSpacing.m,
