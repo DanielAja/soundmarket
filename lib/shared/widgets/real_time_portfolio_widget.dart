@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // For HapticFeedback
 import 'package:provider/provider.dart';
 import '../models/portfolio_item.dart'; // Corrected path
 import '../models/song.dart'; // Corrected path
@@ -27,6 +28,10 @@ class _RealTimePortfolioWidgetState extends State<RealTimePortfolioWidget> with 
   late AnimationController _flashAnimationController;
   late Animation<Color?> _flashAnimation;
   
+  // Animation controller for pulse effect
+  late AnimationController _pulseAnimationController;
+  late Animation<double> _pulseAnimation;
+  
   // Map to track which items were recently updated
   final Map<String, bool> _recentlyUpdatedItems = {};
   
@@ -46,9 +51,10 @@ class _RealTimePortfolioWidgetState extends State<RealTimePortfolioWidget> with 
       duration: const Duration(milliseconds: 800),
     );
     
+    // We'll update this animation dynamically based on price change direction
     _flashAnimation = ColorTween(
       begin: Colors.transparent,
-      end: Colors.blue.withAlpha(51), // 0.2 opacity equals 51 in alpha (255*0.2)
+      end: Colors.blue.withAlpha(60), // Slightly more visible
     ).animate(CurvedAnimation(
       parent: _flashAnimationController,
       curve: Curves.easeInOut,
@@ -59,12 +65,27 @@ class _RealTimePortfolioWidgetState extends State<RealTimePortfolioWidget> with 
         _flashAnimationController.reverse();
       }
     });
+    
+    // Initialize pulse animation controller
+    _pulseAnimationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+    
+    _pulseAnimation = Tween<double>(
+      begin: 1.0,
+      end: 1.15, // Scale up by 15%
+    ).animate(CurvedAnimation(
+      parent: _pulseAnimationController,
+      curve: Curves.easeInOut,
+    ));
   }
   
   @override
   void dispose() {
     _timestampTimer?.cancel();
     _flashAnimationController.dispose();
+    _pulseAnimationController.dispose();
     super.dispose();
   }
   
@@ -87,8 +108,13 @@ class _RealTimePortfolioWidgetState extends State<RealTimePortfolioWidget> with 
     // Flash the animation
     _flashAnimationController.forward(from: 0.0);
     
+    // Make sure pulse animator is running
+    if (!_pulseAnimationController.isAnimating) {
+      _pulseAnimationController.repeat(reverse: true);
+    }
+    
     // Reset the updated flag after animation completes
-    Future.delayed(const Duration(milliseconds: 1500), () {
+    Future.delayed(const Duration(milliseconds: 2000), () {
       if (mounted) {
         setState(() {
           _recentlyUpdatedItems[songId] = false;
@@ -205,27 +231,39 @@ class _RealTimePortfolioWidgetState extends State<RealTimePortfolioWidget> with 
             decoration: BoxDecoration(
               color: isRecentlyUpdated ? _flashAnimation.value : Colors.transparent,
               borderRadius: BorderRadius.circular(8),
+              border: isRecentlyUpdated ? Border.all(
+                color: (priceChange == PriceChange.increase ? Colors.green : 
+                       priceChange == PriceChange.decrease ? Colors.red : 
+                       Colors.transparent).withOpacity(0.3),
+                width: 0.5,
+              ) : null,
             ),
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
               child: Row(
                 children: [
-                  // Price change indicator
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 300),
-                    width: 4,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: indicatorColor,
-                      borderRadius: BorderRadius.circular(2),
-                      boxShadow: isRecentlyUpdated ? [
-                        BoxShadow(
-                          color: indicatorColor.withAlpha(128), // 0.5 opacity equals 128 in alpha (255*0.5)
-                          blurRadius: 4,
-                          spreadRadius: 1,
+                  // Price change indicator with enhanced animation
+                  AnimatedBuilder(
+                    animation: _pulseAnimationController,
+                    builder: (context, child) {
+                      return AnimatedContainer(
+                        duration: const Duration(milliseconds: 300),
+                        width: isRecentlyUpdated ? 6 : 4, // Wider when updated
+                        height: isRecentlyUpdated ? 45 : 40, // Taller when updated
+                        decoration: BoxDecoration(
+                          color: indicatorColor,
+                          borderRadius: BorderRadius.circular(isRecentlyUpdated ? 3 : 2),
+                          boxShadow: isRecentlyUpdated ? [
+                            BoxShadow(
+                              color: indicatorColor.withAlpha(isRecentlyUpdated ? 
+                                 (128 + (50 * _pulseAnimation.value).toInt()).clamp(0, 255) : 0), // Pulsing glow
+                              blurRadius: isRecentlyUpdated ? 6 * _pulseAnimation.value : 0,
+                              spreadRadius: isRecentlyUpdated ? 2 * _pulseAnimation.value : 0,
+                            ),
+                          ] : null,
                         ),
-                      ] : null,
-                    ),
+                      );
+                    },
                   ),
                   const SizedBox(width: 12),
                   // Song info
@@ -289,8 +327,30 @@ class _RealTimePortfolioWidgetState extends State<RealTimePortfolioWidget> with 
                                   // Check if price has changed and trigger the animation
                                   if (updatedSong.currentPrice != song.currentPrice &&
                                       !_recentlyUpdatedItems.containsKey(item.songId)) {
+                                    // Determine animation color based on price change direction
+                                    Color flashColor;
+                                    if (updatedSong.currentPrice > song.currentPrice) {
+                                      flashColor = Colors.green.withAlpha(50);
+                                      HapticFeedback.lightImpact();
+                                    } else {
+                                      flashColor = Colors.red.withAlpha(50);
+                                      HapticFeedback.mediumImpact();
+                                    }
+                                    
                                     // Use Future.microtask to avoid setState during build
-                                    Future.microtask(() => _animateItemUpdate(item.songId));
+                                    Future.microtask(() {
+                                      // Update the animation color
+                                      _flashAnimation = ColorTween(
+                                        begin: Colors.transparent,
+                                        end: flashColor,
+                                      ).animate(CurvedAnimation(
+                                        parent: _flashAnimationController,
+                                        curve: Curves.easeInOut,
+                                      ));
+                                      
+                                      // Trigger the animation
+                                      _animateItemUpdate(item.songId);
+                                    });
                                   }
                                 }
                                 
@@ -314,22 +374,30 @@ class _RealTimePortfolioWidgetState extends State<RealTimePortfolioWidget> with 
                                       ),
                                     );
                                   },
-                                  child: Text(
-                                    '\$${displaySong.currentPrice.toStringAsFixed(2)}',
-                                    key: ValueKey<String>(displaySong.currentPrice.toStringAsFixed(2)),
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: isRecentlyUpdated ? 16 : 14, // Larger when updated
-                                      color: priceChange == PriceChange.none
-                                          ? Theme.of(context).textTheme.bodyLarge?.color // Use theme color for 'none'
-                                          : indicatorColor,
-                                      shadows: isRecentlyUpdated ? [
-                                        Shadow(
-                                          color: indicatorColor.withAlpha(128), // 0.5 opacity equals 128 in alpha (255*0.5)
-                                          blurRadius: 4,
+                                  child: AnimatedBuilder(
+                                    animation: _pulseAnimationController,
+                                    builder: (context, child) {
+                                      return Transform.scale(
+                                        scale: isRecentlyUpdated ? _pulseAnimation.value : 1.0,
+                                        child: Text(
+                                          '\$${displaySong.currentPrice.toStringAsFixed(2)}',
+                                          key: ValueKey<String>(displaySong.currentPrice.toStringAsFixed(2)),
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: isRecentlyUpdated ? 16 : 14, // Larger when updated
+                                            color: priceChange == PriceChange.none
+                                                ? Theme.of(context).textTheme.bodyLarge?.color // Use theme color for 'none'
+                                                : indicatorColor,
+                                            shadows: isRecentlyUpdated ? [
+                                              Shadow(
+                                                color: indicatorColor.withAlpha(128), // 0.5 opacity equals 128 in alpha (255*0.5)
+                                                blurRadius: 4,
+                                              ),
+                                            ] : null,
+                                          ),
                                         ),
-                                      ] : null,
-                                    ),
+                                      );
+                                    },
                                   ),
                                 );
                               },
@@ -368,27 +436,38 @@ class _RealTimePortfolioWidgetState extends State<RealTimePortfolioWidget> with 
                                   ),
                                 );
                               },
-                              child: Text(
-                                '\$${updatedValue.toStringAsFixed(2)}',
-                                key: ValueKey<String>(updatedValue.toStringAsFixed(2)),
-                                style: TextStyle(
-                                  fontSize: isRecentlyUpdated ? 13 : 12,
-                                  fontWeight: FontWeight.w500, // Slightly bolder
-                                  color: 
-                                      priceChange == PriceChange.increase ? Colors.green[700] :
-                                      priceChange == PriceChange.decrease ? Colors.red[700] :
-                                      Colors.grey[600],
-                                  shadows: isRecentlyUpdated ? [
-                                    Shadow(
-                                      color: (priceChange == PriceChange.increase ? Colors.green : 
-                                              priceChange == PriceChange.decrease ? Colors.red : 
-                                              Colors.grey).withAlpha(128), // 0.5 opacity equals 128 in alpha (255*0.5)
-                                      blurRadius: 3,
+                              child: AnimatedBuilder(
+                                animation: _pulseAnimationController,
+                                builder: (context, child) {
+                                  final valueColor = priceChange == PriceChange.increase ? Colors.green[700] :
+                                                    priceChange == PriceChange.decrease ? Colors.red[700] :
+                                                    Colors.grey[600];
+                                                    
+                                  final shadowColor = priceChange == PriceChange.increase ? Colors.green : 
+                                                     priceChange == PriceChange.decrease ? Colors.red : 
+                                                     Colors.grey;
+                                  
+                                  return Transform.scale(
+                                    scale: isRecentlyUpdated ? _pulseAnimation.value * 0.95 : 1.0, // Slightly less scaling
+                                    child: Text(
+                                      '\$${updatedValue.toStringAsFixed(2)}',
+                                      key: ValueKey<String>(updatedValue.toStringAsFixed(2)),
+                                      style: TextStyle(
+                                        fontSize: isRecentlyUpdated ? 13 : 12,
+                                        fontWeight: isRecentlyUpdated ? FontWeight.bold : FontWeight.w500, // Bolder when updated
+                                        color: valueColor,
+                                        shadows: isRecentlyUpdated ? [
+                                          Shadow(
+                                            color: shadowColor.withAlpha(128), // 0.5 opacity equals 128 in alpha (255*0.5)
+                                            blurRadius: 3,
+                                          ),
+                                        ] : null,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
-                                  ] : null,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                                  );
+                                },
                               ),
                             );
                           },
