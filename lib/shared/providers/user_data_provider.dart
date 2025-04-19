@@ -402,6 +402,29 @@ class UserDataProvider with ChangeNotifier {
     return true;
   }
 
+  // Add funds to user's account
+  Future<bool> addFunds(double amount) async {
+    if (_userProfile == null) return false;
+    
+    try {
+      // Update user balance
+      _userProfile = _userProfile!.copyWith(
+        cashBalance: _userProfile!.cashBalance + amount
+      );
+      
+      // Save user data
+      await _saveData();
+      
+      // Add a portfolio snapshot after adding funds
+      await _addPortfolioSnapshot();
+      
+      notifyListeners();
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
   // Reset user data (for demo purposes)
   Future<void> resetData() async {
     _userProfile = UserProfile(

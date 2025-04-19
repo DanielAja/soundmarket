@@ -669,6 +669,124 @@ class ProfileScreen extends StatelessWidget {
   }
   */ // End of commented out unused method
 
+  // Show dialog to add funds
+  Future<void> _showAddFundsDialog(BuildContext context, UserDataProvider userDataProvider) async {
+    final virtualAmount = 100.0; // Amount of virtual dollars to add
+    final realAmount = 0.99; // Amount in real dollars
+
+    return showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Add Funds'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Add \$${virtualAmount.toStringAsFixed(2)} to your account',
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16.0,
+              ),
+            ),
+            const SizedBox(height: 16.0),
+            const Text(
+              'Add funds to your account to invest in more songs and expand your portfolio.',
+              style: TextStyle(fontSize: 14.0),
+            ),
+            const SizedBox(height: 16.0),
+            Row(
+              children: [
+                Icon(
+                  Icons.info_outline,
+                  size: 16.0,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                const SizedBox(width: 8.0),
+                const Expanded(
+                  child: Text(
+                    'Payment is processed securely through our payment provider.',
+                    style: TextStyle(
+                      fontSize: 12.0,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              
+              // Show payment processing dialog
+              _showLoadingDialog(context, 'Processing payment...');
+              
+              // Simulate payment processing delay
+              await Future.delayed(const Duration(seconds: 1));
+              
+              // Close loading dialog
+              Navigator.pop(context);
+              
+              // Add funds to user account
+              final success = await userDataProvider.addFunds(virtualAmount);
+              
+              if (success) {
+                // Show success message
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('\$${virtualAmount.toStringAsFixed(2)} added to your account'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                }
+              } else {
+                // Show error message
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Failed to add funds. Please try again.'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.primary,
+            ),
+            child: Text('\$${realAmount.toStringAsFixed(2)}'),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  // Show loading dialog while processing payment
+  void _showLoadingDialog(BuildContext context, String message) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        content: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const CircularProgressIndicator(),
+            const SizedBox(width: 16.0),
+            Text(message),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildActionButtons(BuildContext context, UserDataProvider userDataProvider) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -686,10 +804,7 @@ class ProfileScreen extends StatelessWidget {
           title: const Text('Add Funds'),
           trailing: const Icon(Icons.chevron_right),
           onTap: () {
-            // TODO: Implement add funds functionality
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Add funds coming soon!')),
-            );
+            _showAddFundsDialog(context, userDataProvider);
           },
         ),
         const Divider(),
