@@ -184,51 +184,6 @@ class _RealTimePortfolioWidgetState extends State<RealTimePortfolioWidget> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                // Stream Count Indicator
-                Row(
-                  children: [
-                    Icon(
-                      Icons.graphic_eq,
-                      size: 12,
-                      color: Colors.blue,
-                    ),
-                    const SizedBox(width: 4),
-                    // Animated pulsing dot for live data
-                    StreamBuilder<List<Song>>(
-                      stream: Provider.of<UserDataProvider>(context, listen: false).songUpdatesStream,
-                      builder: (context, snapshot) {
-                        return Row(
-                          children: [
-                            AnimatedContainer(
-                              duration: const Duration(milliseconds: 500),
-                              width: 4,
-                              height: 4,
-                              decoration: BoxDecoration(
-                                color: Colors.blue,
-                                borderRadius: BorderRadius.circular(2),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.blue.withOpacity(0.5),
-                                    blurRadius: 4,
-                                    spreadRadius: 1,
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 2),
-                            Text(
-                              'Live stream data',
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: Colors.blue,
-                              ),
-                            ),
-                          ],
-                        );
-                      },
-                    ),
-                  ],
-                ),
                 ],
               ),
             ),

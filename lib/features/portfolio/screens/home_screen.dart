@@ -466,25 +466,6 @@ class _PortfolioItemDetailsSheetContentState
                                           ),
                                         ],
                                       ),
-                                      // Stream count indicator (new)
-                                      const SizedBox(height: AppSpacing.xs),
-                                      Row(
-                                        children: [
-                                          Icon(
-                                            Icons.trending_up,
-                                            color: Colors.blue,
-                                            size: 14,
-                                          ),
-                                          const SizedBox(width: AppSpacing.xs),
-                                          Text(
-                                            'Live stream updates',
-                                            style: TextStyle(
-                                              color: Colors.blue,
-                                              fontSize: 12,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
                                     ],
                                   );
                                 },
@@ -1259,71 +1240,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           ),
                           const SizedBox(width: AppSpacing.xs),
                           // Stream count icon/indicator for real-time updates with pulse animation
-                          Tooltip(
-                            message: 'Real-time stream count updates',
-                            child: AnimatedBuilder(
-                              animation: _pulseAnimationController,
-                              builder: (context, child) {
-                                // Create a pulsing effect with the animation controller
-                                return Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: AppSpacing.s,
-                                    vertical: 2,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.blue.withOpacity(
-                                      0.2 +
-                                          (0.2 *
-                                              _pulseAnimationController.value),
-                                    ),
-                                    borderRadius: BorderRadius.circular(10),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.blue.withOpacity(
-                                          0.2 * _pulseAnimationController.value,
-                                        ),
-                                        blurRadius:
-                                            4.0 *
-                                            _pulseAnimationController.value,
-                                        spreadRadius:
-                                            1.0 *
-                                            _pulseAnimationController.value,
-                                      ),
-                                    ],
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        Icons.trending_up,
-                                        color: Colors.blue.withOpacity(
-                                          0.7 +
-                                              (0.3 *
-                                                  _pulseAnimationController
-                                                      .value),
-                                        ),
-                                        size: 12,
-                                      ),
-                                      const SizedBox(width: 2),
-                                      Text(
-                                        'LIVE',
-                                        style: TextStyle(
-                                          color: Colors.blue.withOpacity(
-                                            0.7 +
-                                                (0.3 *
-                                                    _pulseAnimationController
-                                                        .value),
-                                          ),
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
                         ],
                       ),
                       // Corrected: Removed the duplicate AnimatedSwitcher
