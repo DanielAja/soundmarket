@@ -1,23 +1,59 @@
 import 'dart:async';
-// Removed duplicate import 'dart:async';
+import 'dart:collection';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../../core/config/environment_config.dart'; // Corrected path
 import '../../core/constants/api_constants.dart'; // Corrected path
 import '../models/song.dart';
 
+// Batch request class for handling multiple track requests
+class _BatchRequest {
+  final String trackId;
+  final Completer<Map<String, dynamic>> completer = Completer<Map<String, dynamic>>();
+  final DateTime createdAt = DateTime.now();
+  
+  _BatchRequest(this.trackId);
+}
+
 class SpotifyApiService {
   // Singleton pattern
   static final SpotifyApiService _instance = SpotifyApiService._internal();
   factory SpotifyApiService() => _instance;
-  SpotifyApiService._internal();
-
+  
   // HTTP client
   final http.Client _client = http.Client();
   
   // Authentication token
   String? _accessToken;
   DateTime? _tokenExpiry;
+  
+  // Rate limiting
+  final int _maxRequestsPerSecond = 2; // Spotify allows ~100 requests per 30 seconds, being conservative
+  final Queue<DateTime> _requestTimestamps = Queue<DateTime>();
+  final int _retryAfterMs = 1000; // Wait 1 second before retrying
+  final int _maxRetries = 3; // Maximum number of retries for a request
+  
+  // Batch request cache
+  final Map<String, Map<String, dynamic>> _trackDetailsCache = {};
+  final Duration _cacheDuration = Duration(minutes: 30); // Cache track details for 30 mins
+  
+  // Request queue for batch processing
+  final List<_BatchRequest> _batchQueue = [];
+  Timer? _batchTimer;
+  bool _processingBatch = false;
+  
+  SpotifyApiService._internal() {
+    // Start the batch processor
+    _startBatchProcessor();
+  }
+  
+  // Start the batch processor timer
+  void _startBatchProcessor() {
+    _batchTimer?.cancel();
+    _batchTimer = Timer.periodic(Duration(seconds: 2), (_) {
+      _processBatchQueue();
+    });
+  }
   
   // Get access token
   Future<String> _getAccessToken() async {
@@ -64,11 +100,42 @@ class SpotifyApiService {
     }
   }
   
-  // Make authenticated request to Spotify API
-  Future<dynamic> _makeRequest(String endpoint, {Map<String, dynamic>? queryParams}) async {
+  // Check if we can make a request based on rate limits
+  Future<bool> _canMakeRequest() async {
+    final now = DateTime.now();
+    
+    // Remove timestamps older than 1 second
+    while (_requestTimestamps.isNotEmpty && now.difference(_requestTimestamps.first).inMilliseconds > 1000) {
+      _requestTimestamps.removeFirst();
+    }
+    
+    // Check if we've reached the limit
+    return _requestTimestamps.length < _maxRequestsPerSecond;
+  }
+  
+  // Wait until we can make a request
+  Future<void> _waitForRateLimit() async {
+    int attempts = 0;
+    while (!(await _canMakeRequest())) {
+      attempts++;
+      if (attempts > 10) { // Avoid infinite loop
+        print('Rate limit wait timed out after 10 attempts. Proceeding anyway.');
+        break;
+      }
+      await Future.delayed(Duration(milliseconds: _retryAfterMs));
+    }
+    
+    // Record this timestamp
+    _requestTimestamps.add(DateTime.now());
+  }
+  
+  // Make authenticated request to Spotify API with rate limiting and retries
+  Future<dynamic> _makeRequest(String endpoint, {Map<String, dynamic>? queryParams, int retryCount = 0}) async {
     try {
-      final token = await _getAccessToken();
+      // Wait for rate limit before making request
+      await _waitForRateLimit();
       
+      final token = await _getAccessToken();
       final uri = Uri.parse(endpoint).replace(queryParameters: queryParams);
       
       final response = await _client.get(
@@ -80,13 +147,95 @@ class SpotifyApiService {
       
       if (response.statusCode == 200) {
         return json.decode(response.body);
+      } else if (response.statusCode == 429 && retryCount < _maxRetries) {
+        // Handle rate limiting - extract Retry-After header if available
+        final retryAfter = response.headers['retry-after'];
+        int waitTime = retryAfter != null ? int.parse(retryAfter) * 1000 : _retryAfterMs * (retryCount + 1);
+        
+        print('Rate limited (429). Waiting ${waitTime}ms before retry ${retryCount + 1}/${_maxRetries}');
+        await Future.delayed(Duration(milliseconds: waitTime));
+        
+        // Retry the request with incremented retry count
+        return _makeRequest(endpoint, queryParams: queryParams, retryCount: retryCount + 1);
       } else {
         print('Spotify API error. Status: ${response.statusCode}, Endpoint: $endpoint, Body: ${response.body}');
         throw Exception('Spotify API error: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
       print('Error making Spotify API request to $endpoint: $e');
+      if (e.toString().contains('429') && retryCount < _maxRetries) {
+        // Additional retry for general 429 errors
+        print('Retrying due to rate limit error...');
+        await Future.delayed(Duration(milliseconds: _retryAfterMs * (retryCount + 1)));
+        return _makeRequest(endpoint, queryParams: queryParams, retryCount: retryCount + 1);
+      }
       rethrow;
+    }
+  }
+  
+  // The batch request object is now defined outside the class
+  
+  // Process batched requests
+  Future<void> _processBatchQueue() async {
+    if (_batchQueue.isEmpty || _processingBatch) return;
+    
+    _processingBatch = true;
+    
+    try {
+      // Process up to 10 requests at a time
+      final batch = _batchQueue.take(10).toList();
+      _batchQueue.removeRange(0, batch.length > _batchQueue.length ? _batchQueue.length : batch.length);
+      
+      print('Processing batch of ${batch.length} track requests');
+      
+      // Group by batch of 5 to avoid overwhelming the API
+      for (int i = 0; i < batch.length; i += 5) {
+        final end = i + 5 > batch.length ? batch.length : i + 5;
+        final currentBatch = batch.sublist(i, end);
+        
+        await Future.wait(currentBatch.map((request) async {
+          try {
+            // Check cache first
+            if (_trackDetailsCache.containsKey(request.trackId)) {
+              final cachedData = _trackDetailsCache[request.trackId];
+              final cacheTime = cachedData!['cacheTime'] as DateTime;
+              
+              if (DateTime.now().difference(cacheTime) < _cacheDuration) {
+                // Cache is fresh, use it
+                request.completer.complete(cachedData);
+                return;
+              } else {
+                // Cache expired, remove it
+                _trackDetailsCache.remove(request.trackId);
+              }
+            }
+            
+            // Fetch from API
+            final data = await _makeRequest('${ApiConstants.spotifyTracks}/${request.trackId}');
+            
+            final result = {
+              'track': data,
+              'cacheTime': DateTime.now(),
+            };
+            
+            // Cache the result
+            _trackDetailsCache[request.trackId] = result;
+            
+            // Complete the request
+            request.completer.complete(result);
+          } catch (e) {
+            print('Error processing batch request for track ${request.trackId}: $e');
+            request.completer.completeError(e);
+          }
+        }));
+        
+        // Small delay between batch groups to avoid rate limiting
+        if (end < batch.length) {
+          await Future.delayed(Duration(milliseconds: 500));
+        }
+      }
+    } finally {
+      _processingBatch = false;
     }
   }
   
@@ -358,23 +507,71 @@ class SpotifyApiService {
     }
   }
   
-  // Get track details - only fetch basic track data, not audio features (which may be restricted)
+  // Get track details using batch processing system
   Future<Map<String, dynamic>> getTrackDetails(String trackId) async {
     try {
-      final trackData = await _makeRequest('${ApiConstants.spotifyTracks}/$trackId');
+      // Check cache first to avoid even queueing the request
+      if (_trackDetailsCache.containsKey(trackId)) {
+        final cachedData = _trackDetailsCache[trackId]!;
+        final cacheTime = cachedData['cacheTime'] as DateTime;
+        
+        if (DateTime.now().difference(cacheTime) < _cacheDuration) {
+          // Return cached data if it's still fresh
+          return cachedData;
+        } else {
+          // Remove expired data from cache
+          _trackDetailsCache.remove(trackId);
+        }
+      }
       
-      return {
-        'track': trackData,
-        // We no longer fetch audio features as they appear to be causing 403 errors
-      };
+      // Create a new batch request
+      final request = _BatchRequest(trackId);
+      _batchQueue.add(request);
+      
+      // Process batch immediately if there are many pending requests
+      if (_batchQueue.length >= 10 && !_processingBatch) {
+        _processBatchQueue();
+      }
+      
+      // Wait for the request to complete
+      final result = await request.completer.future;
+      return result;
     } catch (e) {
       print('Error getting track details: $e');
       return {};
     }
   }
   
+  // Get track details for multiple tracks at once
+  Future<Map<String, Map<String, dynamic>>> getTrackDetailsBatch(List<String> trackIds) async {
+    final results = <String, Map<String, dynamic>>{};
+    final futures = <Future>[];
+    
+    // Process all track IDs
+    for (final trackId in trackIds) {
+      futures.add(getTrackDetails(trackId).then((result) {
+        if (result.isNotEmpty) {
+          results[trackId] = result;
+        }
+      }));
+    }
+    
+    // Wait for all requests to complete
+    await Future.wait(futures);
+    return results;
+  }
+  
   // Dispose resources
   void dispose() {
+    _batchTimer?.cancel();
     _client.close();
+    
+    // Complete any pending requests with empty results
+    for (final request in _batchQueue) {
+      if (!request.completer.isCompleted) {
+        request.completer.complete({});
+      }
+    }
+    _batchQueue.clear();
   }
 }

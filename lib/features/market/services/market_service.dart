@@ -150,24 +150,43 @@ class MarketService {
   // Start the price simulation timer
   void _startPriceSimulation() {
     _priceUpdateTimer?.cancel(); // Cancel existing timer
-    _priceUpdateTimer = Timer.periodic(const Duration(seconds: 30), (timer) async {
+    _priceUpdateTimer = Timer.periodic(const Duration(minutes: 3), (timer) async {
+      // Simulate price changes less frequently to avoid rate limiting
       await _simulatePriceChanges();
     });
   }
 
-  // Update song prices based on Spotify popularity and stream counts
+  // Update song prices based on Spotify popularity in batches to avoid rate limiting
   Future<void> _simulatePriceChanges() async {
     if (_songs.isEmpty) return; // Don't simulate if no songs loaded
 
-    bool hasUpdates = false;
-    for (final song in _songs) {
-      song.previousPrice = song.currentPrice; // Store previous price
-
-      try {
-        // Get updated track details from Spotify including popularity
-        final details = await _spotifyApi.getTrackDetails(song.id);
-        if (details.isNotEmpty && details['track'] != null) {
-          final track = details['track'];
+    try {
+      // Take a subset of songs to update (max 50 per batch)
+      final songsToUpdate = _songs.length > 50 ? 
+          _songs.sublist(0, 50) : 
+          _songs;
+      
+      print('Updating prices for ${songsToUpdate.length} songs in batch');
+      
+      // Store previous prices
+      for (final song in songsToUpdate) {
+        song.previousPrice = song.currentPrice;
+      }
+      
+      // Extract IDs for batch request
+      final songIds = songsToUpdate.map((song) => song.id).toList();
+      
+      // Make batch request for all songs at once
+      final batchDetails = await _spotifyApi.getTrackDetailsBatch(songIds);
+      bool hasUpdates = false;
+      
+      // Process the results
+      for (final song in songsToUpdate) {
+        if (batchDetails.containsKey(song.id) && 
+            batchDetails[song.id]!.containsKey('track') && 
+            batchDetails[song.id]!['track'] != null) {
+          
+          final track = batchDetails[song.id]!['track'];
           final int popularity = track['popularity'] ?? 50; // Default to 50 if not available
           
           // Calculate new price based directly on popularity with no random fluctuation
@@ -179,29 +198,22 @@ class MarketService {
           }
           
           hasUpdates = true;
-        } else {
-          // If we couldn't get updated data, maintain the current price
-          // No random fluctuations, keep price stable until we can get updated popularity data
-          hasUpdates = false;
         }
-      } catch (e) {
-        print('Error updating price for song ${song.name}: $e');
-        // On error, maintain the current price
-        // No random fluctuations, keep price stable until we can get updated popularity data
-        hasUpdates = false;
       }
-    }
-
-    if (hasUpdates) {
-      _updateCachedLists();
-      _songUpdateController.add(List.from(_songs));
       
-      // Save updated songs to storage
-      try {
-        await _storageService.saveSongs(_songs);
-      } catch (e) {
-        print('Error saving updated song prices: $e');
+      if (hasUpdates) {
+        _updateCachedLists();
+        _songUpdateController.add(List.from(_songs));
+        
+        // Save updated songs to storage
+        try {
+          await _storageService.saveSongs(_songs);
+        } catch (e) {
+          print('Error saving updated song prices: $e');
+        }
       }
+    } catch (e) {
+      print('Error updating song prices in batch: $e');
     }
   }
   
@@ -212,8 +224,9 @@ class MarketService {
   void startContinuousUpdates() {
     stopContinuousUpdates(); // Stop any existing timer
     
-    // Update prices every 3 seconds to simulate real-time stream count changes
-    _continuousUpdateTimer = Timer.periodic(const Duration(seconds: 3), (timer) async {
+    // Update prices every 10 seconds to simulate real-time stream count changes
+    // This reduces API load and relies more on client-side simulation
+    _continuousUpdateTimer = Timer.periodic(const Duration(seconds: 10), (timer) async {
       await _updatePricesBasedOnStreams();
     });
     
