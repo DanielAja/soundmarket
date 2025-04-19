@@ -180,8 +180,11 @@ class UserDataProvider with ChangeNotifier {
         displayName: 'New Investor',
       );
 
+      // Wait for a bit to ensure market service has loaded its songs
+      await Future.delayed(const Duration(milliseconds: 500));
+      
       // Initialize portfolio service with loaded data
-      _portfolioService.initialize(_portfolio, _marketService.getAllSongs()); // Renamed variable
+      _portfolioService.initialize(_portfolio, _marketService.getAllSongs());
       
       // Load songs related to user's existing portfolio
       if (_portfolio.isNotEmpty) {
@@ -193,7 +196,7 @@ class UserDataProvider with ChangeNotifier {
 
       notifyListeners();
     } catch (e) {
-      // print('Error loading data: $e'); // Removed print
+      print('Error loading data: $e');
       // Initialize with default data on error
       _userProfile = UserProfile(
         userId: 'defaultUser',
@@ -215,16 +218,17 @@ class UserDataProvider with ChangeNotifier {
   Future<void> _saveData() async {
     try {
       if (_userProfile != null) {
-        // Save profile, portfolio, and transactions (History saved separately via snapshots)
+        // Save profile, portfolio, transactions, and songs
         await _storageService.saveUserData(
           profile: _userProfile!,
           portfolio: _portfolio,
           transactions: _transactions,
+          songs: _marketService.getAllSongs(), // Save current song prices
           // history: _portfolioHistory, // Removed: History is saved via savePortfolioSnapshot
         );
       }
     } catch (e) {
-      // print('Error saving data: $e'); // Removed print
+      print('Error saving data: $e');
     }
   }
 

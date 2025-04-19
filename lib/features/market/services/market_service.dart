@@ -3,6 +3,7 @@ import 'dart:math';
 import '../../../shared/models/song.dart';
 import '../../../shared/models/portfolio_item.dart'; // Import PortfolioItem
 import '../../../shared/services/spotify_api_service.dart'; // Import SpotifyApiService
+import '../../../shared/services/storage_service.dart'; // Import StorageService
 
 class MarketService {
   // Singleton pattern
@@ -18,8 +19,9 @@ class MarketService {
   final List<Song> _songs = [];
   bool _isInitialized = false; // Flag to track initialization
 
-  // Spotify API service
+  // Services
   final SpotifyApiService _spotifyApi = SpotifyApiService();
+  final StorageService _storageService = StorageService();
 
   // Stream controller for song updates
   final _songUpdateController = StreamController<List<Song>>.broadcast();
@@ -27,18 +29,55 @@ class MarketService {
 
   // Timer for price simulation
   Timer? _priceUpdateTimer;
+  // Counter for periodic saving of stream updates
+  int _streamUpdateSaveCounter = 0;
   // Random number generator no longer used since we rely solely on popularity data
 
   MarketService._internal() {
-    _initializeSpotifyApi();
+    _initialize();
     // Start continuous real-time price updates immediately
     startContinuousUpdates();
   }
+  
+  // Initialize the MarketService 
+  Future<void> _initialize() async {
+    await _loadSavedSongsOrFetchNew();
+  }
 
-  // Initialize the Spotify API service and fetch initial data
-  Future<void> _initializeSpotifyApi() async {
+  // Try to load saved songs, or fetch new ones if there are none saved
+  Future<void> _loadSavedSongsOrFetchNew() async {
     if (_isInitialized) return; // Prevent multiple initializations
 
+    try {
+      print('Loading saved songs or initializing MarketService with Spotify data...');
+      
+      // First try to load songs from storage
+      final savedSongs = await _storageService.loadSongs();
+      
+      if (savedSongs.isNotEmpty) {
+        print('Loaded ${savedSongs.length} saved songs from storage.');
+        _songs.clear();
+        _songs.addAll(savedSongs);
+        _updateCachedLists();
+        _isInitialized = true;
+        // Start the price simulation timer after loading saved songs
+        _startPriceSimulation();
+        // Notify listeners with loaded data
+        _songUpdateController.add(List.from(_songs));
+      } else {
+        // If no saved songs, fetch from Spotify API
+        print('No saved songs found. Fetching from Spotify API...');
+        await _fetchSongsFromSpotify();
+      }
+    } catch (e) {
+      print('Error loading saved songs: $e');
+      // Try to fetch from Spotify API if loading fails
+      await _fetchSongsFromSpotify();
+    }
+  }
+
+  // Initialize the Spotify API service and fetch initial data
+  Future<void> _fetchSongsFromSpotify() async {
     try {
       print('Initializing MarketService with Spotify data...');
       // Fetch top popular tracks based on current trends
@@ -54,6 +93,11 @@ class MarketService {
         _updateCachedLists();
         _isInitialized = true; // Mark as initialized
         print('MarketService initialized successfully with ${_songs.length} songs.');
+        
+        // Save songs to storage
+        await _storageService.saveSongs(_songs);
+        print('Saved ${_songs.length} songs to storage.');
+        
         // Start the price simulation timer only after successful initialization
         _startPriceSimulation();
         // Notify listeners with initial data
@@ -151,6 +195,13 @@ class MarketService {
     if (hasUpdates) {
       _updateCachedLists();
       _songUpdateController.add(List.from(_songs));
+      
+      // Save updated songs to storage
+      try {
+        await _storageService.saveSongs(_songs);
+      } catch (e) {
+        print('Error saving updated song prices: $e');
+      }
     }
   }
   
@@ -221,6 +272,18 @@ class MarketService {
     if (hasUpdates) {
       _updateCachedLists();
       _songUpdateController.add(List.from(_songs));
+      
+      // Save updated songs to storage periodically (every 5 updates)
+      // This is to avoid saving too frequently during continuous updates
+      _streamUpdateSaveCounter++;
+      if (_streamUpdateSaveCounter >= 5) {
+        _streamUpdateSaveCounter = 0;
+        try {
+          await _storageService.saveSongs(_songs);
+        } catch (e) {
+          print('Error saving stream-updated song prices: $e');
+        }
+      }
     }
   }
   
@@ -258,7 +321,7 @@ class MarketService {
   Future<void> refreshData() async {
     // Re-initialize to fetch fresh data
     _isInitialized = false; // Allow re-initialization
-    await _initializeSpotifyApi();
+    await _fetchSongsFromSpotify();
   }
   
   // Load songs similar to a user's portfolio
@@ -343,14 +406,14 @@ class MarketService {
   // Search for songs using Spotify API
   Future<List<Song>> searchSongs(String query) async {
     // Ensure service is initialized before searching
-    if (!_isInitialized) await _initializeSpotifyApi();
+    if (!_isInitialized) await _loadSavedSongsOrFetchNew();
     return await _spotifyApi.searchTracks(query);
   }
 
   // Get new releases using Spotify API
   Future<List<Song>> getNewReleases() async {
      // Ensure service is initialized before fetching
-    if (!_isInitialized) await _initializeSpotifyApi();
+    if (!_isInitialized) await _loadSavedSongsOrFetchNew();
     return await _spotifyApi.getNewReleases();
   }
 

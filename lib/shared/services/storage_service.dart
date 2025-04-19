@@ -7,12 +7,14 @@ import '../models/user_profile.dart';
 import '../models/portfolio_item.dart';
 import '../models/transaction.dart';
 import '../models/portfolio_snapshot.dart';
+import '../models/song.dart'; // Import Song model
 
 class StorageService {
-  // Keys for SharedPreferences (Profile, Portfolio, Transactions)
+  // Keys for SharedPreferences (Profile, Portfolio, Transactions, Songs)
   static const String _userProfileKey = 'user_profile';
   static const String _portfolioKey = 'portfolio';
   static const String _transactionsKey = 'transactions';
+  static const String _songsKey = 'songs'; // Add key for songs
 
   // Database instance
   static sqflite.Database? _database; // Use prefix
@@ -190,31 +192,67 @@ class StorageService {
   }
 
 
+  // --- Save and Load Songs ---
+  
+  // Save songs to local storage
+  Future<void> saveSongs(List<Song> songs) async {
+    final prefs = await SharedPreferences.getInstance();
+    final songsJsonList = songs.map((song) => song.toJson()).toList();
+    final songsJson = jsonEncode(songsJsonList);
+    await prefs.setString(_songsKey, songsJson);
+  }
+  
+  // Load songs from local storage
+  Future<List<Song>> loadSongs() async {
+    final prefs = await SharedPreferences.getInstance();
+    final songsJson = prefs.getString(_songsKey);
+    
+    if (songsJson == null) {
+      return [];
+    }
+    
+    try {
+      final List<dynamic> songsList = jsonDecode(songsJson);
+      return songsList
+          .map((item) => Song.fromJson(item))
+          .toList();
+    } catch (e) {
+      print('Error loading songs: $e');
+      return [];
+    }
+  }
+
   // --- Combined Load/Save/Clear ---
 
-  // Save user profile, portfolio, and transactions (History saved separately)
+  // Save user profile, portfolio, transactions, and songs (History saved separately)
   Future<void> saveUserData({
     required UserProfile profile,
     required List<PortfolioItem> portfolio,
     required List<Transaction> transactions,
+    List<Song>? songs, // Add optional songs parameter
     // Note: History is no longer saved in bulk here
   }) async {
     await saveUserProfile(profile);
     await savePortfolio(portfolio);
     await saveTransactions(transactions);
+    if (songs != null) {
+      await saveSongs(songs);
+    }
   }
 
-  // Load user profile, portfolio, and transactions (History loaded on demand)
+  // Load user profile, portfolio, transactions, and songs (History loaded on demand)
   Future<Map<String, dynamic>> loadUserData() async {
     final profile = await loadUserProfile();
     final portfolio = await loadPortfolio();
     final transactions = await loadTransactions();
+    final songs = await loadSongs();
     // Note: History is not loaded here anymore
 
     return {
       'profile': profile,
       'portfolio': portfolio,
       'transactions': transactions,
+      'songs': songs, // Add songs to the returned data
       // 'history': history, // Removed history loading
     };
   }
@@ -226,6 +264,7 @@ class StorageService {
     await prefs.remove(_userProfileKey);
     await prefs.remove(_portfolioKey);
     await prefs.remove(_transactionsKey);
+    await prefs.remove(_songsKey); // Also clear saved songs
 
     // Clear SQLite table
     try {
