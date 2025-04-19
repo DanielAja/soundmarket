@@ -503,6 +503,27 @@ class UserDataProvider with ChangeNotifier {
         .where((t) => t.type == TransactionType.sell)
         .fold(0.0, (sum, t) => sum + t.totalValue);
   }
+  
+  // Calculate portfolio value based on provided songs and portfolio items
+  double calculatePortfolioValue(List<Song> songs, List<PortfolioItem> portfolioItems) {
+    double total = 0.0;
+    
+    // Create a map of song IDs to songs for faster lookup
+    final songMap = {for (var song in songs) song.id: song};
+    
+    for (var item in portfolioItems) {
+      final song = songMap[item.songId];
+      if (song != null) {
+        // If we have the song in our map, use its current price
+        total += item.quantity * song.currentPrice;
+      } else {
+        // Fallback to using the purchase price if the song isn't in the provided list
+        total += item.quantity * item.purchasePrice;
+      }
+    }
+    
+    return total;
+  }
 
   // --- Stream Count methods removed as Spotify API doesn't provide this easily ---
 
