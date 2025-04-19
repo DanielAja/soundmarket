@@ -289,8 +289,8 @@ class UserDataProvider with ChangeNotifier {
 
   // Buy a song
   Future<bool> buySong(String songId, int quantity) async {
-    // Get the song
-    final song = _marketService.getSongById(songId); // Renamed variable
+    // Get the song using our new helper method that checks both sources
+    final song = getSongById(songId);
     if (song == null) return false;
 
     // Calculate total cost
@@ -392,8 +392,9 @@ class UserDataProvider with ChangeNotifier {
     // Check if user has enough quantity to sell
     if (item.quantity < quantity) return false;
 
-    // Get current song price
-    final song = _marketService.getSongById(songId); // Renamed variable
+    // Get the song using our new helper method that checks both sources
+    final song = getSongById(songId);
+
     final currentPrice = song?.currentPrice ?? item.purchasePrice;
 
     // Calculate sale proceeds
@@ -663,6 +664,24 @@ class UserDataProvider with ChangeNotifier {
 
   // Keep track of songs added from searches (not in the main catalog)
   final List<Song> _songsFromSearches = [];
+
+  // Get a song by ID, checking both main catalog and search results
+  Song? getSongById(String songId) {
+    // First check the market service
+    Song? song = _marketService.getSongById(songId);
+
+    // If not found, check search results
+    if (song == null) {
+      try {
+        song = _songsFromSearches.firstWhere((s) => s.id == songId);
+      } catch (e) {
+        // Song not found in search results either
+        return null;
+      }
+    }
+
+    return song;
+  }
 }
 
 // Removed duplicate PriceChange enum definition from here
