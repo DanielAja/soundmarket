@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // For HapticFeedback
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'dart:math';
@@ -832,71 +833,167 @@ class _HomeScreenState extends State<HomeScreen> {
       ];
     }
 
-    // --- Data Aggregation (Example for 1Y/All) ---
+    // --- Data Aggregation based on timeFilter ---
     List<PortfolioSnapshot> processedSnapshots = snapshots;
-    if ((timeFilter == '1Y' || timeFilter == 'All') && snapshots.length > 150) {
+    
+    // Apply different aggregation strategies based on time filter
+    if (timeFilter == '1Y' && snapshots.length > 300) {
+      // For 1 year, aggregate weekly
+      processedSnapshots = _aggregateWeeklyAverage(snapshots);
+    } else if (timeFilter == 'All' && snapshots.length > 500) {
+      // For all time, aggregate monthly
+      processedSnapshots = _aggregateMonthlyAverage(snapshots);
+    } else if ((timeFilter == '3M' || timeFilter == '1M') && snapshots.length > 150) {
+      // For 3 months or 1 month, aggregate daily
       processedSnapshots = _aggregateDailyAverage(snapshots);
-      if (processedSnapshots.isEmpty) processedSnapshots = snapshots; // Revert if aggregation empties list
+    } else if (timeFilter == '1D' && snapshots.length > 60) {
+      // For 1 day, take samples every 5 minutes
+      processedSnapshots = _sampleData(snapshots, 5); // Sample every 5 points
+    }
+    
+    if (processedSnapshots.isEmpty) {
+      processedSnapshots = snapshots; // Revert if aggregation empties list
     }
 
-    // --- Generate FlSpots ---
+    // --- Generate normalized FlSpots (x values between 0.0 and 1.0) ---
     final spots = <FlSpot>[];
     if (processedSnapshots.isEmpty) {
-       return [FlSpot(0, currentPortfolioValue), FlSpot(1, currentPortfolioValue)]; // Fallback
+      return [FlSpot(0, currentPortfolioValue), FlSpot(1, currentPortfolioValue)]; // Fallback
     }
-    final firstTimestampMillis = processedSnapshots.first.timestamp.millisecondsSinceEpoch;
+    
+    final firstTimestamp = processedSnapshots.first.timestamp;
+    final lastTimestamp = processedSnapshots.last.timestamp;
+    final totalDuration = lastTimestamp.difference(firstTimestamp).inMilliseconds;
+    
+    // If duration is 0 (only one data point), handle it specially
+    if (totalDuration == 0) {
+      return [
+        FlSpot(0, processedSnapshots.first.value),
+        FlSpot(1, currentPortfolioValue),
+      ];
+    }
 
+    // Create normalized spots
     for (int i = 0; i < processedSnapshots.length; i++) {
       final snapshot = processedSnapshots[i];
-      final double xValue = (snapshot.timestamp.millisecondsSinceEpoch - firstTimestampMillis).toDouble();
+      // Normalize x value to range 0.0-1.0 for better scaling
+      final double xValue = (snapshot.timestamp.difference(firstTimestamp).inMilliseconds) / totalDuration;
       spots.add(FlSpot(xValue, snapshot.value));
     }
 
-    // Add a final spot representing the current time and value
+    // Add current value as last point if needed
     final now = DateTime.now();
-    final lastTimestamp = processedSnapshots.last.timestamp;
-    final Duration timeSinceLastSnapshot = now.difference(lastTimestamp);
-
-    bool addCurrentValuePoint = true;
-    Duration threshold = const Duration(minutes: 5);
-    if (timeFilter == '1D') threshold = const Duration(seconds: 10);
-    if (timeSinceLastSnapshot < threshold) {
-        addCurrentValuePoint = false;
+    if (now.isAfter(lastTimestamp)) {
+      // Only add if current time is after last snapshot
+      final double currentXValue;
+      if (now.difference(lastTimestamp).inMinutes < 10) {
+        // If last point is very recent, place current value just a bit after
+        currentXValue = 1.0;
+      } else {
+        // Otherwise normalize based on actual time difference
+        currentXValue = (now.difference(firstTimestamp).inMilliseconds) / totalDuration;
+      }
+      // Only add if it doesn't create a duplicate x value
+      if (spots.isEmpty || currentXValue > spots.last.x) {
+        spots.add(FlSpot(currentXValue.clamp(0, 1), currentPortfolioValue));
+      }
     }
 
-    if (addCurrentValuePoint) {
-       final double currentXValue = (now.millisecondsSinceEpoch - firstTimestampMillis).toDouble();
-       if (spots.isNotEmpty && currentXValue > spots.last.x) {
-          spots.add(FlSpot(currentXValue, currentPortfolioValue));
-       } else if (spots.isEmpty) {
-         spots.add(FlSpot(0, currentPortfolioValue));
-         spots.add(FlSpot(1, currentPortfolioValue));
-       }
-    }
-
-    // Ensure at least two spots exist
-    if (spots.length == 1) {
-       spots.add(FlSpot(spots.first.x + 1, spots.first.y));
-    } else if (spots.isEmpty) {
-       spots.add(FlSpot(0, currentPortfolioValue));
-       spots.add(FlSpot(1, currentPortfolioValue));
-    }
-
-    // Ensure distinct x-values for flat lines
-    if (spots.length > 1 && spots.every((s) => s.y == spots.first.y)) {
-        bool distinctX = true;
-        for (int i = 1; i < spots.length; i++) {
-            if (spots[i].x <= spots[i-1].x) {
-                distinctX = false;
-                break;
-            }
-        }
-        if (!distinctX) {
-            return [FlSpot(0, spots.first.y), FlSpot(1, spots.first.y)];
-        }
+    // Ensure we have at least two points
+    if (spots.isEmpty) {
+      spots.add(FlSpot(0, currentPortfolioValue));
+      spots.add(FlSpot(1, currentPortfolioValue));
+    } else if (spots.length == 1) {
+      spots.add(FlSpot(1, spots.first.y));
     }
 
     return spots;
+  }
+  
+  // Sample data by taking every nth point
+  List<PortfolioSnapshot> _sampleData(List<PortfolioSnapshot> snapshots, int sampleRate) {
+    if (snapshots.isEmpty || sampleRate <= 1) return snapshots;
+    
+    final List<PortfolioSnapshot> sampled = [];
+    for (int i = 0; i < snapshots.length; i += sampleRate) {
+      if (i < snapshots.length) {
+        sampled.add(snapshots[i]);
+      }
+    }
+    
+    // Always include the last point
+    if (sampled.isEmpty || sampled.last != snapshots.last) {
+      sampled.add(snapshots.last);
+    }
+    
+    return sampled;
+  }
+  
+  // Weekly aggregation for longer timeframes
+  List<PortfolioSnapshot> _aggregateWeeklyAverage(List<PortfolioSnapshot> snapshots) {
+    if (snapshots.isEmpty) return [];
+    Map<int, List<double>> weeklyValues = {};
+    
+    for (var snapshot in snapshots) {
+      // Get year and week number
+      final date = snapshot.timestamp;
+      final int year = date.year;
+      final int weekNumber = (date.difference(DateTime(date.year, 1, 1)).inDays / 7).floor();
+      final int weekKey = year * 100 + weekNumber; // Unique key: YYYYWW
+      
+      weeklyValues.putIfAbsent(weekKey, () => []).add(snapshot.value);
+    }
+    
+    List<PortfolioSnapshot> aggregated = [];
+    final sortedWeeks = weeklyValues.keys.toList()..sort();
+    
+    for (var weekKey in sortedWeeks) {
+      final values = weeklyValues[weekKey]!;
+      if (values.isNotEmpty) {
+        final average = values.reduce((a, b) => a + b) / values.length;
+        
+        // Create a date for this week - approximate to middle of week
+        final year = weekKey ~/ 100;
+        final week = weekKey % 100;
+        final weekDate = DateTime(year, 1, 1).add(Duration(days: week * 7 + 3));
+        
+        aggregated.add(PortfolioSnapshot(timestamp: weekDate, value: average));
+      }
+    }
+    
+    return aggregated;
+  }
+  
+  // Monthly aggregation for very long timeframes
+  List<PortfolioSnapshot> _aggregateMonthlyAverage(List<PortfolioSnapshot> snapshots) {
+    if (snapshots.isEmpty) return [];
+    Map<int, List<double>> monthlyValues = {};
+    
+    for (var snapshot in snapshots) {
+      final date = snapshot.timestamp;
+      final int monthKey = date.year * 100 + date.month; // YYYYMM
+      
+      monthlyValues.putIfAbsent(monthKey, () => []).add(snapshot.value);
+    }
+    
+    List<PortfolioSnapshot> aggregated = [];
+    final sortedMonths = monthlyValues.keys.toList()..sort();
+    
+    for (var monthKey in sortedMonths) {
+      final values = monthlyValues[monthKey]!;
+      if (values.isNotEmpty) {
+        final average = values.reduce((a, b) => a + b) / values.length;
+        
+        // Create a date for middle of this month
+        final year = monthKey ~/ 100;
+        final month = monthKey % 100;
+        final monthDate = DateTime(year, month, 15); // Middle of month
+        
+        aggregated.add(PortfolioSnapshot(timestamp: monthDate, value: average));
+      }
+    }
+    
+    return aggregated;
   }
 
   // Helper for basic daily aggregation
@@ -938,7 +1035,9 @@ class _HomeScreenState extends State<HomeScreen> {
       startValue = spots.first.y;
       endValue = spots.last.y;
 
+      // Add decent padding for better visualization
       if ((maxY - minY).abs() < 0.01) {
+        // For very flat charts, create some visual range
         final center = (maxY + minY) / 2;
         minY = center - max(0.1, center.abs() * 0.1);
         maxY = center + max(0.1, center.abs() * 0.1);
@@ -947,15 +1046,19 @@ class _HomeScreenState extends State<HomeScreen> {
            if ((maxY - minY).abs() < 0.1) maxY = minY + 0.1;
         }
       } else {
-        final padding = (maxY - minY) * 0.05;
+        // Add percentage padding for normal charts
+        final padding = (maxY - minY) * 0.1; // Increased padding for better visualization
         final potentialMinY = minY - padding;
         minY = spots.every((s) => s.y >= 0) && potentialMinY < 0 ? 0 : potentialMinY;
         maxY += padding;
       }
+      
+      // Ensure maxY is always greater than minY
       if (maxY <= minY) {
          maxY = minY + 0.1;
       }
 
+      // Calculate percentage change for display
       isPositive = endValue >= startValue;
       if (startValue.abs() > 0.001) {
         percentageChange = ((endValue / startValue) - 1) * 100;
@@ -965,9 +1068,9 @@ class _HomeScreenState extends State<HomeScreen> {
         percentageChange = 0.0;
       }
     } else if (!_isChartLoading) {
-      minY = currentPortfolioValue - max(0.1, currentPortfolioValue.abs() * 0.1);
+      // Default values when no data but not loading
+      minY = max(0, currentPortfolioValue - max(0.1, currentPortfolioValue.abs() * 0.1));
       maxY = currentPortfolioValue + max(0.1, currentPortfolioValue.abs() * 0.1);
-      if (currentPortfolioValue >= 0 && minY < 0) minY = 0;
       if (maxY <= minY) maxY = minY + 0.1;
       isPositive = true;
       percentageChange = 0.0;
@@ -976,6 +1079,9 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     final chartColor = isPositive ? Colors.green : Colors.red;
+
+    // Get period label for display
+    String periodLabel = _getPeriodLabel();
 
     return Card(
       elevation: 4.0,
@@ -1009,6 +1115,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ],
             ),
+            // Show selected time period
+            Text(
+              periodLabel,
+              style: TextStyle(color: Colors.grey[400], fontSize: 12),
+            ),
             const SizedBox(height: AppSpacing.l),
             SizedBox(
               height: 200.0,
@@ -1032,29 +1143,21 @@ class _HomeScreenState extends State<HomeScreen> {
                                 sideTitles: SideTitles(
                                   showTitles: true,
                                   reservedSize: 30,
-                                  interval: spots.length > 1 && spots.last.x > spots.first.x ? max(1, (spots.last.x - spots.first.x) / 5) : 1,
+                                  interval: 0.2, // Fixed interval for normalized x values (0.0-1.0)
                                   getTitlesWidget: (value, meta) {
                                     if (spots.isEmpty || chartData.isEmpty) return const SizedBox();
-                                    final firstTimestampMillis = chartData.first.timestamp.millisecondsSinceEpoch;
-                                    final timestampMillis = firstTimestampMillis + value.toInt();
-                                    final timestamp = DateTime.fromMillisecondsSinceEpoch(timestampMillis);
-                                    String label = '';
-                                    final Duration totalDuration = chartData.length > 1 ? chartData.last.timestamp.difference(chartData.first.timestamp) : Duration.zero;
-                                    final bool isLastPoint = (value - meta.max).abs() < (meta.max - meta.min) * 0.01;
-
-                                    // Simplified Label Logic (Add more cases as needed)
-                                    switch (_selectedTimeFilter) {
-                                      case '1D': label = isLastPoint ? 'Now' : (timestamp.minute == 0 && timestamp.hour % 3 == 0 ? '${timestamp.hour}:00' : ''); break;
-                                      case '1W': const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']; label = isLastPoint || (timestamp.hour < 1 && timestamp.minute < 15) ? days[timestamp.weekday - 1] : ''; break;
-                                      case '1M': label = isLastPoint || timestamp.day % 7 == 1 || timestamp.day == 1 ? timestamp.day.toString() : ''; break;
-                                      // Add cases for 3M, 1Y, All similarly
-                                      default: label = ''; // Default empty
+                                    
+                                    // Skip most labels for cleaner look
+                                    if (value != 0.0 && value != 0.5 && value != 1.0) {
+                                      return const SizedBox();
                                     }
-
+                                    
+                                    // Get labels based on time filter
+                                    String label = _getAxisLabel(value, chartData);
+                                    
                                     if (label.isEmpty) return const SizedBox();
                                     return SideTitleWidget(
-                                      meta: meta, // **FIXED: Added meta**
-                                      // **FIXED: Removed axisSide**
+                                      meta: meta,
                                       space: AppSpacing.s,
                                       child: Text(label, style: TextStyle(color: Colors.grey[400], fontSize: 10)),
                                     );
@@ -1068,17 +1171,24 @@ class _HomeScreenState extends State<HomeScreen> {
                                   reservedSize: 45,
                                   getTitlesWidget: (value, meta) {
                                     if (value < meta.min || value > meta.max) return const SizedBox();
+                                    
+                                    // Format currency values
                                     String formattedValue;
-                                    double range = meta.max - meta.min; if (range <= 0) range = 1.0;
+                                    double range = meta.max - meta.min; 
+                                    if (range <= 0) range = 1.0;
+                                    
+                                    // Format with appropriate scale and precision
                                     int decimalPlaces = (range < 1) ? 2 : ((range < 10) ? 1 : 0);
-                                    if (value.abs() >= 1000000) formattedValue = '\$${(value / 1000000).toStringAsFixed(1)}M';
-                                    else if (value.abs() >= 1000) formattedValue = '\$${(value / 1000).toStringAsFixed(value.abs() >= 10000 ? 0 : 1)}k';
-                                    else formattedValue = '\$${value.toStringAsFixed(decimalPlaces)}';
-                                    if (value == 0 && (meta.min < -0.01 || meta.max > 0.01) && meta.max != meta.min) { /* Optionally hide 0 */ }
+                                    if (value.abs() >= 1000000) {
+                                      formattedValue = '\$${(value / 1000000).toStringAsFixed(1)}M';
+                                    } else if (value.abs() >= 1000) {
+                                      formattedValue = '\$${(value / 1000).toStringAsFixed(value.abs() >= 10000 ? 0 : 1)}k';
+                                    } else {
+                                      formattedValue = '\$${value.toStringAsFixed(decimalPlaces)}';
+                                    }
 
                                     return SideTitleWidget(
-                                      meta: meta, // **FIXED: Added meta**
-                                      // **FIXED: Removed axisSide**
+                                      meta: meta,
                                       space: AppSpacing.s,
                                       child: Text(formattedValue, style: TextStyle(color: Colors.grey[400], fontSize: 10), textAlign: TextAlign.right),
                                     );
@@ -1087,45 +1197,43 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                             ),
                             borderData: FlBorderData(show: false),
-                            minX: spots.isNotEmpty ? spots.first.x : 0,
-                            maxX: spots.length > 1 ? spots.last.x : (spots.isNotEmpty ? spots.first.x + 1 : 1),
+                            minX: 0, // Always 0.0 for normalized values
+                            maxX: 1, // Always 1.0 for normalized values
                             minY: minY,
                             maxY: maxY,
                             lineBarsData: [
                               LineChartBarData(
-                                spots: spots, isCurved: true, curveSmoothness: 0.35, color: chartColor, barWidth: 2, isStrokeCapRound: true,
+                                spots: spots, 
+                                isCurved: true, 
+                                curveSmoothness: 0.35, 
+                                color: chartColor, 
+                                barWidth: 2, 
+                                isStrokeCapRound: true,
                                 dotData: const FlDotData(show: false),
-                                belowBarData: BarAreaData(show: true, gradient: LinearGradient(colors: [chartColor.withOpacity(0.3), chartColor.withOpacity(0.0)], begin: Alignment.topCenter, end: Alignment.bottomCenter)),
+                                belowBarData: BarAreaData(
+                                  show: true, 
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      chartColor.withOpacity(0.3), 
+                                      chartColor.withOpacity(0.0)
+                                    ], 
+                                    begin: Alignment.topCenter, 
+                                    end: Alignment.bottomCenter
+                                  )
+                                ),
                               ),
                             ],
                             lineTouchData: LineTouchData(
                               enabled: true,
                               touchTooltipData: LineTouchTooltipData(
-                                // **FIXED: Removed invalid tooltipBgColor**
-                                tooltipRoundedRadius: 4,
+                                tooltipRoundedRadius: 8,
+                                fitInsideHorizontally: true,
                                 getTooltipItems: (touchedSpots) => touchedSpots.map((spot) {
-                                  String formattedTime = '';
-                                  // ... (tooltip time formatting logic remains the same) ...
-                                   if (chartData.isNotEmpty) {
-                                        final firstTimestampMillis = chartData.first.timestamp.millisecondsSinceEpoch;
-                                        final targetMillis = firstTimestampMillis + spot.x.toInt();
-                                        PortfolioSnapshot? closestSnapshot;
-                                        int minDiff = -1;
-                                        for (final snapshot in chartData) {
-                                           final diff = (snapshot.timestamp.millisecondsSinceEpoch - targetMillis).abs();
-                                           if (closestSnapshot == null || diff < minDiff) {
-                                              minDiff = diff;
-                                              closestSnapshot = snapshot;
-                                           }
-                                        }
-                                        if (closestSnapshot != null) {
-                                           final timestamp = closestSnapshot.timestamp;
-                                           if (_selectedTimeFilter == '1D') formattedTime = '${timestamp.hour}:${timestamp.minute.toString().padLeft(2, '0')}';
-                                           else formattedTime = '${timestamp.month}/${timestamp.day}';
-                                        }
-                                     }
+                                  // Format date/time for tooltip
+                                  String formattedTime = _getTooltipDateTime(spot, chartData);
+                                  
                                   return LineTooltipItem(
-                                    '\$${spot.y.toStringAsFixed(2)} ${formattedTime.isNotEmpty ? '\n$formattedTime' : ''}',
+                                    '\$${spot.y.toStringAsFixed(2)}${formattedTime.isNotEmpty ? '\n$formattedTime' : ''}',
                                     const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
                                     textAlign: TextAlign.center,
                                   );
@@ -1133,7 +1241,15 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                               getTouchedSpotIndicator: (barData, spotIndexes) => spotIndexes.map((index) => TouchedSpotIndicatorData(
                                 FlLine(color: chartColor.withOpacity(0.5), strokeWidth: 1),
-                                FlDotData(show: true, getDotPainter: (spot, percent, bar, index) => FlDotCirclePainter(radius: 4, color: chartColor, strokeWidth: 1, strokeColor: Colors.black)),
+                                FlDotData(
+                                  show: true, 
+                                  getDotPainter: (spot, percent, bar, index) => FlDotCirclePainter(
+                                    radius: 4, 
+                                    color: chartColor, 
+                                    strokeWidth: 1, 
+                                    strokeColor: Colors.black
+                                  )
+                                ),
                               )).toList(),
                             ),
                           ),
@@ -1159,36 +1275,178 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
+  
+  // Get human-readable period label
+  String _getPeriodLabel() {
+    switch (_selectedTimeFilter) {
+      case '1D': return 'Today';
+      case '1W': return 'Past Week';
+      case '1M': return 'Past Month';
+      case '3M': return 'Past 3 Months';
+      case '1Y': return 'Past Year';
+      case 'All': return 'All Time';
+      default: return '';
+    }
+  }
+  
+  // Get axis labels based on time filter
+  String _getAxisLabel(double normalizedValue, List<PortfolioSnapshot> data) {
+    if (data.isEmpty) return '';
+    
+    // Convert normalized value (0.0-1.0) back to an actual timestamp
+    final firstTimestamp = data.first.timestamp;
+    final lastTimestamp = data.last.timestamp;
+    final duration = lastTimestamp.difference(firstTimestamp);
+    final offset = Duration(milliseconds: (duration.inMilliseconds * normalizedValue).round());
+    final timestamp = firstTimestamp.add(offset);
+    
+    // Format based on time filter
+    switch (_selectedTimeFilter) {
+      case '1D':
+        // For 1 day, show hour
+        if (normalizedValue == 0.0) return '${timestamp.hour}:00';
+        if (normalizedValue == 0.5) return '${timestamp.hour}:${timestamp.minute.toString().padLeft(2, '0')}';
+        if (normalizedValue == 1.0) return 'Now';
+        return '';
+      
+      case '1W':
+        // For 1 week, show weekday
+        if (normalizedValue == 0.0) return _getWeekdayName(timestamp.weekday);
+        if (normalizedValue == 0.5) return _getWeekdayName(timestamp.weekday);
+        if (normalizedValue == 1.0) return 'Today';
+        return '';
+      
+      case '1M':
+        // For 1 month, show day of month
+        if (normalizedValue == 0.0) return '${timestamp.month}/${timestamp.day}';
+        if (normalizedValue == 0.5) return '${timestamp.month}/${timestamp.day}';
+        if (normalizedValue == 1.0) return 'Now';
+        return '';
+      
+      case '3M':
+        // For 3 months, show month abbreviation
+        if (normalizedValue == 0.0) return _getMonthAbbr(timestamp.month);
+        if (normalizedValue == 0.5) return _getMonthAbbr(timestamp.month);
+        if (normalizedValue == 1.0) return 'Now';
+        return '';
+      
+      case '1Y':
+      case 'All':
+        // For year or all time, show month/year
+        if (normalizedValue == 0.0) return '${_getMonthAbbr(timestamp.month)}/${timestamp.year.toString().substring(2)}';
+        if (normalizedValue == 0.5) return '${_getMonthAbbr(timestamp.month)}/${timestamp.year.toString().substring(2)}';
+        if (normalizedValue == 1.0) return 'Now';
+        return '';
+        
+      default:
+        return '';
+    }
+  }
+  
+  // Get tooltip formatting for datetime
+  String _getTooltipDateTime(FlSpot spot, List<PortfolioSnapshot> data) {
+    if (data.isEmpty) return '';
+    
+    // Find closest timestamp to the spot's x value
+    final firstTimestamp = data.first.timestamp;
+    final lastTimestamp = data.last.timestamp;
+    final duration = lastTimestamp.difference(firstTimestamp);
+    
+    // Convert normalized x to actual time
+    final offset = Duration(milliseconds: (duration.inMilliseconds * spot.x).round());
+    final timestamp = firstTimestamp.add(offset);
+    
+    // Format based on time filter
+    switch (_selectedTimeFilter) {
+      case '1D':
+        return '${timestamp.hour}:${timestamp.minute.toString().padLeft(2, '0')}';
+      case '1W':
+        return '${_getWeekdayName(timestamp.weekday)} ${timestamp.hour}:${timestamp.minute.toString().padLeft(2, '0')}';
+      case '1M':
+      case '3M':
+        return '${_getMonthAbbr(timestamp.month)} ${timestamp.day}';
+      case '1Y':
+      case 'All':
+        return '${_getMonthAbbr(timestamp.month)} ${timestamp.day}, ${timestamp.year}';
+      default:
+        return '';
+    }
+  }
+  
+  // Helper to get weekday name
+  String _getWeekdayName(int weekday) {
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    return days[weekday - 1];
+  }
+  
+  // Helper to get month abbreviation
+  String _getMonthAbbr(int month) {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return months[month - 1];
+  }
 
   Widget _buildTimeFilterChip(String label, bool isSelected) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
-      child: ChoiceChip(
-        label: Text(label),
-        selected: isSelected,
-        onSelected: (selected) {
-          if (selected && _selectedTimeFilter != label) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-               if (mounted) {
-                 setState(() {
-                   _selectedTimeFilter = label;
-                   _isChartLoading = true;
-                   _chartData = [];
-                 });
-                 _updateChartData(label);
-               }
-            });
-          }
-        },
-        labelStyle: TextStyle(color: isSelected ? Theme.of(context).colorScheme.onPrimary : Theme.of(context).textTheme.bodyLarge?.color, fontSize: 12.0, fontWeight: FontWeight.w600, fontFamily: 'Poppins'),
-        backgroundColor: Theme.of(context).chipTheme.backgroundColor,
-        selectedColor: Theme.of(context).colorScheme.primary,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16.0),
-          side: BorderSide(color: isSelected ? Theme.of(context).colorScheme.primary : Colors.grey[700] ?? Colors.grey, width: 1), // **FIXED: Added null fallback**
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+      margin: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            if (!isSelected) {
+              // Add haptic feedback on tap
+              HapticFeedback.lightImpact();
+              
+              // Update state and reload chart data
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted) {
+                  setState(() {
+                    _selectedTimeFilter = label;
+                    _isChartLoading = true;
+                    _chartData = [];
+                  });
+                  _updateChartData(label);
+                }
+              });
+            }
+          },
+          borderRadius: BorderRadius.circular(20.0),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOutQuart,
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.l, vertical: AppSpacing.s),
+            decoration: BoxDecoration(
+              color: isSelected ? Theme.of(context).colorScheme.primary : Colors.transparent,
+              borderRadius: BorderRadius.circular(20.0),
+              border: Border.all(
+                color: isSelected 
+                  ? Theme.of(context).colorScheme.primary 
+                  : Colors.grey[700] ?? Colors.grey,
+                width: 1.0,
+              ),
+              boxShadow: isSelected ? [
+                BoxShadow(
+                  color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+                  spreadRadius: 1,
+                  blurRadius: 3,
+                  offset: const Offset(0, 1),
+                )
+              ] : null,
+            ),
+            child: Text(
+              label,
+              style: TextStyle(
+                color: isSelected 
+                  ? Theme.of(context).colorScheme.onPrimary 
+                  : Theme.of(context).textTheme.bodyLarge?.color,
+                fontSize: 13.0,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ),
         ),
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.m, vertical: AppSpacing.s),
-        showCheckmark: false,
       ),
     );
   }
