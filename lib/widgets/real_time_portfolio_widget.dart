@@ -1,14 +1,14 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../models/portfolio_item.dart'; // Corrected path
-import '../models/song.dart'; // Corrected path
-import '../providers/user_data_provider.dart'; // Corrected path
-import '../../features/portfolio/services/portfolio_service.dart'; // Corrected path
+import '../shared/models/portfolio_item.dart'; // Corrected path
+import '../shared/models/song.dart'; // Corrected path
+import '../shared/providers/user_data_provider.dart'; // Corrected path
+import '../features/portfolio/services/portfolio_service.dart'; // Corrected path
 
 class RealTimePortfolioWidget extends StatefulWidget {
   final Function(PortfolioItem, Song)? onItemTap;
-  
+
   const RealTimePortfolioWidget({
     super.key, // Use super parameter
     this.onItemTap,
@@ -22,24 +22,24 @@ class _RealTimePortfolioWidgetState extends State<RealTimePortfolioWidget> {
   // Timer for updating the timestamp
   Timer? _timestampTimer;
   String _lastUpdated = '';
-  
+
   @override
   void initState() {
     super.initState();
     _updateTimestamp();
-    
+
     // Update timestamp every second
     _timestampTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       _updateTimestamp();
     });
   }
-  
+
   @override
   void dispose() {
     _timestampTimer?.cancel();
     super.dispose();
   }
-  
+
   void _updateTimestamp() {
     if (mounted) {
       setState(() {
@@ -54,11 +54,11 @@ class _RealTimePortfolioWidgetState extends State<RealTimePortfolioWidget> {
     return Consumer<UserDataProvider>(
       builder: (context, provider, child) {
         final portfolio = provider.portfolio;
-        
+
         if (portfolio.isEmpty) {
           return const SizedBox.shrink();
         }
-        
+
         return Card(
           elevation: 4,
           margin: const EdgeInsets.symmetric(vertical: 8),
@@ -106,10 +106,10 @@ class _RealTimePortfolioWidgetState extends State<RealTimePortfolioWidget> {
       },
     );
   }
-  
+
   Widget _buildPortfolioItemTile(
-    BuildContext context, 
-    PortfolioItem item, 
+    BuildContext context,
+    PortfolioItem item,
     UserDataProvider provider
   ) {
     // Get the song to access current price and other details
@@ -123,18 +123,18 @@ class _RealTimePortfolioWidgetState extends State<RealTimePortfolioWidget> {
         currentPrice: item.purchasePrice,
       ),
     );
-    
+
     // Calculate values
     final currentValue = item.quantity * song.currentPrice;
-    
+
     // Get price change indicator
     // Assuming PriceChange enum is now accessible via PortfolioService import
     final priceChange = provider.getPriceChangeIndicator(item.songId);
-    
+
     // Determine indicator color
     Color indicatorColor = Colors.transparent;
     IconData indicatorIcon = Icons.remove;
-    
+
     // Use the PriceChange enum from the imported PortfolioService
     if (priceChange == PriceChange.increase) {
       indicatorColor = Colors.green;
@@ -143,7 +143,7 @@ class _RealTimePortfolioWidgetState extends State<RealTimePortfolioWidget> {
       indicatorColor = Colors.red;
       indicatorIcon = Icons.arrow_downward;
     }
-    
+
     return InkWell(
       onTap: widget.onItemTap != null ? () => widget.onItemTap!(item, song) : null,
       borderRadius: BorderRadius.circular(8),
@@ -175,16 +175,16 @@ class _RealTimePortfolioWidgetState extends State<RealTimePortfolioWidget> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                Text(
-                  item.artistName,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[600],
+                  Text( // Note: Corrected potential missing comma here from original read
+                    item.artistName,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                // Removed Stream Count Row
+                  // Removed Stream Count Row
                 ],
               ),
             ),

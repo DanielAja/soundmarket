@@ -6,10 +6,370 @@ import 'dart:async'; // Import Timer (Moved to top)
 import '../../../shared/providers/user_data_provider.dart'; // Corrected path
 import '../../../shared/models/portfolio_item.dart'; // Corrected path
 import '../../../shared/models/song.dart'; // Corrected path
-import '../../../shared/models/transaction.dart'; // Corrected path
+// Removed unused import: import '../../../shared/models/transaction.dart';
 import '../../../shared/models/portfolio_snapshot.dart'; // Import Snapshot model
 import '../../../shared/widgets/real_time_portfolio_widget.dart'; // Corrected path
 import '../../../core/theme/app_spacing.dart'; // Corrected path
+
+// New StatefulWidget to manage the state and controllers for the bottom sheet content
+class _PortfolioItemDetailsSheetContent extends StatefulWidget {
+  final PortfolioItem item;
+  final Song song;
+  final UserDataProvider userDataProvider;
+
+  const _PortfolioItemDetailsSheetContent({
+    // Removed Key key parameter as it's implicitly handled by StatefulWidget
+    required this.item,
+    required this.song,
+    required this.userDataProvider,
+  });
+
+  @override
+  _PortfolioItemDetailsSheetContentState createState() => _PortfolioItemDetailsSheetContentState();
+}
+
+class _PortfolioItemDetailsSheetContentState extends State<_PortfolioItemDetailsSheetContent> {
+  late final TextEditingController _quantityController;
+  late final ValueNotifier<int> _quantityNotifier;
+
+  @override
+  void initState() {
+    super.initState();
+    _quantityController = TextEditingController(text: '1');
+    _quantityNotifier = ValueNotifier<int>(1);
+
+    // Add listener to update notifier when text changes
+    _quantityController.addListener(() {
+      final newQuantity = int.tryParse(_quantityController.text) ?? 0;
+      if (newQuantity >= 0 && _quantityNotifier.value != newQuantity) {
+         _quantityNotifier.value = newQuantity;
+      } else if (newQuantity < 0 && _quantityController.text.isNotEmpty) {
+         // Reset to 0 if negative input
+         WidgetsBinding.instance.addPostFrameCallback((_) {
+           if (mounted) {
+             _quantityController.text = '0';
+             _quantityController.selection = TextSelection.fromPosition(TextPosition(offset: _quantityController.text.length));
+             if (_quantityNotifier.value != 0) {
+                _quantityNotifier.value = 0;
+             }
+           }
+         });
+      } else if (_quantityController.text.isEmpty && _quantityNotifier.value != 0) {
+         // Handle empty text field case: set notifier to 0
+         _quantityNotifier.value = 0;
+      }
+    });
+
+    // Add listener to update text field when notifier changes
+    _quantityNotifier.addListener(() {
+       final currentText = _quantityController.text;
+       final notifierValueString = _quantityNotifier.value.toString();
+       if (currentText != notifierValueString) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+             if (mounted) {
+                _quantityController.text = notifierValueString;
+                _quantityController.selection = TextSelection.fromPosition(
+                   TextPosition(offset: _quantityController.text.length)
+                );
+             }
+          });
+       }
+    });
+  }
+
+  @override
+  void dispose() {
+    _quantityController.dispose();
+    _quantityNotifier.dispose();
+    super.dispose();
+  }
+
+  // Redefined dialog logic here for encapsulation
+  void _showFullAlbumArtDialog(BuildContext context, String albumArtUrl, String songName, String artistName) {
+     showDialog(
+      context: context,
+      builder: (context) => Dialog(
+         backgroundColor: Colors.transparent,
+         insetPadding: const EdgeInsets.all(AppSpacing.l),
+         child: Column(
+           mainAxisSize: MainAxisSize.min,
+           children: [
+             ClipRRect( // Album Art
+               borderRadius: BorderRadius.circular(12),
+               child: Container(
+                 constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.9, maxHeight: MediaQuery.of(context).size.height * 0.6),
+                 child: Image.network(
+                   albumArtUrl,
+                   fit: BoxFit.contain,
+                   loadingBuilder: (context, child, loadingProgress) {
+                     if (loadingProgress == null) return child;
+                     return Container(
+                       width: MediaQuery.of(context).size.width * 0.9, height: MediaQuery.of(context).size.width * 0.9, color: Colors.grey[900],
+                       child: Center(child: CircularProgressIndicator(
+                         value: loadingProgress.expectedTotalBytes != null && loadingProgress.expectedTotalBytes! > 0
+                             ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                             : null,
+                       )),
+                     );
+                   },
+                   errorBuilder: (context, error, stackTrace) => Container(width: MediaQuery.of(context).size.width * 0.9, height: MediaQuery.of(context).size.width * 0.9, color: Colors.grey[900], child: const Center(child: Icon(Icons.error_outline, size: 50, color: Colors.white))),
+                 ),
+               ),
+             ),
+             Container( // Song Info
+               padding: const EdgeInsets.all(AppSpacing.l), margin: const EdgeInsets.only(top: AppSpacing.l),
+               decoration: BoxDecoration(color: Colors.black.withAlpha(180), borderRadius: BorderRadius.circular(12)),
+               child: Column(children: [
+                 Text(songName, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white), textAlign: TextAlign.center),
+                 const SizedBox(height: AppSpacing.xs),
+                 Text(artistName, style: TextStyle(fontSize: 16, color: Colors.grey[300]), textAlign: TextAlign.center),
+               ]),
+             ),
+             Padding( // Close Button
+               padding: const EdgeInsets.only(top: AppSpacing.l),
+               child: ElevatedButton(
+                 onPressed: () => Navigator.pop(context),
+                 style: ElevatedButton.styleFrom(backgroundColor: Colors.grey[800], foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)), padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12)),
+                 child: const Text('CLOSE'),
+               ),
+             ),
+           ],
+         ),
+       ),
+     );
+  }
+
+
+  @override
+  Widget build(BuildContext context) {
+    // Calculate values based on widget properties
+    final currentValue = widget.song.currentPrice * widget.item.quantity;
+    final purchaseValue = widget.item.purchasePrice * widget.item.quantity;
+    double profitLoss = 0.0;
+    double profitLossPercent = 0.0;
+    if (purchaseValue.abs() > 0.001) {
+       profitLoss = currentValue - purchaseValue;
+       profitLossPercent = (profitLoss / purchaseValue) * 100;
+    } else if (currentValue > 0) {
+       profitLoss = currentValue;
+       profitLossPercent = double.infinity;
+    }
+    final isProfit = profitLoss >= 0;
+
+    // Use ValueListenableBuilder to react to quantity changes for button states etc.
+    return ValueListenableBuilder<int>(
+      valueListenable: _quantityNotifier,
+      builder: (context, currentQuantity, child) {
+        final transactionValue = widget.song.currentPrice * currentQuantity;
+        final cashBalance = widget.userDataProvider.userProfile?.cashBalance ?? 0.0;
+        final canBuy = cashBalance >= transactionValue && currentQuantity > 0;
+        final canSell = widget.item.quantity >= currentQuantity && currentQuantity > 0;
+
+        // Wrap with Padding to handle keyboard overlap
+        return Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+          child: Container(
+            constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.9),
+            decoration: BoxDecoration(
+              color: Theme.of(context).scaffoldBackgroundColor,
+              borderRadius: const BorderRadius.only(topLeft: Radius.circular(20), topRight: Radius.circular(20)),
+            ),
+            child: SingleChildScrollView(
+              child: Padding(
+                // Keep original padding for content, outer padding handles keyboard
+                padding: const EdgeInsets.only(bottom: AppSpacing.l, left: AppSpacing.l, right: AppSpacing.l, top: AppSpacing.s),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Handle bar
+                    Center(
+                      child: Container(
+                        margin: const EdgeInsets.only(top: AppSpacing.s, bottom: AppSpacing.m),
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[600],
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+
+                    // Header with song info
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: AppSpacing.m),
+                      child: Row(
+                        children: [
+                          GestureDetector(
+                            onTap: () {
+                              if (widget.item.albumArtUrl != null) {
+                                _showFullAlbumArtDialog(context, widget.item.albumArtUrl!, widget.item.songName, widget.item.artistName);
+                              }
+                            },
+                            child: CircleAvatar(
+                              radius: 30,
+                              backgroundColor: Colors.grey[800],
+                              backgroundImage: widget.item.albumArtUrl != null ? NetworkImage(widget.item.albumArtUrl!) : null,
+                              child: widget.item.albumArtUrl == null ? const Icon(Icons.music_note, size: 30) : null,
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.l),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(widget.item.songName, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis, maxLines: 1),
+                                Text(widget.item.artistName, style: TextStyle(fontSize: 16, color: Colors.grey[400]), overflow: TextOverflow.ellipsis, maxLines: 1),
+                                const SizedBox(height: AppSpacing.xs),
+                                Row(
+                                  children: [
+                                    Icon(Icons.category, size: 14, color: Colors.grey[400]),
+                                    const SizedBox(width: AppSpacing.xs),
+                                    Expanded(child: Text(widget.song.genre, style: TextStyle(color: Colors.grey[400], fontSize: 12), overflow: TextOverflow.ellipsis)),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Listen button
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: AppSpacing.m),
+                      child: ElevatedButton.icon(
+                        onPressed: () { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Opening ${widget.item.songName}... (Not implemented)'))); },
+                        icon: const Icon(Icons.play_circle_filled, color: Colors.white),
+                        label: const Text('LISTEN TO SONG'),
+                        style: ElevatedButton.styleFrom(backgroundColor: Colors.purple, foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 48)),
+                      ),
+                    ),
+
+                    const Divider(),
+
+                    // Current price and performance
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: AppSpacing.l),
+                      child: Row(
+                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Column( crossAxisAlignment: CrossAxisAlignment.start, children: [
+                              Text('Current Price', style: TextStyle(color: Colors.grey[400], fontSize: 14)),
+                              const SizedBox(height: AppSpacing.xs),
+                              Text('\$${widget.song.currentPrice.toStringAsFixed(2)}', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                              const SizedBox(height: AppSpacing.xs),
+                              Row(children: [ Icon(widget.song.isPriceUp ? Icons.arrow_upward : Icons.arrow_downward, color: widget.song.isPriceUp ? Colors.green : Colors.red, size: 14), const SizedBox(width: AppSpacing.xs), Text('${widget.song.isPriceUp ? "+" : ""}${widget.song.priceChangePercent.toStringAsFixed(2)}%', style: TextStyle(color: widget.song.isPriceUp ? Colors.green : Colors.red, fontSize: 14))])
+                          ]),
+                          Column( crossAxisAlignment: CrossAxisAlignment.end, children: [
+                              Text('Your Position', style: TextStyle(color: Colors.grey[400], fontSize: 14)),
+                              const SizedBox(height: AppSpacing.xs),
+                              Text('${widget.item.quantity} ${widget.item.quantity == 1 ? 'share' : 'shares'}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                              const SizedBox(height: AppSpacing.xs),
+                              Text('Avg. Price: \$${widget.item.purchasePrice.toStringAsFixed(2)}', style: TextStyle(color: Colors.grey[400], fontSize: 14))
+                          ])
+                        ]
+                      ),
+                    ),
+
+                    // Portfolio value and profit/loss
+                    Container(
+                      color: Colors.grey[900], padding: const EdgeInsets.all(AppSpacing.l),
+                      child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [ Text('Current Value', style: TextStyle(color: Colors.grey[400], fontSize: 14)), const SizedBox(height: AppSpacing.xs), Text('\$${currentValue.toStringAsFixed(2)}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)) ]),
+                          Column(crossAxisAlignment: CrossAxisAlignment.end, children: [ Text('Profit/Loss', style: TextStyle(color: Colors.grey[400], fontSize: 14)), const SizedBox(height: AppSpacing.xs), Row(children: [ Icon(isProfit ? Icons.arrow_upward : Icons.arrow_downward, color: isProfit ? Colors.green : Colors.red, size: 14), const SizedBox(width: AppSpacing.xs), Text('${isProfit ? "+" : ""}${profitLoss.toStringAsFixed(2)} (${isProfit ? "+" : ""}${profitLossPercent.isFinite ? profitLossPercent.toStringAsFixed(2) + "%" : "N/A"})', style: TextStyle(color: isProfit ? Colors.green : Colors.red, fontSize: 16, fontWeight: FontWeight.bold)) ]) ])
+                      ])
+                    ),
+
+                    const SizedBox(height: AppSpacing.l),
+
+                    // Transaction section
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: AppSpacing.m),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Trade', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                          const SizedBox(height: AppSpacing.l),
+                          Row( // Quantity Input
+                            children: [
+                              const Text('Quantity:', style: TextStyle(fontSize: 16)),
+                              const SizedBox(width: AppSpacing.l),
+                              Expanded(
+                                child: TextField(
+                                  controller: _quantityController, // Use the state's controller
+                                  keyboardType: TextInputType.number,
+                                  decoration: const InputDecoration(border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8)),
+                                  // onChanged is handled by the controller listener
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: AppSpacing.l),
+                          Row( // Transaction Value
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [ const Text('Transaction Value:', style: TextStyle(fontSize: 16)), Text('\$${transactionValue.toStringAsFixed(2)}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)) ],
+                          ),
+                          const SizedBox(height: AppSpacing.s),
+                          Row( // Cash Balance
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [ const Text('Cash Balance:', style: TextStyle(fontSize: 16)), Text('\$${cashBalance.toStringAsFixed(2)}', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: canBuy ? Colors.white : Colors.red)) ],
+                          ),
+                          const SizedBox(height: AppSpacing.xl),
+                          Row( // Buy/Sell Buttons
+                            children: [
+                              Expanded(child: ElevatedButton(
+                                onPressed: canBuy ? () async {
+                                   final success = await widget.userDataProvider.buySong(widget.song.id, currentQuantity);
+                                   if (!mounted) return; // Check mounted after await
+                                   if (success) {
+                                      Navigator.pop(context);
+                                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Successfully bought $currentQuantity ${currentQuantity == 1 ? 'share' : 'shares'} of ${widget.song.name}'), backgroundColor: Colors.green));
+                                   } else {
+                                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to buy shares. Insufficient funds or error occurred.'), backgroundColor: Colors.red));
+                                   }
+                                } : null,
+                                style: ElevatedButton.styleFrom(backgroundColor: Colors.green, padding: const EdgeInsets.symmetric(vertical: 16), disabledBackgroundColor: Colors.green.withOpacity(0.5)),
+                                child: const Text('BUY', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                              )),
+                              const SizedBox(width: AppSpacing.l),
+                              Expanded(child: ElevatedButton(
+                                onPressed: canSell ? () async {
+                                   final success = await widget.userDataProvider.sellSong(widget.song.id, currentQuantity);
+                                   if (!mounted) return; // Check mounted after await
+                                   if (success) {
+                                      Navigator.pop(context);
+                                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Successfully sold $currentQuantity ${currentQuantity == 1 ? 'share' : 'shares'} of ${widget.song.name}'), backgroundColor: Colors.blue));
+                                   } else {
+                                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to sell shares. Insufficient shares or error occurred.'), backgroundColor: Colors.red));
+                                   }
+                                } : null,
+                                style: ElevatedButton.styleFrom(backgroundColor: Colors.red, padding: const EdgeInsets.symmetric(vertical: 16), disabledBackgroundColor: Colors.red.withOpacity(0.5)),
+                                child: const Text('SELL', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                              )),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    Padding( // Close Button
+                      padding: const EdgeInsets.only(top: AppSpacing.l),
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.pop(context),
+                        style: ElevatedButton.styleFrom(backgroundColor: Colors.grey[800], padding: const EdgeInsets.symmetric(vertical: 16)),
+                        child: const Text('CLOSE'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
 
 
 class HomeScreen extends StatefulWidget {
@@ -318,18 +678,10 @@ class _HomeScreenState extends State<HomeScreen> {
                               color: Colors.grey[400],
                             ),
                           ),
-                          const SizedBox(width: AppSpacing.s), // Use AppSpacing.s
-                          Icon(Icons.headphones, size: 14, color: Colors.grey[400]),
-                          const SizedBox(width: AppSpacing.xxs), // Use AppSpacing.xxs
-                          Text(
-                            userDataProvider.getFormattedTotalPortfolioStreamCount(),
-                            style: TextStyle(
-                              color: Colors.grey[400],
-                              fontSize: 12,
-                            ),
-                          ),
+                          // Removed Stream Count Display
                         ],
                       ),
+                      // Corrected: Removed the duplicate AnimatedSwitcher
                       AnimatedSwitcher(
                         duration: const Duration(milliseconds: 500),
                         transitionBuilder: (Widget child, Animation<double> animation) {
@@ -844,249 +1196,21 @@ class _HomeScreenState extends State<HomeScreen> {
   // Show portfolio item details in a bottom sheet with buy/sell options
   void _showPortfolioItemDetails(BuildContext context, PortfolioItem item, Song song) {
     final userDataProvider = Provider.of<UserDataProvider>(context, listen: false);
-    final currentValue = song.currentPrice * item.quantity;
-    final purchaseValue = item.purchasePrice * item.quantity;
-    double profitLoss = 0.0;
-    double profitLossPercent = 0.0;
-    if (purchaseValue.abs() > 0.001) {
-       profitLoss = currentValue - purchaseValue;
-       profitLossPercent = (profitLoss / purchaseValue) * 100;
-    } else if (currentValue > 0) {
-       profitLoss = currentValue;
-       profitLossPercent = double.infinity;
-    }
-    final isProfit = profitLoss >= 0;
-
-    // **FIXED: Define controllers outside builder**
-    final TextEditingController quantityController = TextEditingController(text: '1');
-    final ValueNotifier<int> quantityNotifier = ValueNotifier<int>(1);
 
     showModalBottomSheet(
       context: context,
-      isScrollControlled: true,
+      isScrollControlled: true, // Important for keyboard avoidance
       backgroundColor: Colors.transparent,
       builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setStateModal) {
-            final currentQuantity = quantityNotifier.value; // Read from notifier
-            final transactionValue = song.currentPrice * currentQuantity;
-            final cashBalance = userDataProvider.userProfile?.cashBalance ?? 0.0;
-            final canBuy = cashBalance >= transactionValue;
-            final canSell = item.quantity >= currentQuantity && currentQuantity > 0;
-
-            return Container(
-              constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.9),
-              decoration: BoxDecoration(
-                color: Theme.of(context).scaffoldBackgroundColor,
-                borderRadius: const BorderRadius.only(topLeft: Radius.circular(20), topRight: Radius.circular(20)),
-              ),
-              child: SingleChildScrollView(
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: AppSpacing.l, left: AppSpacing.l, right: AppSpacing.l, top: AppSpacing.s),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Handle bar, Header, Listen Button, Divider, Price/Performance, Value/ProfitLoss...
-                      // (Code for these sections remains largely the same as before)
-                       // Handle bar
-                      Center(
-                        child: Container(
-                          margin: const EdgeInsets.only(top: AppSpacing.s, bottom: AppSpacing.m), // Adjusted margin
-                          width: 40,
-                          height: 4,
-                          decoration: BoxDecoration(
-                            color: Colors.grey[600],
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                        ),
-                      ),
-
-                      // Header with song info
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: AppSpacing.m), // Vertical padding
-                        child: Row(
-                          children: [
-                            GestureDetector(
-                              onTap: () {
-                                if (item.albumArtUrl != null) {
-                                  _showFullAlbumArt(context, item.albumArtUrl!, item.songName, item.artistName);
-                                }
-                              },
-                              child: CircleAvatar(
-                                radius: 30,
-                                backgroundColor: Colors.grey[800],
-                                backgroundImage: item.albumArtUrl != null ? NetworkImage(item.albumArtUrl!) : null,
-                                child: item.albumArtUrl == null ? const Icon(Icons.music_note, size: 30) : null,
-                              ),
-                            ),
-                            const SizedBox(width: AppSpacing.l), // Use AppSpacing.l
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(item.songName, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis, maxLines: 1),
-                                  Text(item.artistName, style: TextStyle(fontSize: 16, color: Colors.grey[400]), overflow: TextOverflow.ellipsis, maxLines: 1),
-                                  const SizedBox(height: AppSpacing.xs),
-                                  Row(
-                                    children: [
-                                      Icon(Icons.headphones, size: 14, color: Colors.grey[400]),
-                                      const SizedBox(width: AppSpacing.xs),
-                                      Text(userDataProvider.getSongStreamCount(item.songId), style: TextStyle(color: Colors.grey[400], fontSize: 12)),
-                                      const SizedBox(width: AppSpacing.m),
-                                      Icon(Icons.category, size: 14, color: Colors.grey[400]),
-                                      const SizedBox(width: AppSpacing.xs),
-                                      Expanded(child: Text(song.genre, style: TextStyle(color: Colors.grey[400], fontSize: 12), overflow: TextOverflow.ellipsis)),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      // Listen button
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: AppSpacing.m),
-                        child: ElevatedButton.icon(
-                          onPressed: () { /* Playback logic */ ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Opening ${item.songName}... (Not implemented)'))); },
-                          icon: const Icon(Icons.play_circle_filled, color: Colors.white),
-                          label: const Text('LISTEN TO SONG'),
-                          style: ElevatedButton.styleFrom(backgroundColor: Colors.purple, foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 48)),
-                        ),
-                      ),
-
-                      const Divider(),
-
-                      // Current price and performance
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: AppSpacing.l),
-                        child: Row( /* ... Price details ... */
-                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Column( crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                Text('Current Price', style: TextStyle(color: Colors.grey[400], fontSize: 14)),
-                                const SizedBox(height: AppSpacing.xs),
-                                Text('\$${song.currentPrice.toStringAsFixed(2)}', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-                                const SizedBox(height: AppSpacing.xs),
-                                Row(children: [ Icon(song.isPriceUp ? Icons.arrow_upward : Icons.arrow_downward, color: song.isPriceUp ? Colors.green : Colors.red, size: 14), const SizedBox(width: AppSpacing.xs), Text('${song.isPriceUp ? "+" : ""}${song.priceChangePercent.toStringAsFixed(2)}%', style: TextStyle(color: song.isPriceUp ? Colors.green : Colors.red, fontSize: 14))])
-                            ]),
-                            Column( crossAxisAlignment: CrossAxisAlignment.end, children: [
-                                Text('Your Position', style: TextStyle(color: Colors.grey[400], fontSize: 14)),
-                                const SizedBox(height: AppSpacing.xs),
-                                Text('${item.quantity} ${item.quantity == 1 ? 'share' : 'shares'}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                                const SizedBox(height: AppSpacing.xs),
-                                Text('Avg. Price: \$${item.purchasePrice.toStringAsFixed(2)}', style: TextStyle(color: Colors.grey[400], fontSize: 14))
-                            ])
-                          ]
-                        ),
-                      ),
-
-                      // Portfolio value and profit/loss
-                      Container( /* ... Value/Profit details ... */
-                        color: Colors.grey[900], padding: const EdgeInsets.all(AppSpacing.l),
-                        child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [ Text('Current Value', style: TextStyle(color: Colors.grey[400], fontSize: 14)), const SizedBox(height: AppSpacing.xs), Text('\$${currentValue.toStringAsFixed(2)}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)) ]),
-                            Column(crossAxisAlignment: CrossAxisAlignment.end, children: [ Text('Profit/Loss', style: TextStyle(color: Colors.grey[400], fontSize: 14)), const SizedBox(height: AppSpacing.xs), Row(children: [ Icon(isProfit ? Icons.arrow_upward : Icons.arrow_downward, color: isProfit ? Colors.green : Colors.red, size: 14), const SizedBox(width: AppSpacing.xs), Text('${isProfit ? "+" : ""}${profitLoss.toStringAsFixed(2)} (${isProfit ? "+" : ""}${profitLossPercent.isFinite ? profitLossPercent.toStringAsFixed(2) + "%" : "N/A"})', style: TextStyle(color: isProfit ? Colors.green : Colors.red, fontSize: 16, fontWeight: FontWeight.bold)) ]) ])
-                        ])
-                      ),
-
-                      const SizedBox(height: AppSpacing.l),
-
-                      // Transaction section
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: AppSpacing.m),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('Trade', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                            const SizedBox(height: AppSpacing.l),
-                            Row( // Quantity Input
-                              children: [
-                                const Text('Quantity:', style: TextStyle(fontSize: 16)),
-                                const SizedBox(width: AppSpacing.l),
-                                Expanded(
-                                  child: TextField(
-                                    controller: quantityController, // Use the controller defined outside
-                                    keyboardType: TextInputType.number,
-                                    decoration: const InputDecoration(border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8)),
-                                    onChanged: (value) {
-                                      int newQuantity = int.tryParse(value) ?? 0;
-                                      if (newQuantity < 0) newQuantity = 0;
-                                      quantityNotifier.value = newQuantity; // Update notifier
-                                      setStateModal(() {}); // Trigger rebuild for button states
-                                    },
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: AppSpacing.l),
-                            Row( // Transaction Value
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [ const Text('Transaction Value:', style: TextStyle(fontSize: 16)), Text('\$${transactionValue.toStringAsFixed(2)}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)) ],
-                            ),
-                            const SizedBox(height: AppSpacing.s),
-                            Row( // Cash Balance
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [ const Text('Cash Balance:', style: TextStyle(fontSize: 16)), Text('\$${cashBalance.toStringAsFixed(2)}', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: canBuy ? Colors.white : Colors.red)) ],
-                            ),
-                            const SizedBox(height: AppSpacing.xl),
-                            Row( // Buy/Sell Buttons
-                              children: [
-                                Expanded(child: ElevatedButton(
-                                  onPressed: canBuy && currentQuantity > 0 ? () async { /* Buy Logic */
-                                     final success = await userDataProvider.buySong(song.id, currentQuantity);
-                                     if(mounted && success) {
-                                        Navigator.pop(context);
-                                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Successfully bought $currentQuantity ${currentQuantity == 1 ? 'share' : 'shares'} of ${song.name}'), backgroundColor: Colors.green));
-                                     } else if (mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to buy shares. Insufficient funds or error occurred.'), backgroundColor: Colors.red));
-                                     }
-                                  } : null,
-                                  style: ElevatedButton.styleFrom(backgroundColor: Colors.green, padding: const EdgeInsets.symmetric(vertical: 16), disabledBackgroundColor: Colors.green.withOpacity(0.5)),
-                                  child: const Text('BUY', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
-                                )),
-                                const SizedBox(width: AppSpacing.l),
-                                Expanded(child: ElevatedButton(
-                                  onPressed: canSell ? () async { /* Sell Logic */
-                                     final success = await userDataProvider.sellSong(song.id, currentQuantity);
-                                     if(mounted && success) {
-                                        Navigator.pop(context);
-                                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Successfully sold $currentQuantity ${currentQuantity == 1 ? 'share' : 'shares'} of ${song.name}'), backgroundColor: Colors.blue));
-                                     } else if (mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to sell shares. Insufficient shares or error occurred.'), backgroundColor: Colors.red));
-                                     }
-                                  } : null,
-                                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red, padding: const EdgeInsets.symmetric(vertical: 16), disabledBackgroundColor: Colors.red.withOpacity(0.5)),
-                                  child: const Text('SELL', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
-                                )),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      Padding( // Close Button
-                        padding: const EdgeInsets.only(top: AppSpacing.l),
-                        child: ElevatedButton(
-                          onPressed: () => Navigator.pop(context),
-                          style: ElevatedButton.styleFrom(backgroundColor: Colors.grey[800], padding: const EdgeInsets.symmetric(vertical: 16)),
-                          child: const Text('CLOSE'),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          },
+        // Use the dedicated StatefulWidget for the sheet content
+        return _PortfolioItemDetailsSheetContent(
+          item: item,
+          song: song,
+          userDataProvider: userDataProvider,
         );
       },
-    ).whenComplete(() {
-       // **FIXED: Dispose controllers here**
-       quantityNotifier.dispose();
-       quantityController.dispose();
-    });
+      // Removed whenComplete disposal as it's handled by _PortfolioItemDetailsSheetContent's State
+    );
   }
 
   // Show full album art in a dialog

@@ -477,34 +477,7 @@ class UserDataProvider with ChangeNotifier {
         .fold(0.0, (sum, t) => sum + t.totalValue);
   }
 
-  // Get formatted stream count for a song
-  String getSongStreamCount(String songId) {
-    return _marketService.getFormattedStreamCount(songId); // Renamed variable
-  }
-
-  // Get total stream count for all songs in portfolio
-  int getTotalPortfolioStreamCount() {
-    int total = 0;
-    for (var item in _portfolio) {
-      total += _marketService.getStreamCount(item.songId); // Renamed variable
-    }
-    return total;
-  }
-
-  // Get formatted total stream count for all songs in portfolio
-  String getFormattedTotalPortfolioStreamCount() {
-    final count = getTotalPortfolioStreamCount();
-
-    if (count >= 1000000000) {
-      return '${(count / 1000000000).toStringAsFixed(1)}B';
-    } else if (count >= 1000000) {
-      return '${(count / 1000000).toStringAsFixed(1)}M';
-    } else if (count >= 1000) {
-      return '${(count / 1000).toStringAsFixed(1)}K';
-    } else {
-      return count.toString();
-    }
-  }
+  // --- Stream Count methods removed as Spotify API doesn't provide this easily ---
 
   // Refresh data to update prices in real-time and reload portfolio data
   Future<void> refreshData() async {

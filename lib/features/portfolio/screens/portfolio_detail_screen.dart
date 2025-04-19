@@ -16,10 +16,10 @@ class PortfolioDetailScreen extends StatefulWidget {
 class _PortfolioDetailScreenState extends State<PortfolioDetailScreen> {
   // Auto-refresh state
   bool _autoRefreshEnabled = true;
-  
+
   // Auto-refresh timer
   Timer? _refreshTimer;
-  
+
   @override
   void initState() {
     super.initState();
@@ -28,25 +28,26 @@ class _PortfolioDetailScreenState extends State<PortfolioDetailScreen> {
       _startAutoRefresh(context);
     });
   }
-  
+
   @override
   void dispose() {
     _stopAutoRefresh();
     super.dispose();
   }
-  
+
   void _startAutoRefresh(BuildContext context) {
     // Cancel any existing timer
     _refreshTimer?.cancel();
-    
+
     // Create a new timer that refreshes data every 30 seconds
     _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       if (_autoRefreshEnabled && mounted) {
+        // Use read here as we don't need to listen in the timer callback
         context.read<UserDataProvider>().refreshData();
       }
     });
   }
-  
+
   void _stopAutoRefresh() {
     _refreshTimer?.cancel();
     _refreshTimer = null;
@@ -75,9 +76,9 @@ class _PortfolioDetailScreenState extends State<PortfolioDetailScreen> {
               child: CircularProgressIndicator(),
             );
           }
-          
+
           final portfolio = provider.portfolio;
-          
+
           if (portfolio.isEmpty) {
             return const Center(
               child: Text(
@@ -87,7 +88,7 @@ class _PortfolioDetailScreenState extends State<PortfolioDetailScreen> {
               ),
             );
           }
-          
+
           return RefreshIndicator(
             onRefresh: () => provider.refreshData(),
             child: ListView(
@@ -118,7 +119,7 @@ class _PortfolioDetailScreenState extends State<PortfolioDetailScreen> {
       ),
     );
   }
-  
+
   Widget _buildAutoRefreshToggle(BuildContext context) {
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -130,7 +131,7 @@ class _PortfolioDetailScreenState extends State<PortfolioDetailScreen> {
             setState(() {
               _autoRefreshEnabled = value;
             });
-            
+
             // Start or stop auto-refresh timer
             if (_autoRefreshEnabled) {
               _startAutoRefresh(context);
@@ -142,11 +143,11 @@ class _PortfolioDetailScreenState extends State<PortfolioDetailScreen> {
       ],
     );
   }
-  
+
   Widget _buildPortfolioSummary(BuildContext context, UserDataProvider provider) {
     final totalValue = provider.totalPortfolioValue;
     final cashBalance = provider.userProfile?.cashBalance ?? 0.0;
-    
+
     return Card(
       elevation: 4,
       child: Padding(
@@ -180,7 +181,7 @@ class _PortfolioDetailScreenState extends State<PortfolioDetailScreen> {
             _buildSummaryRow('Cash Balance', '\$${cashBalance.toStringAsFixed(2)}'),
             const Divider(),
             _buildSummaryRow(
-              'Total Balance', 
+              'Total Balance',
               '\$${(totalValue + cashBalance).toStringAsFixed(2)}',
               isBold: true,
             ),
@@ -189,12 +190,12 @@ class _PortfolioDetailScreenState extends State<PortfolioDetailScreen> {
       ),
     );
   }
-  
+
   String _getFormattedTime() {
     final now = DateTime.now();
     return '${now.hour}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}';
   }
-  
+
   Widget _buildSummaryRow(String label, String value, {bool isBold = false}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -219,10 +220,10 @@ class _PortfolioDetailScreenState extends State<PortfolioDetailScreen> {
       ),
     );
   }
-  
+
   Widget _buildPortfolioItemCard(
-    BuildContext context, 
-    PortfolioItem item, 
+    BuildContext context,
+    PortfolioItem item,
     UserDataProvider provider
   ) {
     // Get the song to access current price and other details
@@ -236,19 +237,17 @@ class _PortfolioDetailScreenState extends State<PortfolioDetailScreen> {
         currentPrice: item.purchasePrice,
       ),
     );
-    
+
     // Calculate values
     final currentValue = item.quantity * song.currentPrice;
     final purchaseValue = item.totalPurchaseValue;
     final profitLoss = currentValue - purchaseValue;
-    final profitLossPercent = (profitLoss / purchaseValue) * 100;
-    
-    // Get stream count
-    final streamCount = provider.getSongStreamCount(item.songId);
-    
+    // Avoid division by zero for percentage calculation
+    final profitLossPercent = purchaseValue.abs() > 0.001 ? (profitLoss / purchaseValue) * 100 : 0.0;
+
     // Get price change indicator
     final priceChange = provider.getPriceChangeIndicator(item.songId);
-    
+
     // Determine card color based on price change
     Color? cardColor;
     if (priceChange == PriceChange.increase) {
@@ -256,7 +255,7 @@ class _PortfolioDetailScreenState extends State<PortfolioDetailScreen> {
     } else if (priceChange == PriceChange.decrease) {
       cardColor = Colors.red[50]; // Light red for price decrease
     }
-    
+
     return AnimatedContainer(
       duration: const Duration(milliseconds: 500),
       margin: const EdgeInsets.only(bottom: 16),
@@ -322,14 +321,7 @@ class _PortfolioDetailScreenState extends State<PortfolioDetailScreen> {
                             color: Colors.grey[600],
                           ),
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Streams: $streamCount',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey[600],
-                          ),
-                        ),
+                        // Removed Stream Count Display
                       ],
                     ),
                   ),
@@ -341,14 +333,14 @@ class _PortfolioDetailScreenState extends State<PortfolioDetailScreen> {
               _buildDetailRow('Quantity', '${item.quantity}'),
               _buildDetailRow('Purchase Price', '\$${item.purchasePrice.toStringAsFixed(2)}'),
               _buildDetailRow(
-                'Current Price', 
+                'Current Price',
                 '\$${song.currentPrice.toStringAsFixed(2)}',
                 suffix: _buildPriceChangeIndicator(priceChange),
               ),
               _buildDetailRow('Total Purchase Value', '\$${purchaseValue.toStringAsFixed(2)}'),
               _buildDetailRow('Current Value', '\$${currentValue.toStringAsFixed(2)}'),
               _buildDetailRow(
-                'Profit/Loss', 
+                'Profit/Loss',
                 '\$${profitLoss.toStringAsFixed(2)} (${profitLossPercent.toStringAsFixed(2)}%)',
                 textColor: profitLoss >= 0 ? Colors.green : Colors.red,
               ),
@@ -378,7 +370,7 @@ class _PortfolioDetailScreenState extends State<PortfolioDetailScreen> {
       ),
     );
   }
-  
+
   Widget _buildPriceChangeIndicator(PriceChange priceChange) {
     if (priceChange == PriceChange.increase) {
       return const Icon(Icons.arrow_upward, color: Colors.green, size: 16);
@@ -388,7 +380,7 @@ class _PortfolioDetailScreenState extends State<PortfolioDetailScreen> {
       return const SizedBox.shrink();
     }
   }
-  
+
   Widget _buildDetailRow(String label, String value, {Color? textColor, Widget? suffix}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -419,17 +411,17 @@ class _PortfolioDetailScreenState extends State<PortfolioDetailScreen> {
       ),
     );
   }
-  
+
   void _showBuyDialog(
-    BuildContext context, 
-    PortfolioItem item, 
-    Song song, 
+    BuildContext context,
+    PortfolioItem item,
+    Song song,
     UserDataProvider provider
   ) {
     int quantity = 1;
     final cashBalance = provider.userProfile?.cashBalance ?? 0.0;
     final maxAffordable = (cashBalance / song.currentPrice).floor();
-    
+
     showDialog(
       context: context,
       builder: (context) {
@@ -437,7 +429,7 @@ class _PortfolioDetailScreenState extends State<PortfolioDetailScreen> {
           builder: (context, setState) {
             final totalCost = quantity * song.currentPrice;
             final canAfford = totalCost <= cashBalance;
-            
+
             return AlertDialog(
               title: Text('Buy ${item.songName}'),
               content: Column(
@@ -484,10 +476,15 @@ class _PortfolioDetailScreenState extends State<PortfolioDetailScreen> {
                   child: const Text('Cancel'),
                 ),
                 ElevatedButton(
-                  onPressed: canAfford
-                      ? () {
-                          provider.buySong(item.songId, quantity);
-                          Navigator.pop(context);
+                  onPressed: canAfford && quantity > 0 // Ensure quantity is positive
+                      ? () async { // Make async
+                          final success = await provider.buySong(item.songId, quantity);
+                          Navigator.pop(context); // Pop regardless of success
+                          if (mounted && success) {
+                             ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Successfully bought $quantity shares'), backgroundColor: Colors.green));
+                          } else if (mounted) {
+                             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Buy failed'), backgroundColor: Colors.red));
+                          }
                         }
                       : null,
                   child: const Text('Buy'),
@@ -499,22 +496,22 @@ class _PortfolioDetailScreenState extends State<PortfolioDetailScreen> {
       },
     );
   }
-  
+
   void _showSellDialog(
-    BuildContext context, 
-    PortfolioItem item, 
-    Song song, 
+    BuildContext context,
+    PortfolioItem item,
+    Song song,
     UserDataProvider provider
   ) {
     int quantity = 1;
-    
+
     showDialog(
       context: context,
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setState) {
             final totalValue = quantity * song.currentPrice;
-            
+
             return AlertDialog(
               title: Text('Sell ${item.songName}'),
               content: Column(
@@ -556,10 +553,17 @@ class _PortfolioDetailScreenState extends State<PortfolioDetailScreen> {
                   child: const Text('Cancel'),
                 ),
                 ElevatedButton(
-                  onPressed: () {
-                    provider.sellSong(item.songId, quantity);
-                    Navigator.pop(context);
-                  },
+                  onPressed: quantity > 0 // Ensure quantity is positive
+                      ? () async { // Make async
+                          final success = await provider.sellSong(item.songId, quantity);
+                           Navigator.pop(context); // Pop regardless of success
+                          if (mounted && success) {
+                             ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Successfully sold $quantity shares'), backgroundColor: Colors.blue));
+                          } else if (mounted) {
+                             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Sell failed'), backgroundColor: Colors.red));
+                          }
+                        }
+                      : null,
                   child: const Text('Sell'),
                 ),
               ],
