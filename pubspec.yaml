@@ -44,6 +44,10 @@ dependencies:
   spotify: ^0.12.0 # For Spotify Web API integration
   sqflite: ^2.3.3+1 # For SQLite database (adjust version as needed)
   path_provider: ^2.1.3 # For finding database path (adjust version as needed)
+  flutter_background_service: ^5.0.5 # For background service execution
+  flutter_background_service_android: ^6.2.2 # For Android-specific background service
+  flutter_background_service_ios: ^5.0.0 # For iOS-specific background service
+  flutter_local_notifications: ^19.1.0 # For notifications from background service
 
 dev_dependencies:
   flutter_test:

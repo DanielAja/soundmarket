@@ -7,6 +7,7 @@ import '../models/song.dart';
 import '../models/transaction.dart';
 import '../models/portfolio_snapshot.dart'; // Import the snapshot model
 import '../services/storage_service.dart';
+import '../services/portfolio_background_service.dart'; // Import the background service
 import '../../features/market/services/market_service.dart';
 // Import the new portfolio service to potentially use its PriceChange enum if needed elsewhere
 import '../../features/portfolio/services/portfolio_service.dart';
@@ -143,11 +144,33 @@ class UserDataProvider with ChangeNotifier {
         );
         _portfolioService.forceUpdate();
         
+        // Update the background service with current portfolio data
+        _updateBackgroundService();
+        
         // We might notify listeners here if we want the graph to update
         // based *only* on new snapshots, but current logic updates on price changes anyway.
         // notifyListeners();
       }
     });
+  }
+  
+  // Update the background service with current portfolio data
+  void _updateBackgroundService() {
+    // Only update if we have valid data
+    if (_portfolio.isEmpty || _userProfile == null) return;
+    
+    // Calculate current portfolio value
+    final portfolioValue = _calculatePortfolioValue();
+    
+    // Get all songs (both from market service and search)
+    final allSongs = [..._marketService.getAllSongs(), ..._songsFromSearches];
+    
+    // Send data to the background service
+    PortfolioBackgroundService.sendDataToBackground(
+      portfolioValue: portfolioValue,
+      portfolioItems: _portfolio,
+      songs: allSongs,
+    );
   }
   
   // Helper method to update prices of songs from search results that are in portfolio
@@ -274,6 +297,9 @@ class UserDataProvider with ChangeNotifier {
       // Initialize portfolio service with loaded data
       _portfolioService.initialize(_portfolio, _marketService.getAllSongs());
 
+      // Check for portfolio snapshots that were created while the app was closed
+      await _loadBackgroundSnapshots();
+
       // Load songs related to user's existing portfolio
       if (_portfolio.isNotEmpty) {
         // Use a delayed call to avoid slowing down the initial loading
@@ -281,6 +307,9 @@ class UserDataProvider with ChangeNotifier {
           _marketService.loadRelatedSongsForPortfolio(_portfolio);
         });
       }
+
+      // Update the background service with current portfolio data
+      _updateBackgroundService();
 
       notifyListeners();
     } catch (e) {
@@ -301,6 +330,111 @@ class UserDataProvider with ChangeNotifier {
       notifyListeners();
     }
   }
+  
+  // Load portfolio snapshots created by the background service
+  Future<void> _loadBackgroundSnapshots() async {
+    try {
+      if (_portfolio.isEmpty) return;
+      
+      // Get the timestamp of the most recent snapshot we created before app closure
+      final lastSnapshot = await _getLatestPortfolioSnapshot();
+      
+      if (lastSnapshot != null) {
+        // Find snapshots created after the last one we explicitly created
+        final now = DateTime.now();
+        final backgroundSnapshots = await _storageService.loadPortfolioHistoryRange(
+          lastSnapshot.timestamp.add(const Duration(seconds: 1)),
+          now,
+        );
+        
+        if (backgroundSnapshots.isNotEmpty) {
+          print('Loaded ${backgroundSnapshots.length} snapshots created while app was closed');
+          
+          // Update the portfolio with the latest background snapshot value
+          // if it's significantly different
+          final latestBackgroundSnapshot = backgroundSnapshots.last;
+          final currentValue = _calculatePortfolioValue();
+          
+          // If the difference is more than 5%, update our local price data
+          if ((latestBackgroundSnapshot.value - currentValue).abs() / currentValue > 0.05) {
+            _updatePortfolioPricesFromSnapshot(latestBackgroundSnapshot.value);
+          }
+        }
+      }
+    } catch (e) {
+      print('Error loading background snapshots: $e');
+    }
+  }
+  
+  // Get the most recent portfolio snapshot
+  Future<PortfolioSnapshot?> _getLatestPortfolioSnapshot() async {
+    // Get a date range from yesterday to now to find the most recent snapshot
+    final now = DateTime.now();
+    final yesterday = now.subtract(const Duration(days: 1));
+    
+    // Get snapshots from the last day
+    final snapshots = await _storageService.loadPortfolioHistoryRange(yesterday, now);
+    
+    if (snapshots.isEmpty) {
+      return null;
+    }
+    
+    // Sort snapshots by timestamp (newest first)
+    snapshots.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    
+    // Return the most recent snapshot
+    return snapshots.first;
+  }
+  
+  // Update portfolio prices based on a snapshot value
+  void _updatePortfolioPricesFromSnapshot(double snapshotValue) {
+    if (_portfolio.isEmpty) return;
+    
+    // Calculate the current portfolio value
+    final currentValue = _calculatePortfolioValue();
+    
+    // Calculate the ratio between the snapshot value and current value
+    final ratio = snapshotValue / currentValue;
+    
+    // Only update if the change is significant
+    if ((ratio - 1.0).abs() < 0.01) return;
+    
+    // Update song prices in the portfolio to match the snapshot value
+    final songs = _marketService.getAllSongs();
+    final songIds = _portfolio.map((item) => item.songId).toSet();
+    
+    // Create a map of song IDs to songs for faster lookup
+    final songMap = {for (var song in songs) song.id: song};
+    
+    // Apply the ratio to each song in the portfolio
+    for (final id in songIds) {
+      final song = songMap[id];
+      if (song != null) {
+        // Find the song in the market service and update its price
+        final index = songs.indexWhere((s) => s.id == id);
+        if (index >= 0) {
+          songs[index] = song.copyWith(
+            previousPrice: song.currentPrice,
+            currentPrice: song.currentPrice * ratio,
+          );
+        }
+      }
+    }
+    
+    // Also update search songs that are in the portfolio
+    for (int i = 0; i < _songsFromSearches.length; i++) {
+      final song = _songsFromSearches[i];
+      if (songIds.contains(song.id)) {
+        _songsFromSearches[i] = song.copyWith(
+          previousPrice: song.currentPrice,
+          currentPrice: song.currentPrice * ratio,
+        );
+      }
+    }
+    
+    // Notify listeners to update UI with new prices
+    notifyListeners();
+  }
 
   // Save user data to storage
   Future<void> _saveData() async {
@@ -314,6 +448,9 @@ class UserDataProvider with ChangeNotifier {
           songs: _marketService.getAllSongs(), // Save current song prices
           // history: _portfolioHistory, // Removed: History is saved via savePortfolioSnapshot
         );
+        
+        // Update the background service with the latest data
+        _updateBackgroundService();
       }
     } catch (e) {
       print('Error saving data: $e');
