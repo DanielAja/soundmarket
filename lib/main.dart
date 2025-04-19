@@ -12,11 +12,21 @@ import 'core/navigation/route_constants.dart'; // Import for route constants
 
 void main() {
   // Ensure Flutter bindings are initialized for services like shared_preferences
-  WidgetsFlutterBinding.ensureInitialized(); 
-  
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Create MusicDataApiService instance
+  final musicDataApiService = MusicDataApiService();
+
   runApp(
-    ChangeNotifierProvider(
-      create: (context) => UserDataProvider(), // Provide the UserData state
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(
+          create: (context) => UserDataProvider(), // Provide the UserData state
+        ),
+        Provider<MusicDataApiService>.value(
+          value: musicDataApiService, // Provide the music data API service
+        ),
+      ],
       child: const SoundMarketApp(),
     ),
   );
@@ -39,13 +49,17 @@ class SoundMarketApp extends StatelessWidget {
         primaryColor: const Color(0xFF00D632), // Cash App green
         scaffoldBackgroundColor: Colors.black,
         colorScheme: ColorScheme.dark(
-          primary: const Color(0xFF00D632),    // Cash App green
-          secondary: const Color(0xFF00C2FF),  // Cash App blue accent
-          surface: Colors.black, // Use background color for surface (replacing deprecated background)
+          primary: const Color(0xFF00D632), // Cash App green
+          secondary: const Color(0xFF00C2FF), // Cash App blue accent
+          surface:
+              Colors
+                  .black, // Use background color for surface (replacing deprecated background)
           // surface: const Color(0xFF121212),    // Removed duplicate Dark surface
           onPrimary: Colors.black,
           onSecondary: Colors.black,
-          onSurface: Colors.white, // Use onBackground color for onSurface (replacing deprecated onBackground)
+          onSurface:
+              Colors
+                  .white, // Use onBackground color for onSurface (replacing deprecated onBackground)
           // onSurface: Colors.white, // Removed duplicate onSurface
         ),
         // Card theme
@@ -139,38 +153,31 @@ class _MainNavigationWrapperState extends State<MainNavigationWrapper> {
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
-      
+
       // Update the discover tab active state
-      _musicDataApiService.setDiscoverTabActive(index == 1); // 1 is the index of the Discover tab
+      _musicDataApiService.setDiscoverTabActive(
+        index == 1,
+      ); // 1 is the index of the Discover tab
     });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Center(
-        child: _widgetOptions.elementAt(_selectedIndex),
-      ),
+      body: Center(child: _widgetOptions.elementAt(_selectedIndex)),
       bottomNavigationBar: BottomNavigationBar(
         items: const <BottomNavigationBarItem>[
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.search),
-            label: 'Discover',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: 'Profile',
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+          BottomNavigationBarItem(icon: Icon(Icons.search), label: 'Discover'),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
         ],
         currentIndex: _selectedIndex,
-        selectedItemColor: Theme.of(context).colorScheme.primary, // Use theme color
+        selectedItemColor:
+            Theme.of(context).colorScheme.primary, // Use theme color
         unselectedItemColor: Colors.grey, // Color for inactive tabs
         onTap: _onItemTapped,
-        backgroundColor: Theme.of(context).colorScheme.surface, // Use theme surface color
+        backgroundColor:
+            Theme.of(context).colorScheme.surface, // Use theme surface color
       ),
     );
   }

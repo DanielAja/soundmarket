@@ -3,14 +3,12 @@ import 'package:provider/provider.dart';
 import '../../../shared/models/song.dart'; // Corrected path
 import '../../../shared/providers/user_data_provider.dart'; // Corrected path
 import '../../../shared/widgets/search_bar_with_suggestions.dart'; // Corrected path
+import '../../../shared/services/music_data_api_service.dart'; // Added import
 
 class SearchResultsScreen extends StatefulWidget {
   final String initialQuery;
 
-  const SearchResultsScreen({
-    super.key,
-    required this.initialQuery,
-  });
+  const SearchResultsScreen({super.key, required this.initialQuery});
 
   @override
   State<SearchResultsScreen> createState() => _SearchResultsScreenState();
@@ -28,67 +26,119 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
     _performSearch();
   }
 
-  void _performSearch() {
+  Future<void> _performSearch() async {
     setState(() {
       _isSearching = true;
     });
 
-    // Get all songs from the provider
-    final userDataProvider = Provider.of<UserDataProvider>(context, listen: false);
-    final allSongs = userDataProvider.allSongs;
+    try {
+      final userDataProvider = Provider.of<UserDataProvider>(
+        context,
+        listen: false,
+      );
 
-    // Filter songs based on search query
-    final filteredSongs = allSongs.where((song) {
-      final songNameLower = song.name.toLowerCase();
-      final artistNameLower = song.artist.toLowerCase();
-      final genreLower = song.genre.toLowerCase();
-      final queryLower = _searchQuery.toLowerCase();
+      // Combine results from two sources:
+      List<Song> combinedResults = [];
 
-      return songNameLower.contains(queryLower) ||
-          artistNameLower.contains(queryLower) ||
-          genreLower.contains(queryLower);
-    }).toList();
+      // 1. First search for real-time API results from Spotify
+      final musicDataService = Provider.of<MusicDataApiService>(
+        context,
+        listen: false,
+      );
+      final apiResults = await musicDataService.searchSongs(_searchQuery);
+      if (apiResults.isNotEmpty) {
+        combinedResults.addAll(apiResults);
 
-    // Sort by relevance (exact matches first)
-    filteredSongs.sort((a, b) {
-      final aNameLower = a.name.toLowerCase();
-      final bNameLower = b.name.toLowerCase();
-      final aArtistLower = a.artist.toLowerCase();
-      final bArtistLower = b.artist.toLowerCase();
-      final queryLower = _searchQuery.toLowerCase();
+        // Add API results to the song pool for future reference
+        userDataProvider.addSongsToPool(apiResults);
+      }
 
-      // Exact matches first
-      final aExactNameMatch = aNameLower == queryLower;
-      final bExactNameMatch = bNameLower == queryLower;
-      if (aExactNameMatch && !bExactNameMatch) return -1;
-      if (!aExactNameMatch && bExactNameMatch) return 1;
+      // 2. Then search existing songs in the catalog
+      final allSongs = userDataProvider.allSongs;
+      final localFilteredSongs =
+          allSongs.where((song) {
+            final songNameLower = song.name.toLowerCase();
+            final artistNameLower = song.artist.toLowerCase();
+            final genreLower = song.genre.toLowerCase();
+            final queryLower = _searchQuery.toLowerCase();
 
-      // Then starts with matches
-      final aStartsWithName = aNameLower.startsWith(queryLower);
-      final bStartsWithName = bNameLower.startsWith(queryLower);
-      if (aStartsWithName && !bStartsWithName) return -1;
-      if (!aStartsWithName && bStartsWithName) return 1;
+            return songNameLower.contains(queryLower) ||
+                artistNameLower.contains(queryLower) ||
+                genreLower.contains(queryLower);
+          }).toList();
 
-      // Then artist exact matches
-      final aExactArtistMatch = aArtistLower == queryLower;
-      final bExactArtistMatch = bArtistLower == queryLower;
-      if (aExactArtistMatch && !bExactArtistMatch) return -1;
-      if (!aExactArtistMatch && bExactArtistMatch) return 1;
+      // Add local results (avoiding duplicates)
+      for (final song in localFilteredSongs) {
+        if (!combinedResults.any((s) => s.id == song.id)) {
+          combinedResults.add(song);
+        }
+      }
 
-      // Then artist starts with matches
-      final aStartsWithArtist = aArtistLower.startsWith(queryLower);
-      final bStartsWithArtist = bArtistLower.startsWith(queryLower);
-      if (aStartsWithArtist && !bStartsWithArtist) return -1;
-      if (!aStartsWithArtist && bStartsWithArtist) return 1;
+      // Sort by relevance (exact matches first)
+      combinedResults.sort((a, b) {
+        final aNameLower = a.name.toLowerCase();
+        final bNameLower = b.name.toLowerCase();
+        final aArtistLower = a.artist.toLowerCase();
+        final bArtistLower = b.artist.toLowerCase();
+        final queryLower = _searchQuery.toLowerCase();
 
-      // Default to alphabetical by name
-      return aNameLower.compareTo(bNameLower);
-    });
+        // Exact matches first
+        final aExactNameMatch = aNameLower == queryLower;
+        final bExactNameMatch = bNameLower == queryLower;
+        if (aExactNameMatch && !bExactNameMatch) return -1;
+        if (!aExactNameMatch && bExactNameMatch) return 1;
 
-    setState(() {
-      _searchResults = filteredSongs;
-      _isSearching = false;
-    });
+        // Then starts with matches
+        final aStartsWithName = aNameLower.startsWith(queryLower);
+        final bStartsWithName = bNameLower.startsWith(queryLower);
+        if (aStartsWithName && !bStartsWithName) return -1;
+        if (!aStartsWithName && bStartsWithName) return 1;
+
+        // Then artist exact matches
+        final aExactArtistMatch = aArtistLower == queryLower;
+        final bExactArtistMatch = bArtistLower == queryLower;
+        if (aExactArtistMatch && !bExactArtistMatch) return -1;
+        if (!aExactArtistMatch && bExactArtistMatch) return 1;
+
+        // Then artist starts with matches
+        final aStartsWithArtist = aArtistLower.startsWith(queryLower);
+        final bStartsWithArtist = bArtistLower.startsWith(queryLower);
+        if (aStartsWithArtist && !bStartsWithArtist) return -1;
+        if (!aStartsWithArtist && bStartsWithArtist) return 1;
+
+        // Default to popularity (price) for API results
+        return b.currentPrice.compareTo(a.currentPrice);
+      });
+
+      setState(() {
+        _searchResults = combinedResults;
+        _isSearching = false;
+      });
+    } catch (e) {
+      // Fallback to local search if API search fails
+      final userDataProvider = Provider.of<UserDataProvider>(
+        context,
+        listen: false,
+      );
+      final allSongs = userDataProvider.allSongs;
+
+      final filteredSongs =
+          allSongs.where((song) {
+            final songNameLower = song.name.toLowerCase();
+            final artistNameLower = song.artist.toLowerCase();
+            final genreLower = song.genre.toLowerCase();
+            final queryLower = _searchQuery.toLowerCase();
+
+            return songNameLower.contains(queryLower) ||
+                artistNameLower.contains(queryLower) ||
+                genreLower.contains(queryLower);
+          }).toList();
+
+      setState(() {
+        _searchResults = filteredSongs;
+        _isSearching = false;
+      });
+    }
   }
 
   @override
@@ -115,22 +165,23 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
             ),
           ),
           Expanded(
-            child: _isSearching
-                ? const Center(child: CircularProgressIndicator())
-                : _searchResults.isEmpty
+            child:
+                _isSearching
+                    ? const Center(child: CircularProgressIndicator())
+                    : _searchResults.isEmpty
                     ? Center(
-                        child: Text(
-                          'No results found for "$_searchQuery"',
-                          style: TextStyle(color: Colors.grey[400]),
-                        ),
-                      )
-                    : ListView.builder(
-                        itemCount: _searchResults.length,
-                        itemBuilder: (context, index) {
-                          final song = _searchResults[index];
-                          return _buildSongListItem(context, song);
-                        },
+                      child: Text(
+                        'No results found for "$_searchQuery"',
+                        style: TextStyle(color: Colors.grey[400]),
                       ),
+                    )
+                    : ListView.builder(
+                      itemCount: _searchResults.length,
+                      itemBuilder: (context, index) {
+                        final song = _searchResults[index];
+                        return _buildSongListItem(context, song);
+                      },
+                    ),
           ),
         ],
       ),
@@ -144,30 +195,31 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
     final isPriceUp = song.isPriceUp;
 
     return ListTile(
-      leading: song.albumArtUrl != null
-          ? ClipRRect(
-              borderRadius: BorderRadius.circular(4.0),
-              child: Image.network(
-                song.albumArtUrl!,
+      leading:
+          song.albumArtUrl != null
+              ? ClipRRect(
+                borderRadius: BorderRadius.circular(4.0),
+                child: Image.network(
+                  song.albumArtUrl!,
+                  width: 50.0,
+                  height: 50.0,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      width: 50.0,
+                      height: 50.0,
+                      color: Colors.grey[700],
+                      child: const Icon(Icons.music_note, size: 25.0),
+                    );
+                  },
+                ),
+              )
+              : Container(
                 width: 50.0,
                 height: 50.0,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    width: 50.0,
-                    height: 50.0,
-                    color: Colors.grey[700],
-                    child: const Icon(Icons.music_note, size: 25.0),
-                  );
-                },
+                color: Colors.grey[700],
+                child: const Icon(Icons.music_note, size: 25.0),
               ),
-            )
-          : Container(
-              width: 50.0,
-              height: 50.0,
-              color: Colors.grey[700],
-              child: const Icon(Icons.music_note, size: 25.0),
-            ),
       title: Row(
         children: [
           Expanded(
@@ -179,7 +231,10 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
           ),
           if (isOwned)
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 2.0),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 6.0,
+                vertical: 2.0,
+              ),
               decoration: BoxDecoration(
                 color: Theme.of(context).colorScheme.primary,
                 borderRadius: BorderRadius.circular(4.0),
@@ -206,9 +261,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
         children: [
           Text(
             '\$${song.currentPrice.toStringAsFixed(2)}',
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-            ),
+            style: const TextStyle(fontWeight: FontWeight.bold),
           ),
           Row(
             mainAxisSize: MainAxisSize.min,
@@ -235,7 +288,10 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
   }
 
   void _showSongActions(BuildContext context, Song song) {
-    final userDataProvider = Provider.of<UserDataProvider>(context, listen: false);
+    final userDataProvider = Provider.of<UserDataProvider>(
+      context,
+      listen: false,
+    );
     final ownedQuantity = userDataProvider.getQuantityOwned(song.id);
 
     showModalBottomSheet(
@@ -252,8 +308,14 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                 children: [
                   CircleAvatar(
                     backgroundColor: Colors.grey[800],
-                    backgroundImage: song.albumArtUrl != null ? NetworkImage(song.albumArtUrl!) : null,
-                    child: song.albumArtUrl == null ? const Icon(Icons.music_note) : null,
+                    backgroundImage:
+                        song.albumArtUrl != null
+                            ? NetworkImage(song.albumArtUrl!)
+                            : null,
+                    child:
+                        song.albumArtUrl == null
+                            ? const Icon(Icons.music_note)
+                            : null,
                     radius: 30.0,
                   ),
                   const SizedBox(width: 16.0),
@@ -270,9 +332,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                         ),
                         Text(
                           song.artist,
-                          style: TextStyle(
-                            color: Colors.grey[400],
-                          ),
+                          style: TextStyle(color: Colors.grey[400]),
                         ),
                         const SizedBox(height: 4.0),
                         Row(
@@ -285,7 +345,9 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                             ),
                             const SizedBox(width: 8.0),
                             Icon(
-                              song.isPriceUp ? Icons.arrow_upward : Icons.arrow_downward,
+                              song.isPriceUp
+                                  ? Icons.arrow_upward
+                                  : Icons.arrow_downward,
                               color: song.isPriceUp ? Colors.green : Colors.red,
                               size: 14.0,
                             ),
@@ -293,7 +355,8 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                               '${song.priceChangePercent.toStringAsFixed(1)}%',
                               style: TextStyle(
                                 fontSize: 12.0,
-                                color: song.isPriceUp ? Colors.green : Colors.red,
+                                color:
+                                    song.isPriceUp ? Colors.green : Colors.red,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -307,22 +370,19 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
               const SizedBox(height: 16.0),
               const Text(
                 'Song Details',
-                style: TextStyle(
-                  fontSize: 16.0,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 16.0, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8.0),
               Text('Genre: ${song.genre}'),
               const SizedBox(height: 4.0),
-              Text('Previous Price: \$${song.previousPrice.toStringAsFixed(2)}'),
+              Text(
+                'Previous Price: \$${song.previousPrice.toStringAsFixed(2)}',
+              ),
               const SizedBox(height: 16.0),
               if (ownedQuantity > 0)
                 Text(
                   'You own: $ownedQuantity ${ownedQuantity == 1 ? 'share' : 'shares'}',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
               const SizedBox(height: 16.0),
               Row(
@@ -345,7 +405,12 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                       child: ElevatedButton(
                         onPressed: () {
                           Navigator.pop(context);
-                          _showSellSongDialog(context, song, userDataProvider, ownedQuantity);
+                          _showSellSongDialog(
+                            context,
+                            song,
+                            userDataProvider,
+                            ownedQuantity,
+                          );
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.red,
@@ -362,13 +427,17 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
       },
     );
   }
-  
+
   // Show dialog to buy a song
-  void _showBuySongDialog(BuildContext context, Song song, UserDataProvider provider) {
+  void _showBuySongDialog(
+    BuildContext context,
+    Song song,
+    UserDataProvider provider,
+  ) {
     int quantity = 1;
     final cashBalance = provider.userProfile?.cashBalance ?? 0.0;
     final maxAffordable = (cashBalance / song.currentPrice).floor();
-    
+
     if (maxAffordable < 1) {
       // Show insufficient funds message
       ScaffoldMessenger.of(context).showSnackBar(
@@ -379,7 +448,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
       );
       return;
     }
-    
+
     showDialog(
       context: context,
       builder: (context) {
@@ -387,7 +456,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
           builder: (context, setState) {
             final totalCost = quantity * song.currentPrice;
             final canAfford = totalCost <= cashBalance;
-            
+
             return AlertDialog(
               backgroundColor: Colors.grey[900],
               title: Text('Buy ${song.name}'),
@@ -397,7 +466,9 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                 children: [
                   Text('Artist: ${song.artist}'),
                   const SizedBox(height: 8.0),
-                  Text('Current Price: \$${song.currentPrice.toStringAsFixed(2)}'),
+                  Text(
+                    'Current Price: \$${song.currentPrice.toStringAsFixed(2)}',
+                  ),
                   const SizedBox(height: 8.0),
                   Text('Cash Balance: \$${cashBalance.toStringAsFixed(2)}'),
                   const SizedBox(height: 16.0),
@@ -407,16 +478,18 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                       const Text('Quantity: '),
                       IconButton(
                         icon: const Icon(Icons.remove),
-                        onPressed: quantity > 1
-                            ? () => setState(() => quantity--)
-                            : null,
+                        onPressed:
+                            quantity > 1
+                                ? () => setState(() => quantity--)
+                                : null,
                       ),
                       Text('$quantity'),
                       IconButton(
                         icon: const Icon(Icons.add),
-                        onPressed: quantity < maxAffordable
-                            ? () => setState(() => quantity++)
-                            : null,
+                        onPressed:
+                            quantity < maxAffordable
+                                ? () => setState(() => quantity++)
+                                : null,
                       ),
                     ],
                   ),
@@ -438,30 +511,36 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                   child: const Text('Cancel'),
                 ),
                 ElevatedButton(
-                  onPressed: canAfford
-                      ? () async {
-                          final success = await provider.buySong(song.id, quantity);
-                          Navigator.pop(context);
-                          
-                          if (success) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Successfully purchased $quantity ${quantity == 1 ? 'share' : 'shares'} of ${song.name}'),
-                                backgroundColor: Colors.green,
-                              ),
+                  onPressed:
+                      canAfford
+                          ? () async {
+                            final success = await provider.buySong(
+                              song.id,
+                              quantity,
                             );
-                            // Refresh search results to show updated ownership status
-                            setState(() {});
-                          } else {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Failed to buy shares'),
-                                backgroundColor: Colors.red,
-                              ),
-                            );
+                            Navigator.pop(context);
+
+                            if (success) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    'Successfully purchased $quantity ${quantity == 1 ? 'share' : 'shares'} of ${song.name}',
+                                  ),
+                                  backgroundColor: Colors.green,
+                                ),
+                              );
+                              // Refresh search results to show updated ownership status
+                              setState(() {});
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Failed to buy shares'),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            }
                           }
-                        }
-                      : null,
+                          : null,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green,
                   ),
@@ -474,18 +553,23 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
       },
     );
   }
-  
+
   // Show dialog to sell a song
-  void _showSellSongDialog(BuildContext context, Song song, UserDataProvider provider, int quantityOwned) {
+  void _showSellSongDialog(
+    BuildContext context,
+    Song song,
+    UserDataProvider provider,
+    int quantityOwned,
+  ) {
     int quantity = 1;
-    
+
     showDialog(
       context: context,
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setState) {
             final totalValue = quantity * song.currentPrice;
-            
+
             return AlertDialog(
               backgroundColor: Colors.grey[900],
               title: Text('Sell ${song.name}'),
@@ -495,9 +579,13 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                 children: [
                   Text('Artist: ${song.artist}'),
                   const SizedBox(height: 8.0),
-                  Text('Current Price: \$${song.currentPrice.toStringAsFixed(2)}'),
+                  Text(
+                    'Current Price: \$${song.currentPrice.toStringAsFixed(2)}',
+                  ),
                   const SizedBox(height: 8.0),
-                  Text('You Own: $quantityOwned ${quantityOwned == 1 ? 'share' : 'shares'}'),
+                  Text(
+                    'You Own: $quantityOwned ${quantityOwned == 1 ? 'share' : 'shares'}',
+                  ),
                   const SizedBox(height: 16.0),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -505,16 +593,18 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                       const Text('Quantity to Sell: '),
                       IconButton(
                         icon: const Icon(Icons.remove),
-                        onPressed: quantity > 1
-                            ? () => setState(() => quantity--)
-                            : null,
+                        onPressed:
+                            quantity > 1
+                                ? () => setState(() => quantity--)
+                                : null,
                       ),
                       Text('$quantity'),
                       IconButton(
                         icon: const Icon(Icons.add),
-                        onPressed: quantity < quantityOwned
-                            ? () => setState(() => quantity++)
-                            : null,
+                        onPressed:
+                            quantity < quantityOwned
+                                ? () => setState(() => quantity++)
+                                : null,
                       ),
                     ],
                   ),
@@ -534,11 +624,13 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                   onPressed: () async {
                     final success = await provider.sellSong(song.id, quantity);
                     Navigator.pop(context);
-                    
+
                     if (success) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content: Text('Successfully sold $quantity ${quantity == 1 ? 'share' : 'shares'} of ${song.name}'),
+                          content: Text(
+                            'Successfully sold $quantity ${quantity == 1 ? 'share' : 'shares'} of ${song.name}',
+                          ),
                           backgroundColor: Colors.green,
                         ),
                       );
@@ -553,9 +645,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                       );
                     }
                   },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red,
-                  ),
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
                   child: const Text('Sell'),
                 ),
               ],
