@@ -225,9 +225,9 @@ class MusicDataApiService {
   }
   
   // Search for songs
-  Future<List<Song>> searchSongs(String query) async {
+  Future<List<Song>> searchSongs(String query, {int limit = 20}) async {
     try {
-      return await _spotifyApi.searchTracks(query);
+      return await _spotifyApi.searchTracks(query, limit: limit);
     } catch (e) {
       // print('Error searching songs: $e'); // Removed print
       return [];
@@ -235,9 +235,9 @@ class MusicDataApiService {
   }
   
   // Get new releases
-  Future<List<Song>> getNewReleases() async {
+  Future<List<Song>> getNewReleases({int limit = 20}) async {
     try {
-      return await _spotifyApi.getNewReleases();
+      return await _spotifyApi.getNewReleases(limit: limit);
     } catch (e) {
       // print('Error getting new releases: $e'); // Removed print
       return [];

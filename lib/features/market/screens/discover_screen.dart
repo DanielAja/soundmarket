@@ -30,6 +30,9 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   // Create a persistent controller for the search field
   final TextEditingController searchController = TextEditingController();
 
+  // Flag to limit how often we make API calls
+  static bool _apiDataLoaded = false;
+  
   @override
   void initState() {
     super.initState();
@@ -38,6 +41,168 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     
     // Removed Timer.periodic to prevent live updates
     // Albums will now only update on manual refresh
+    
+    // Use the static flag to prevent multiple API calls when navigating back to this screen
+    if (!_apiDataLoaded) {
+      // Set the flag to true to prevent future unnecessary API calls
+      _apiDataLoaded = true;
+      
+      // Give the UI a chance to render before making API calls
+      Future.delayed(Duration(milliseconds: 500), () {
+        // Load data for one section at a time with delays to prevent rate limiting
+        _loadNewReleasesData();
+      });
+    }
+  }
+  
+  // Load data for each section with delays between API calls to prevent rate limiting
+  void _loadNewReleasesData() {
+    if (_cachedNewSongs == null && !_loadingNewReleases) {
+      _loadingNewReleases = true;
+      _musicDataApi.getNewReleases(limit: 10).then((newReleases) {
+        if (mounted) {
+          setState(() {
+            _cachedNewSongs = newReleases;
+            _loadingNewReleases = false;
+            
+            if (newReleases.isNotEmpty) {
+              final userDataProvider = Provider.of<UserDataProvider>(context, listen: false);
+              userDataProvider.addSongsToPool(newReleases);
+            }
+            
+            // Load next section after a delay
+            Future.delayed(Duration(seconds: 2), _loadTopSongsData);
+          });
+        }
+      }).catchError((error) {
+        if (mounted) {
+          setState(() {
+            // Create fallback data on error - use random songs from the user's data
+            final userDataProvider = Provider.of<UserDataProvider>(context, listen: false);
+            final allSongs = userDataProvider.allSongs;
+            
+            if (allSongs.isNotEmpty) {
+              final random = Random();
+              final songsWithNewness = allSongs.map((song) {
+                return {
+                  'song': song,
+                  'newness': random.nextDouble(),
+                };
+              }).toList();
+              
+              songsWithNewness.sort((a, b) => (b['newness'] as double).compareTo(a['newness'] as double));
+              _cachedNewSongs = songsWithNewness.take(10).map((item) => item['song'] as Song).toList();
+            } else {
+              // If there are no songs available, use an empty list
+              _cachedNewSongs = [];
+            }
+            
+            _loadingNewReleases = false;
+            // Still load the next section even on error
+            Future.delayed(Duration(seconds: 2), _loadTopSongsData);
+          });
+        }
+      });
+    } else {
+      // If this section is already loaded, move to the next one
+      _loadTopSongsData();
+    }
+  }
+  
+  void _loadTopSongsData() {
+    if (_cachedTopSongs == null && !_loadingTopSongs) {
+      _loadingTopSongs = true;
+      _musicDataApi.searchSongs("genre:pop year:2023-2024", limit: 10).then((topTracks) {
+        if (mounted) {
+          setState(() {
+            _cachedTopSongs = topTracks;
+            _loadingTopSongs = false;
+            
+            if (topTracks.isNotEmpty) {
+              final userDataProvider = Provider.of<UserDataProvider>(context, listen: false);
+              userDataProvider.addSongsToPool(topTracks);
+            }
+            
+            // Load next section after a delay
+            Future.delayed(Duration(seconds: 2), _loadTopMoversData);
+          });
+        }
+      }).catchError((error) {
+        if (mounted) {
+          setState(() {
+            _loadingTopSongs = false;
+            // Still load the next section even on error
+            Future.delayed(Duration(seconds: 2), _loadTopMoversData);
+          });
+        }
+      });
+    } else {
+      // If this section is already loaded, move to the next one
+      _loadTopMoversData();
+    }
+  }
+  
+  void _loadTopMoversData() {
+    if (_cachedTopMovers == null && !_loadingTopMovers) {
+      _loadingTopMovers = true;
+      _musicDataApi.searchSongs("genre:hip-hop year:2023-2024", limit: 10).then((hipHopTracks) {
+        if (mounted) {
+          setState(() {
+            _cachedTopMovers = hipHopTracks;
+            _loadingTopMovers = false;
+            
+            if (hipHopTracks.isNotEmpty) {
+              final userDataProvider = Provider.of<UserDataProvider>(context, listen: false);
+              userDataProvider.addSongsToPool(hipHopTracks);
+            }
+            
+            // Load final section after a delay
+            Future.delayed(Duration(seconds: 2), _loadRisingArtistsData);
+          });
+        }
+      }).catchError((error) {
+        if (mounted) {
+          setState(() {
+            _loadingTopMovers = false;
+            // Still load the next section even on error
+            Future.delayed(Duration(seconds: 2), _loadRisingArtistsData);
+          });
+        }
+      });
+    } else {
+      // If this section is already loaded, move to the next one
+      _loadRisingArtistsData();
+    }
+  }
+  
+  void _loadRisingArtistsData() {
+    if (_cachedRisingArtists == null && !_loadingRisingArtists) {
+      _loadingRisingArtists = true;
+      _musicDataApi.searchSongs("genre:indie tag:new", limit: 15).then((indieTracks) {
+        if (mounted) {
+          setState(() {
+            final uniqueArtists = indieTracks
+                .map((song) => song.artist)
+                .toSet()
+                .toList();
+            
+            _cachedRisingArtists = uniqueArtists.take(10).toList();
+            _loadingRisingArtists = false;
+            
+            if (indieTracks.isNotEmpty) {
+              final userDataProvider = Provider.of<UserDataProvider>(context, listen: false);
+              userDataProvider.addSongsToPool(indieTracks);
+            }
+          });
+        }
+      }).catchError((error) {
+        if (mounted) {
+          setState(() {
+            _loadingRisingArtists = false;
+          });
+        }
+      });
+    }
   }
 
   @override
@@ -112,10 +277,26 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                 }
               }
               
-              // Update our cached lists with fresh data on manual refresh
-              _cachedTopSongs = List<Song>.from(topSongs);
-              _cachedTopMovers = List<Song>.from(topMovers);
-              _cachedRisingArtists = List<String>.from(risingArtists);
+              // Reset all our cached data and loading flags to force API re-queries
+              _cachedTopSongs = null;
+              _loadingTopSongs = false;
+              
+              _cachedTopMovers = null;
+              _loadingTopMovers = false;
+              
+              _cachedRisingArtists = null;
+              _loadingRisingArtists = false;
+              
+              _cachedNewSongs = null;
+              _loadingNewReleases = false;
+              
+              // Reset the static flag so API loading can happen again
+              _apiDataLoaded = false;
+              
+              // Start sequential loading of data again
+              Future.delayed(Duration(milliseconds: 500), () {
+                _loadNewReleasesData();
+              });
 
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Refreshed market data')),
@@ -129,6 +310,8 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                 _buildTopSongsSection(context, topSongs, userDataProvider),
                 const SizedBox(height: AppSpacing.xl), // Use AppSpacing.xl
                 _buildTopMoversSection(context, topMovers, userDataProvider),
+                const SizedBox(height: AppSpacing.xl), // Use AppSpacing.xl
+                _buildNewSongsSection(context, userDataProvider),
                 const SizedBox(height: AppSpacing.xl), // Use AppSpacing.xl
                 _buildRisingArtistsSection(context, risingArtists),
                 if (_selectedGenre != null) ...[
@@ -413,14 +596,17 @@ class _DiscoverScreenState extends State<DiscoverScreen>
 
   // Store cached songs for top songs section
   List<Song>? _cachedTopSongs;
+  bool _loadingTopSongs = false;
 
   Widget _buildTopSongsSection(
     BuildContext context,
     List<Song> songs,
     UserDataProvider userDataProvider,
   ) {
-    // Initialize cache if it's empty
-    _cachedTopSongs ??= List<Song>.from(songs);
+    // Initialize with provided songs if needed
+    if (_cachedTopSongs == null) {
+      _cachedTopSongs = List<Song>.from(songs);
+    }
     
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -429,7 +615,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             const Text(
-              'Top Songs',
+              'Top Pop Songs',
               style: TextStyle(fontSize: 20.0, fontWeight: FontWeight.bold),
             ),
             TextButton(
@@ -452,14 +638,35 @@ class _DiscoverScreenState extends State<DiscoverScreen>
         const SizedBox(height: AppSpacing.m), // Use AppSpacing.m
         SizedBox(
           height: 260.0, // Height for the horizontal list container
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            itemCount: _cachedTopSongs!.length,
-            itemBuilder: (context, index) {
-              final song = _cachedTopSongs![index];
-              return _buildSongCard(context, song, userDataProvider);
-            },
-          ),
+          child: _loadingTopSongs
+            ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 10),
+                    Text(
+                      'Loading pop songs...',
+                      style: TextStyle(color: Colors.grey[400]),
+                    ),
+                  ],
+                ),
+              )
+            : _cachedTopSongs!.isEmpty
+              ? Center(
+                  child: Text(
+                    'No pop songs found',
+                    style: TextStyle(color: Colors.grey[400]),
+                  ),
+                )
+              : ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _cachedTopSongs!.length,
+                  itemBuilder: (context, index) {
+                    final song = _cachedTopSongs![index];
+                    return _buildSongCard(context, song, userDataProvider);
+                  },
+                ),
         ),
       ],
     );
@@ -467,14 +674,17 @@ class _DiscoverScreenState extends State<DiscoverScreen>
 
   // Store cached songs for top movers section
   List<Song>? _cachedTopMovers;
+  bool _loadingTopMovers = false;
 
   Widget _buildTopMoversSection(
     BuildContext context,
     List<Song> songs,
     UserDataProvider userDataProvider,
   ) {
-    // Initialize cache if it's empty
-    _cachedTopMovers ??= List<Song>.from(songs);
+    // Initialize with provided songs if needed
+    if (_cachedTopMovers == null) {
+      _cachedTopMovers = List<Song>.from(songs);
+    }
     
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -483,7 +693,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             const Text(
-              'Top Movers',
+              'Top Hip-Hop',
               style: TextStyle(fontSize: 20.0, fontWeight: FontWeight.bold),
             ),
             TextButton(
@@ -506,19 +716,40 @@ class _DiscoverScreenState extends State<DiscoverScreen>
         const SizedBox(height: AppSpacing.m), // Use AppSpacing.m
         SizedBox(
           height: 260.0, // Height for the horizontal list container
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            itemCount: _cachedTopMovers!.length,
-            itemBuilder: (context, index) {
-              final song = _cachedTopMovers![index];
-              return _buildSongCard(
-                context,
-                song,
-                userDataProvider,
-                showPriceChange: true,
-              ); // Pass showPriceChange here
-            },
-          ),
+          child: _loadingTopMovers
+            ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 10),
+                    Text(
+                      'Loading hip-hop tracks...',
+                      style: TextStyle(color: Colors.grey[400]),
+                    ),
+                  ],
+                ),
+              )
+            : _cachedTopMovers!.isEmpty
+              ? Center(
+                  child: Text(
+                    'No hip-hop tracks found',
+                    style: TextStyle(color: Colors.grey[400]),
+                  ),
+                )
+              : ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _cachedTopMovers!.length,
+                  itemBuilder: (context, index) {
+                    final song = _cachedTopMovers![index];
+                    return _buildSongCard(
+                      context,
+                      song,
+                      userDataProvider,
+                      showPriceChange: true,
+                    ); // Pass showPriceChange here
+                  },
+                ),
         ),
       ],
     );
@@ -603,35 +834,144 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     );
   }
 
+  // Store cached new songs
+  List<Song>? _cachedNewSongs;
+  bool _loadingNewReleases = false;
+  
+  // New section for new songs using API query
+  Widget _buildNewSongsSection(
+    BuildContext context,
+    UserDataProvider userDataProvider,
+  ) {
+    // Initialize fallback if needed
+    if (_cachedNewSongs == null) {
+      // If no data loaded yet, get some fallback songs to show
+      final allSongs = userDataProvider.allSongs;
+      if (allSongs.isNotEmpty) {
+        // Get a random subset of songs to display temporarily
+        final random = Random();
+        final songsWithNewness = allSongs.map((song) {
+          return {
+            'song': song,
+            'newness': random.nextDouble(),
+          };
+        }).toList();
+        
+        songsWithNewness.sort((a, b) => (b['newness'] as double).compareTo(a['newness'] as double));
+        _cachedNewSongs = songsWithNewness.take(10).map((item) => item['song'] as Song).toList();
+      } else {
+        _cachedNewSongs = [];
+      }
+    }
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'New Releases',
+              style: TextStyle(fontSize: 20.0, fontWeight: FontWeight.bold),
+            ),
+            TextButton(
+              onPressed: () {
+                // For now, just show a message that this feature is coming soon
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Coming soon: View all new releases')),
+                );
+              },
+              child: const Text('View All'),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.m),
+        SizedBox(
+          height: 260.0,
+          child: _loadingNewReleases
+            ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 10),
+                    Text(
+                      'Loading new releases...',
+                      style: TextStyle(color: Colors.grey[400]),
+                    ),
+                  ],
+                ),
+              )
+            : _cachedNewSongs!.isEmpty
+              ? Center(
+                  child: Text(
+                    'No new releases found',
+                    style: TextStyle(color: Colors.grey[400]),
+                  ),
+                )
+              : ListView.builder(
+                scrollDirection: Axis.horizontal,
+                itemCount: _cachedNewSongs!.length,
+                itemBuilder: (context, index) {
+                  final song = _cachedNewSongs![index];
+                  return _buildSongCard(
+                    context,
+                    song,
+                    userDataProvider,
+                    showPriceChange: false,
+                  );
+                },
+              ),
+        ),
+      ],
+    );
+  }
+
   // Store cached rising artists
   List<String>? _cachedRisingArtists;
+  bool _loadingRisingArtists = false;
 
   Widget _buildRisingArtistsSection(
     BuildContext context,
     List<String> artists,
   ) {
-    // Initialize cache if it's empty
-    _cachedRisingArtists ??= List<String>.from(artists);
+    // Initialize with provided artists if needed
+    if (_cachedRisingArtists == null) {
+      _cachedRisingArtists = List<String>.from(artists);
+    }
     
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Artists on the Rise',
+          'Indie Artists on the Rise',
           style: TextStyle(fontSize: 20.0, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: AppSpacing.m), // Use AppSpacing.m
         SizedBox(
           height: 120.0,
-          child:
-              _cachedRisingArtists!.isEmpty
-                  ? Center(
-                    child: Text(
-                      'No rising artists found',
+          child: _loadingRisingArtists
+            ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 10),
+                    Text(
+                      'Loading indie artists...',
                       style: TextStyle(color: Colors.grey[400]),
                     ),
-                  )
-                  : ListView.builder(
+                  ],
+                ),
+              )
+            : _cachedRisingArtists!.isEmpty
+              ? Center(
+                  child: Text(
+                    'No rising artists found',
+                    style: TextStyle(color: Colors.grey[400]),
+                  ),
+                )
+              : ListView.builder(
                     scrollDirection: Axis.horizontal,
                     itemCount: _cachedRisingArtists!.length,
                     itemBuilder: (context, index) {
