@@ -1084,8 +1084,27 @@ class _HomeScreenState extends State<HomeScreen> {
     String periodLabel = _getPeriodLabel();
 
     return Card(
-      elevation: 4.0,
-      child: Padding(
+      elevation: 6.0, // Increased elevation for more depth
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16.0), // Consistent rounded corners
+        side: BorderSide(
+          color: Colors.grey.withOpacity(0.1), // Subtle border
+          width: 0.5,
+        ),
+      ),
+      // Apply very subtle gradient background to the card
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16.0),
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Theme.of(context).cardTheme.color ?? Colors.black,
+              Theme.of(context).cardTheme.color?.withOpacity(0.95) ?? Colors.black.withOpacity(0.95),
+            ],
+          ),
+        ),
         padding: const EdgeInsets.all(AppSpacing.l),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1121,19 +1140,60 @@ class _HomeScreenState extends State<HomeScreen> {
               style: TextStyle(color: Colors.grey[400], fontSize: 12),
             ),
             const SizedBox(height: AppSpacing.l),
-            SizedBox(
-              height: 200.0,
+            Container(
+              height: 220.0, // Slightly taller chart
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                color: Colors.black.withOpacity(0.2), // Subtle background for chart area
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 2,
+                    spreadRadius: 0.1,
+                    offset: const Offset(0, 1),
+                  )
+                ],
+              ),
+              margin: const EdgeInsets.symmetric(vertical: AppSpacing.s),
+              padding: const EdgeInsets.all(AppSpacing.s),
               child: _isChartLoading
-                  ? const Center(child: CircularProgressIndicator())
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          CircularProgressIndicator(
+                            valueColor: AlwaysStoppedAnimation<Color>(Theme.of(context).colorScheme.primary),
+                            strokeWidth: 2.5,
+                          ),
+                          const SizedBox(height: AppSpacing.m),
+                          Text('Loading chart data...', style: TextStyle(color: Colors.grey[400], fontSize: 12)),
+                        ],
+                      ),
+                    )
                   : spots.isEmpty
                       ? Center(child: Text('No data available for this period.', style: TextStyle(color: Colors.grey[400])))
                       : LineChart(
                           LineChartData(
+                            backgroundColor: Colors.transparent, // Transparent background
+                            clipData: FlClipData.all(), // Clip data to avoid overflow
+                            // Removed extraLinesData as it might cause compatibility issues
                             gridData: FlGridData(
                               show: true,
-                              drawVerticalLine: false,
+                              drawVerticalLine: true, // Show vertical grid lines for a stock chart look
+                              verticalInterval: 0.25, // Show 4 vertical grid lines (at 0.0, 0.25, 0.5, 0.75, 1.0)
                               horizontalInterval: (maxY > minY) ? max(0.1, (maxY - minY) / 4) : 1.0,
-                              getDrawingHorizontalLine: (value) => FlLine(color: Colors.grey[800] ?? Colors.grey, strokeWidth: 0.5, dashArray: [5, 5]),
+                              getDrawingHorizontalLine: (value) => FlLine(
+                                color: Colors.grey[850]?.withOpacity(0.15) ?? Colors.grey.withOpacity(0.15), 
+                                strokeWidth: 0.5, 
+                                dashArray: [5, 5]
+                              ),
+                              getDrawingVerticalLine: (value) => FlLine(
+                                color: Colors.grey[850]?.withOpacity(0.1) ?? Colors.grey.withOpacity(0.1), 
+                                strokeWidth: 0.5, 
+                                dashArray: [5, 5]
+                              ),
+                              checkToShowHorizontalLine: (value) => true,
+                              checkToShowVerticalLine: (value) => value % 0.25 == 0, // Only at 0.0, 0.25, 0.5, 0.75, 1.0
                             ),
                             titlesData: FlTitlesData(
                               show: true,
@@ -1205,17 +1265,21 @@ class _HomeScreenState extends State<HomeScreen> {
                               LineChartBarData(
                                 spots: spots, 
                                 isCurved: true, 
-                                curveSmoothness: 0.35, 
+                                curveSmoothness: 0.5, // Increased smoothness for more professional look
                                 color: chartColor, 
-                                barWidth: 2, 
+                                barWidth: 1.8, // Slightly thinner line for clean appearance
                                 isStrokeCapRound: true,
+                                preventCurveOverShooting: true, // Prevents extreme curves
+                                preventCurveOvershootingThreshold: 10.0, // Controls curve extremes
                                 dotData: const FlDotData(show: false),
+                                // Removed shadowColor as it's not available in this version
                                 belowBarData: BarAreaData(
                                   show: true, 
+                                  // Removed spotsLine as it might not be available in this version
                                   gradient: LinearGradient(
                                     colors: [
-                                      chartColor.withOpacity(0.3), 
-                                      chartColor.withOpacity(0.0)
+                                      chartColor.withOpacity(0.25), // Lighter gradient start
+                                      chartColor.withOpacity(0.0)  // Transparent end
                                     ], 
                                     begin: Alignment.topCenter, 
                                     end: Alignment.bottomCenter
@@ -1240,17 +1304,22 @@ class _HomeScreenState extends State<HomeScreen> {
                                 }).toList(),
                               ),
                               getTouchedSpotIndicator: (barData, spotIndexes) => spotIndexes.map((index) => TouchedSpotIndicatorData(
-                                FlLine(color: chartColor.withOpacity(0.5), strokeWidth: 1),
+                                FlLine(
+                                  color: Colors.grey.withOpacity(0.3), 
+                                  strokeWidth: 1,
+                                  dashArray: [3, 3], // Dashed vertical line
+                                ),
                                 FlDotData(
                                   show: true, 
                                   getDotPainter: (spot, percent, bar, index) => FlDotCirclePainter(
-                                    radius: 4, 
-                                    color: chartColor, 
-                                    strokeWidth: 1, 
-                                    strokeColor: Colors.black
+                                    radius: 5, // Slightly larger dot 
+                                    color: Colors.white, // White center
+                                    strokeWidth: 2, // Thicker border
+                                    strokeColor: chartColor // Colored border
                                   )
                                 ),
                               )).toList(),
+                              // Removed touchCallback as it might not be supported in this version
                             ),
                           ),
                         ),

@@ -245,7 +245,21 @@ class SpotifyApiService {
   // Calculate price based on popularity
   double _calculatePrice(int popularity) {
     // Convert popularity (0-100) to a price between $10 and $100
-    return 10.0 + (popularity * 0.9);
+    // Formula: base price ($10) + scaling factor based on popularity
+    // Popular songs (80-100): $82-$100
+    // Mid-tier songs (40-79): $28-$81.1
+    // Niche songs (0-39): $10-$27.1
+    
+    if (popularity >= 80) {
+      // High popularity - premium pricing
+      return 10.0 + (popularity * 1.1); // $82-$100 for popular songs
+    } else if (popularity >= 40) {
+      // Medium popularity - standard pricing
+      return 10.0 + (popularity * 0.9); // $28-$81.1 for mid-tier songs
+    } else {
+      // Lower popularity - value pricing
+      return 10.0 + (popularity * 0.7); // $10-$27.1 for niche songs
+    }
   }
   
   // Assign genre based on popularity (since Spotify doesn't provide genre per track)
@@ -269,15 +283,14 @@ class SpotifyApiService {
     }
   }
   
-  // Get track details including audio features
+  // Get track details - only fetch basic track data, not audio features (which may be restricted)
   Future<Map<String, dynamic>> getTrackDetails(String trackId) async {
     try {
       final trackData = await _makeRequest('${ApiConstants.spotifyTracks}/$trackId');
-      final audioFeatures = await _makeRequest('${ApiConstants.spotifyBaseUrl}/audio-features/$trackId');
       
       return {
         'track': trackData,
-        'audioFeatures': audioFeatures,
+        // We no longer fetch audio features as they appear to be causing 403 errors
       };
     } catch (e) {
       print('Error getting track details: $e');

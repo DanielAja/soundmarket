@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math'; // Import Random
 import '../../../shared/models/song.dart';
 import '../../../shared/services/spotify_api_service.dart'; // Import SpotifyApiService
 
@@ -26,7 +25,7 @@ class MarketService {
 
   // Timer for price simulation
   Timer? _priceUpdateTimer;
-  final _random = Random();
+  // Random number generator no longer used since we rely solely on popularity data
 
   MarketService._internal() {
     _initializeSpotifyApi();
@@ -64,29 +63,46 @@ class MarketService {
   // Start the price simulation timer
   void _startPriceSimulation() {
     _priceUpdateTimer?.cancel(); // Cancel existing timer
-    _priceUpdateTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
-      _simulatePriceChanges();
+    _priceUpdateTimer = Timer.periodic(const Duration(seconds: 30), (timer) async {
+      await _simulatePriceChanges();
     });
   }
 
-  // Simulate price changes for all songs
-  void _simulatePriceChanges() {
+  // Update song prices based on Spotify popularity
+  Future<void> _simulatePriceChanges() async {
     if (_songs.isEmpty) return; // Don't simulate if no songs loaded
 
     bool hasUpdates = false;
     for (final song in _songs) {
       song.previousPrice = song.currentPrice; // Store previous price
 
-      // Simulate a small price change (+/- up to 5% of current price)
-      final changePercent = (_random.nextDouble() * 0.1) - 0.05; // -0.05 to +0.05
-      final priceChange = song.currentPrice * changePercent;
-      song.currentPrice += priceChange;
-
-      // Ensure price doesn't go below a minimum (e.g., $1)
-      if (song.currentPrice < 1.0) {
-        song.currentPrice = 1.0;
+      try {
+        // Get updated track details from Spotify including popularity
+        final details = await _spotifyApi.getTrackDetails(song.id);
+        if (details.isNotEmpty && details['track'] != null) {
+          final track = details['track'];
+          final int popularity = track['popularity'] ?? 50; // Default to 50 if not available
+          
+          // Calculate new price based directly on popularity with no random fluctuation
+          song.currentPrice = _calculatePriceFromPopularity(popularity);
+          
+          // Ensure price doesn't go below a minimum (e.g., $1)
+          if (song.currentPrice < 1.0) {
+            song.currentPrice = 1.0;
+          }
+          
+          hasUpdates = true;
+        } else {
+          // If we couldn't get updated data, maintain the current price
+          // No random fluctuations, keep price stable until we can get updated popularity data
+          hasUpdates = false;
+        }
+      } catch (e) {
+        print('Error updating price for song ${song.name}: $e');
+        // On error, maintain the current price
+        // No random fluctuations, keep price stable until we can get updated popularity data
+        hasUpdates = false;
       }
-      hasUpdates = true;
     }
 
     if (hasUpdates) {
@@ -127,9 +143,9 @@ class MarketService {
 
   // --- Stream Count methods removed as Spotify API doesn't provide this directly ---
 
-  // Trigger a manual update of song prices (now just runs the simulation)
-  void triggerPriceUpdate() {
-    _simulatePriceChanges();
+  // Trigger a manual update of song prices
+  Future<void> triggerPriceUpdate() async {
+    await _simulatePriceChanges();
   }
 
   // Search for songs using Spotify API
@@ -214,6 +230,26 @@ class MarketService {
     return artists;
   }
 
+  // Helper method to calculate price based on popularity (similar to SpotifyApiService._calculatePrice)
+  double _calculatePriceFromPopularity(int popularity) {
+    // Convert popularity (0-100) to a price between $10 and $100
+    // Formula: base price ($10) + scaling factor based on popularity
+    // Popular songs (80-100): $82-$100
+    // Mid-tier songs (40-79): $28-$81.1
+    // Niche songs (0-39): $10-$27.1
+    
+    if (popularity >= 80) {
+      // High popularity - premium pricing
+      return 10.0 + (popularity * 1.1); // $82-$100 for popular songs
+    } else if (popularity >= 40) {
+      // Medium popularity - standard pricing
+      return 10.0 + (popularity * 0.9); // $28-$81.1 for mid-tier songs
+    } else {
+      // Lower popularity - value pricing
+      return 10.0 + (popularity * 0.7); // $10-$27.1 for niche songs
+    }
+  }
+  
   // Calculate rising artists (helper method)
   List<String> _calculateRisingArtists() {
     if (_songs.isEmpty) return [];
