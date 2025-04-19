@@ -3,6 +3,7 @@ import 'dart:async';
 import '../../../shared/widgets/app_logo.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/navigation/route_constants.dart';
+import '../../../core/constants/string_constants.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -107,7 +108,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                 Opacity(
                   opacity: _taglineAnimation.value,
                   child: Text(
-                    'Invest in the sounds of tomorrow',
+                    StringConstants.appTagline,
                     style: TextStyle(
                       color: Colors.grey[400],
                       fontSize: 16,

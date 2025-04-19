@@ -2,7 +2,7 @@
 class StringConstants {
   // App name and general
   static const String appName = 'Sound Market';
-  static const String appTagline = 'Invest in the music you love';
+  static const String appTagline = 'Trade the Tracks';
   static const String appDescription = 'Buy and sell shares in your favorite songs';
   
   // Authentication
