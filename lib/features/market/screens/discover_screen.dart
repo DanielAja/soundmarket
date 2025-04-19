@@ -24,7 +24,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   final Map<String, AnimationController> _priceAnimationControllers = {};
   final Map<String, Animation<double>> _priceAnimations = {};
   late final MusicDataApiService _musicDataApi;
-  String? _selectedGenre;
+  String? _selectedGenre = 'pop';
 
   // Flag to limit how often we make API calls
   static bool _apiDataLoaded = false;
@@ -108,6 +108,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   void _loadTopSongsData() {
     if (_cachedTopSongs == null && !_loadingTopSongs) {
       _loadingTopSongs = true;
+      // Always use 'pop' for top songs regardless of selected genre
       _musicDataApi.searchSongs("genre:pop year:2023-2024", limit: 10).then((topTracks) {
         if (mounted) {
           setState(() {
@@ -308,7 +309,9 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                 _buildNewSongsSection(context, userDataProvider),
                 const SizedBox(height: AppSpacing.xl), // Use AppSpacing.xl
                 _buildRisingArtistsSection(context, risingArtists),
-                if (_selectedGenre != null) ...[
+                const SizedBox(height: AppSpacing.xl), // Use AppSpacing.xl
+                _buildBrowseByGenreSection(context, userDataProvider),
+                if (_selectedGenre != null && _selectedGenre != 'pop') ...[
                   const SizedBox(height: AppSpacing.xl), // Use AppSpacing.xl
                   _buildGenreSongsSection(
                     context,
@@ -316,8 +319,6 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                     userDataProvider,
                   ),
                 ],
-                const SizedBox(height: AppSpacing.xl), // Use AppSpacing.xl
-                _buildBrowseByGenreSection(context, userDataProvider),
               ],
             ),
           );
@@ -486,7 +487,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             const Text(
-              'Top Pop Songs',
+              'Top Songs',
               style: TextStyle(fontSize: 20.0, fontWeight: FontWeight.bold),
             ),
             TextButton(
@@ -676,16 +677,22 @@ class _DiscoverScreenState extends State<DiscoverScreen>
           style: TextStyle(fontSize: 20.0, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: AppSpacing.m), // Use AppSpacing.m
-        Wrap(
-          spacing: AppSpacing.s, // Use AppSpacing.s
-          runSpacing: AppSpacing.s, // Use AppSpacing.s
-          children:
-              genres.map((genre) {
-                final isSelected = _selectedGenre == genre;
-                return InkWell(
+        SizedBox(
+          height: 50.0, // Height for the horizontal scrolling list
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            itemCount: genres.length,
+            itemBuilder: (context, index) {
+              final genre = genres[index];
+              // Check if this genre is 'pop' or if it matches the current selected genre
+              final isSelected = _selectedGenre == genre || (genre.toLowerCase() == 'pop' && _selectedGenre == 'pop');
+              return Padding(
+                padding: const EdgeInsets.only(right: AppSpacing.s),
+                child: InkWell(
                   onTap: () {
                     setState(() {
                       _selectedGenre = isSelected ? null : genre;
+                      // Only update the genre-specific section, not top songs
                     });
                   },
                   child: Chip(
@@ -697,9 +704,18 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                     labelStyle: TextStyle(
                       color: isSelected ? Colors.black : Colors.white,
                     ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30.0),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.m,
+                      vertical: AppSpacing.xs,
+                    ),
                   ),
-                );
-              }).toList(),
+                ),
+              );
+            },
+          ),
         ),
       ],
     );
