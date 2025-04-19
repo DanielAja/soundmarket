@@ -1,16 +1,15 @@
 import 'dart:math';
-// Removed duplicate import 'dart:math';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../../shared/providers/user_data_provider.dart'; // Corrected path
-import '../../../shared/models/song.dart'; // Corrected path
-// Removed unused import for song_service.dart
-import '../../../shared/services/music_data_api_service.dart'; // Corrected path
-import 'top_songs_list_screen.dart'; // Corrected path (relative)
-import 'search_results_screen.dart'; // Corrected path (relative)
-// Removed unused import for search_bar_with_suggestions.dart
-import '../../../core/theme/app_spacing.dart'; // Corrected path
+import '../../../shared/providers/user_data_provider.dart';
+import '../../../shared/models/song.dart';
+import '../../../shared/services/music_data_api_service.dart';
+import '../../../shared/services/search_state_service.dart';
+import '../../../shared/widgets/search_bar_with_suggestions.dart';
+import 'top_songs_list_screen.dart';
+import 'search_results_screen.dart';
+import '../../../core/theme/app_spacing.dart';
 
 class DiscoverScreen extends StatefulWidget {
   const DiscoverScreen({super.key});
@@ -26,9 +25,6 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   final Map<String, Animation<double>> _priceAnimations = {};
   late final MusicDataApiService _musicDataApi;
   String? _selectedGenre;
-  
-  // Create a persistent controller for the search field
-  final TextEditingController searchController = TextEditingController();
 
   // Flag to limit how often we make API calls
   static bool _apiDataLoaded = false;
@@ -210,8 +206,6 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     for (final controller in _priceAnimationControllers.values) {
       controller.dispose();
     }
-    // Dispose search controller
-    searchController.dispose();
     _musicDataApi.setDiscoverTabActive(false);
     super.dispose();
   }
@@ -417,182 +411,59 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   }
 
   Widget _buildSearchBar() {
-    // Using the class-level searchController
-
+    // Get the shared search state service
+    final searchStateService = Provider.of<SearchStateService>(context, listen: true);
+    
     return Column(
       children: [
-        TextField(
-          controller: searchController,
-          decoration: InputDecoration(
-            hintText: 'Search for artists, songs...',
-            prefixIcon: const Icon(Icons.search),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(30.0),
-            ),
-            filled: true,
-            contentPadding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
-            suffixIcon: IconButton(
-              icon: const Icon(Icons.clear),
-              onPressed: () {
-                searchController.clear();
-              },
-            ),
-          ),
+        SearchBarWithSuggestions(
+          initialQuery: searchStateService.currentQuery,
+          onSongSelected: (song) {
+            _showSongActions(context, song, Provider.of<UserDataProvider>(context, listen: false));
+          },
           onSubmitted: (value) async {
             if (value.isNotEmpty) {
               final searchQuery = value.trim();
-
-              // Show loading indicator
-              showDialog(
-                context: context,
-                barrierDismissible: false,
-                builder: (BuildContext context) {
-                  return AlertDialog(
-                    backgroundColor: Colors.grey[900],
-                    content: Row(
-                      children: [
-                        const CircularProgressIndicator(),
-                        const SizedBox(width: AppSpacing.l),
-                        Text('Searching for "$searchQuery"...'),
-                      ],
-                    ),
-                  );
-                },
-              );
-
-              // Fetch search results from Spotify API
-              final results = await _musicDataApi.searchSongs(searchQuery);
-
-              // Pop loading dialog
-              Navigator.of(context).pop();
-
-              if (results.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('No results found for "$searchQuery"'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-                return;
-              }
-
-              // Show success message with result count
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    'Found ${results.length} results for "$searchQuery"',
-                  ),
-                  backgroundColor: Colors.green,
-                  duration: const Duration(seconds: 2),
-                ),
-              );
-
-              // Navigate to search results screen
-              Navigator.push(
+              
+              // Update the shared search state immediately
+              searchStateService.updateQuery(searchQuery);
+              
+              // Clear genre filter
+              setState(() {
+                _selectedGenre = null;
+              });
+              
+              // Navigate directly to search results screen without showing results in the discover tab
+              final returnedQuery = await Navigator.push<String>(
                 context,
                 MaterialPageRoute(
-                  builder:
-                      (context) =>
-                          SearchResultsScreen(initialQuery: searchQuery),
+                  builder: (context) => SearchResultsScreen(initialQuery: searchQuery),
                 ),
               );
-
-              // Ensure these songs get added to the song catalog
-              final userDataProvider = Provider.of<UserDataProvider>(
-                context,
-                listen: false,
-              );
-              userDataProvider.addSongsToPool(results);
-
-              // Create a new section for popular results from this search
-              setState(() {
-                _searchQuery = searchQuery;
-                _selectedGenre =
-                    null; // Clear genre filter to show our search results
-              });
+              
+              // Update search query if one was returned
+              if (returnedQuery != null && mounted) {
+                searchStateService.updateQuery(returnedQuery);
+              }
             }
           },
         ),
-        if (_searchQuery != null && _searchQuery!.isNotEmpty)
-          _buildSearchResultsSection(context),
+        // Removed search results section that used to appear here
       ],
     );
   }
 
-  // Track the latest search query
-  String? _searchQuery;
+  // Using shared search state instead of a local query
 
+  /* 
+  // REMOVED: No longer showing search results section within the discover tab
+  // This function has been removed as per requirement to not show search results
+  // as a section after searching.
+  
   Widget _buildSearchResultsSection(BuildContext context) {
-    final userDataProvider = Provider.of<UserDataProvider>(context);
-    final allSongs = userDataProvider.allSongs;
-
-    // Filter songs based on search query
-    final filteredSongs =
-        allSongs.where((song) {
-          final songNameLower = song.name.toLowerCase();
-          final artistNameLower = song.artist.toLowerCase();
-          final genreLower = song.genre.toLowerCase();
-          final queryLower = _searchQuery!.toLowerCase();
-
-          return songNameLower.contains(queryLower) ||
-              artistNameLower.contains(queryLower) ||
-              genreLower.contains(queryLower);
-        }).toList();
-
-    // Sort by price (popularity) and limit to top 10
-    filteredSongs.sort((a, b) => b.currentPrice.compareTo(a.currentPrice));
-    final topPopularSongs = filteredSongs.take(10).toList();
-
-    if (topPopularSongs.isEmpty) {
-      return const SizedBox.shrink(); // Don't show section if no results
-    }
-
-    return Padding(
-      padding: const EdgeInsets.only(top: AppSpacing.l),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Popular "$_searchQuery" Songs',
-                style: const TextStyle(
-                  fontSize: 20.0,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              TextButton(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder:
-                          (context) =>
-                              SearchResultsScreen(initialQuery: _searchQuery!),
-                    ),
-                  );
-                },
-                child: const Text('View All'),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.m),
-          SizedBox(
-            height: 260.0,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              itemCount: topPopularSongs.length,
-              itemBuilder: (context, index) {
-                final song = topPopularSongs[index];
-                return _buildSongCard(context, song, userDataProvider);
-              },
-            ),
-          ),
-        ],
-      ),
-    );
+    // Original implementation removed
   }
+  */
 
   // Store cached songs for top songs section
   List<Song>? _cachedTopSongs;

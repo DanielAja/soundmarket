@@ -7,6 +7,7 @@ import 'features/market/screens/discover_screen.dart'; // Corrected path
 import 'features/profile/screens/profile_screen.dart'; // Corrected path
 // transaction_history_screen was moved but not used directly here, so removing import
 import 'shared/services/music_data_api_service.dart'; // Corrected path
+import 'shared/services/search_state_service.dart'; // Import for search state
 import 'core/navigation/app_router.dart'; // Import for route generation
 import 'core/navigation/route_constants.dart'; // Import for route constants
 
@@ -14,8 +15,9 @@ void main() {
   // Ensure Flutter bindings are initialized for services like shared_preferences
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Create MusicDataApiService instance
+  // Create shared service instances
   final musicDataApiService = MusicDataApiService();
+  final searchStateService = SearchStateService();
 
   runApp(
     MultiProvider(
@@ -25,6 +27,9 @@ void main() {
         ),
         Provider<MusicDataApiService>.value(
           value: musicDataApiService, // Provide the music data API service
+        ),
+        ChangeNotifierProvider.value(
+          value: searchStateService, // Provide the search state service
         ),
       ],
       child: const SoundMarketApp(),

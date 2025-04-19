@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../shared/models/song.dart'; // Corrected path
 import '../../../shared/providers/user_data_provider.dart'; // Corrected path
+import '../../../shared/services/search_state_service.dart';
 import '../../../shared/widgets/search_bar_with_suggestions.dart'; // Corrected path
 import '../../../shared/services/music_data_api_service.dart'; // Added import
 
@@ -22,7 +23,17 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
   @override
   void initState() {
     super.initState();
+    // Get the initial query and update the shared search state
     _searchQuery = widget.initialQuery;
+    
+    // Update shared search state
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        final searchStateService = Provider.of<SearchStateService>(context, listen: false);
+        searchStateService.updateQuery(_searchQuery);
+      }
+    });
+    
     _performSearch();
   }
 
@@ -143,47 +154,80 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Search Results: $_searchQuery'),
-        elevation: 0,
-      ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: SearchBarWithSuggestions(
-              onSongSelected: (song) {
-                _showSongActions(context, song);
-              },
-              onSubmitted: (query) {
-                setState(() {
-                  _searchQuery = query;
-                });
-                _performSearch();
-              },
-            ),
+    return PopScope(
+      // Handle back button press to pass data back to previous screen
+      canPop: false,
+      onPopInvoked: (didPop) {
+        if (!didPop) {
+          // Get the latest search state before popping
+          final searchStateService = Provider.of<SearchStateService>(context, listen: false);
+          searchStateService.updateQuery(_searchQuery);
+          
+          // Return the current search query when navigating back for compatibility
+          Navigator.pop(context, _searchQuery);
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text('Search Results: $_searchQuery'),
+          elevation: 0,
+          // Add a custom back button to handle returning with search data
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () {
+              // Get the latest search state before popping
+              final searchStateService = Provider.of<SearchStateService>(context, listen: false);
+              searchStateService.updateQuery(_searchQuery);
+              
+              // Pass the current query back to the previous screen for compatibility
+              Navigator.pop(context, _searchQuery);
+            },
           ),
-          Expanded(
-            child:
-                _isSearching
-                    ? const Center(child: CircularProgressIndicator())
-                    : _searchResults.isEmpty
-                    ? Center(
+        ),
+        body: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: SearchBarWithSuggestions(
+                initialQuery: _searchQuery,
+                onSongSelected: (song) {
+                  _showSongActions(context, song);
+                },
+                onSubmitted: (query) {
+                  // Update local state and search
+                  setState(() {
+                    _searchQuery = query;
+                  });
+                  
+                  // Update shared search state
+                  final searchStateService = Provider.of<SearchStateService>(context, listen: false);
+                  searchStateService.updateQuery(query);
+                  
+                  // Perform search with new query
+                  _performSearch();
+                },
+              ),
+            ),
+            Expanded(
+              child: _isSearching
+                ? const Center(child: CircularProgressIndicator())
+                : _searchResults.isEmpty
+                  ? Center(
                       child: Text(
                         'No results found for "$_searchQuery"',
                         style: TextStyle(color: Colors.grey[400]),
                       ),
                     )
-                    : ListView.builder(
+                  : ListView.builder(
                       itemCount: _searchResults.length,
                       itemBuilder: (context, index) {
                         final song = _searchResults[index];
                         return _buildSongListItem(context, song);
                       },
                     ),
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
     );
   }

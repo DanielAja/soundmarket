@@ -6,11 +6,13 @@ import '../providers/user_data_provider.dart'; // Corrected path
 class SearchBarWithSuggestions extends StatefulWidget {
   final Function(Song) onSongSelected;
   final Function(String) onSubmitted;
+  final String? initialQuery;
 
   const SearchBarWithSuggestions({
     super.key,
     required this.onSongSelected,
     required this.onSubmitted,
+    this.initialQuery,
   });
 
   @override
@@ -18,19 +20,37 @@ class SearchBarWithSuggestions extends StatefulWidget {
 }
 
 class _SearchBarWithSuggestionsState extends State<SearchBarWithSuggestions> {
-  final TextEditingController _controller = TextEditingController();
+  late final TextEditingController _controller;
   final FocusNode _focusNode = FocusNode();
   bool _showSuggestions = false;
-  String _searchQuery = '';
+  late String _searchQuery;
   
   @override
   void initState() {
     super.initState();
+    // Initialize with the provided query if available
+    _searchQuery = widget.initialQuery ?? '';
+    _controller = TextEditingController(text: _searchQuery);
+    
     _focusNode.addListener(() {
       setState(() {
         _showSuggestions = _focusNode.hasFocus && _searchQuery.isNotEmpty;
       });
     });
+  }
+  
+  @override
+  void didUpdateWidget(SearchBarWithSuggestions oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Update controller text if initialQuery changes
+    if (widget.initialQuery != oldWidget.initialQuery && widget.initialQuery != null) {
+      _searchQuery = widget.initialQuery!;
+      // Update the controller text without triggering the onChanged event
+      _controller.value = TextEditingValue(
+        text: _searchQuery,
+        selection: TextSelection.collapsed(offset: _searchQuery.length),
+      );
+    }
   }
   
   @override
