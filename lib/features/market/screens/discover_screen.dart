@@ -35,12 +35,9 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     super.initState();
     _musicDataApi = MusicDataApiService();
     _musicDataApi.setDiscoverTabActive(true);
-
-    Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) {
-        setState(() {});
-      }
-    });
+    
+    // Removed Timer.periodic to prevent live updates
+    // Albums will now only update on manual refresh
   }
 
   @override
@@ -91,6 +88,8 @@ class _DiscoverScreenState extends State<DiscoverScreen>
           return RefreshIndicator(
             onRefresh: () async {
               final random = Random();
+              
+              // Update prices randomly for all song categories
               for (final song in [...topSongs, ...topMovers, ...genreSongs]) {
                 if (random.nextBool()) {
                   final oldPrice = song.currentPrice;
@@ -112,6 +111,10 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                   }
                 }
               }
+              
+              // Update our cached lists with fresh data on manual refresh
+              _cachedTopSongs = List<Song>.from(topSongs);
+              _cachedTopMovers = List<Song>.from(topMovers);
 
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Refreshed market data')),
@@ -407,11 +410,17 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     );
   }
 
+  // Store cached songs for top songs section
+  List<Song>? _cachedTopSongs;
+
   Widget _buildTopSongsSection(
     BuildContext context,
     List<Song> songs,
     UserDataProvider userDataProvider,
   ) {
+    // Initialize cache if it's empty
+    _cachedTopSongs ??= List<Song>.from(songs);
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -444,9 +453,9 @@ class _DiscoverScreenState extends State<DiscoverScreen>
           height: 260.0, // Height for the horizontal list container
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
-            itemCount: songs.length,
+            itemCount: _cachedTopSongs!.length,
             itemBuilder: (context, index) {
-              final song = songs[index];
+              final song = _cachedTopSongs![index];
               return _buildSongCard(context, song, userDataProvider);
             },
           ),
@@ -455,11 +464,17 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     );
   }
 
+  // Store cached songs for top movers section
+  List<Song>? _cachedTopMovers;
+
   Widget _buildTopMoversSection(
     BuildContext context,
     List<Song> songs,
     UserDataProvider userDataProvider,
   ) {
+    // Initialize cache if it's empty
+    _cachedTopMovers ??= List<Song>.from(songs);
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -492,9 +507,9 @@ class _DiscoverScreenState extends State<DiscoverScreen>
           height: 260.0, // Height for the horizontal list container
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
-            itemCount: songs.length,
+            itemCount: _cachedTopMovers!.length,
             itemBuilder: (context, index) {
-              final song = songs[index];
+              final song = _cachedTopMovers![index];
               return _buildSongCard(
                 context,
                 song,
