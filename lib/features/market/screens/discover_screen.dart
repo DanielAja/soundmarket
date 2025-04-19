@@ -999,7 +999,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Indie Artists on the Rise',
+          'Trending Artists',
           style: TextStyle(fontSize: 20.0, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: AppSpacing.m), // Use AppSpacing.m
@@ -1032,39 +1032,52 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                     itemCount: _cachedRisingArtists!.length,
                     itemBuilder: (context, index) {
                       final artist = _cachedRisingArtists![index];
-                      return Card(
-                        margin: const EdgeInsets.only(
-                          right: AppSpacing.m,
-                        ), // Use AppSpacing.m
-                        child: Padding(
-                          padding: const EdgeInsets.all(
-                            AppSpacing.m,
+                      return GestureDetector(
+                        onTap: () {
+                          // Navigate to search results screen with artist name as query
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => SearchResultsScreen(
+                                initialQuery: artist,
+                              ),
+                            ),
+                          );
+                        },
+                        child: Card(
+                          margin: const EdgeInsets.only(
+                            right: AppSpacing.m,
                           ), // Use AppSpacing.m
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              CircleAvatar(
-                                radius: 30.0,
-                                backgroundColor: Colors.grey[800],
-                                child: Text(
-                                  artist.substring(0, 1).toUpperCase(),
+                          child: Padding(
+                            padding: const EdgeInsets.all(
+                              AppSpacing.m,
+                            ), // Use AppSpacing.m
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                CircleAvatar(
+                                  radius: 30.0,
+                                  backgroundColor: Colors.grey[800],
+                                  child: Text(
+                                    artist.substring(0, 1).toUpperCase(),
+                                    style: const TextStyle(
+                                      fontSize: 24.0,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(
+                                  height: AppSpacing.s,
+                                ), // Use AppSpacing.s
+                                Text(
+                                  // Move child property last
+                                  artist,
                                   style: const TextStyle(
-                                    fontSize: 24.0,
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
-                              ),
-                              const SizedBox(
-                                height: AppSpacing.s,
-                              ), // Use AppSpacing.s
-                              Text(
-                                // Move child property last
-                                artist,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
                       );
