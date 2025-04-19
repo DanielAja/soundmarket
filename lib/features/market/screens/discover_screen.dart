@@ -42,7 +42,12 @@ class _DiscoverScreenState extends State<DiscoverScreen>
 
       // Give the UI a chance to render before making API calls
       Future.delayed(Duration(milliseconds: 500), () {
-        // Load data for one section at a time with delays to prevent rate limiting
+        // Load top songs first and only once
+        if (_cachedTopSongs == null) {
+          _loadTopSongsData();
+        }
+
+        // Load data for other sections after top songs
         _loadNewReleasesData();
 
         // Always load pop genre songs by default
@@ -92,7 +97,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                 }
 
                 // Load next section after a delay
-                Future.delayed(Duration(seconds: 2), _loadTopSongsData);
+                Future.delayed(Duration(seconds: 2), _loadTopMoversData);
               });
             }
           })
@@ -129,37 +134,78 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                 }
 
                 _loadingNewReleases = false;
-                // Still load the next section even on error
-                Future.delayed(Duration(seconds: 2), _loadTopSongsData);
+                // Skip loading top songs to keep them consistent
+                // Go directly to loading top movers section
+                Future.delayed(Duration(seconds: 2), _loadTopMoversData);
               });
             }
           });
     } else {
       // If this section is already loaded, move to the next one
-      _loadTopSongsData();
+      // Skip top songs and go directly to top movers
+      _loadTopMoversData();
     }
   }
 
   void _loadTopSongsData() {
-    if (_cachedTopSongs == null && !_loadingTopSongs) {
+    if ((_cachedTopSongs == null || _cachedTopSongs!.isEmpty) &&
+        !_loadingTopSongs) {
       _loadingTopSongs = true;
-      // Always use the selected genre (which defaults to 'pop')
-      final genre = _selectedGenre.toLowerCase();
+      // Get the most popular songs across all genres for the Top Songs section
+      // Explicitly exclude songs with title "Price tag" which seem to appear erroneously
       _musicDataApi
-          .searchSongs("genre:$genre year:2023-2024", limit: 10)
+          .searchSongs(
+            "tag:popular year:2023-2024 NOT title:\"Price tag\"",
+            limit: 10,
+          ) // More specific query to avoid the Price tag songs
           .then((topTracks) {
             if (mounted) {
               setState(() {
-                _cachedTopSongs = topTracks;
-                _loadingTopSongs = false;
-
+                // Only update if we got valid data and filter out any "Price tag" songs that might have slipped through
                 if (topTracks.isNotEmpty) {
-                  final userDataProvider = Provider.of<UserDataProvider>(
-                    context,
-                    listen: false,
-                  );
-                  userDataProvider.addSongsToPool(topTracks);
+                  // Check if we have any "Price tag" songs in the results
+                  final priceTagSongs =
+                      topTracks
+                          .where(
+                            (song) => song.name.toLowerCase() == "price tag",
+                          )
+                          .toList();
+
+                  if (priceTagSongs.isNotEmpty) {
+                    print(
+                      'WARNING: Found ${priceTagSongs.length} "Price tag" songs in search results',
+                    );
+                  }
+
+                  // Filter out any "Price tag" songs that might have slipped through the query
+                  final filteredTracks =
+                      topTracks
+                          .where(
+                            (song) => song.name.toLowerCase() != "price tag",
+                          )
+                          .toList();
+
+                  // Only use the results if we still have songs after filtering
+                  if (filteredTracks.isNotEmpty) {
+                    _cachedTopSongs = filteredTracks;
+
+                    // Add songs to pool
+                    final userDataProvider = Provider.of<UserDataProvider>(
+                      context,
+                      listen: false,
+                    );
+                    userDataProvider.addSongsToPool(filteredTracks);
+                  } else if (_cachedTopSongs == null) {
+                    // If filtering removed all songs and we have no cached data, create empty list
+                    _cachedTopSongs = [];
+                  }
+                } else if (_cachedTopSongs == null) {
+                  // If no data returned and we have no cached data, create an empty list
+                  // but not null, so we'll show placeholders instead of loading indicators
+                  _cachedTopSongs = [];
                 }
+
+                _loadingTopSongs = false;
 
                 // Load next section after a delay
                 Future.delayed(Duration(seconds: 2), _loadTopMoversData);
@@ -169,6 +215,12 @@ class _DiscoverScreenState extends State<DiscoverScreen>
           .catchError((error) {
             if (mounted) {
               setState(() {
+                // On error, keep any existing data (_cachedTopSongs is unchanged)
+                // If _cachedTopSongs was null, set it to empty list to show placeholders
+                if (_cachedTopSongs == null) {
+                  _cachedTopSongs = [];
+                }
+
                 _loadingTopSongs = false;
                 // Still load the next section even on error
                 Future.delayed(Duration(seconds: 2), _loadTopMoversData);
@@ -321,7 +373,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                 }
               }
 
-              // Reset all our cached data and loading flags to force API re-queries
+              // Reset all cached data to refresh everything on pull-to-refresh
               _cachedTopSongs = null;
               _loadingTopSongs = false;
 
@@ -334,12 +386,13 @@ class _DiscoverScreenState extends State<DiscoverScreen>
               _cachedNewSongs = null;
               _loadingNewReleases = false;
 
-              // Reset the static flag so API loading can happen again
+              // Reset the API loading flag to allow reloading all sections
               _apiDataLoaded = false;
 
-              // Start sequential loading of data again
+              // Restart the sequential loading process with all sections
               Future.delayed(Duration(milliseconds: 500), () {
-                _loadNewReleasesData();
+                // Load top songs first since it was reset
+                _loadTopSongsData();
               });
 
               ScaffoldMessenger.of(context).showSnackBar(
@@ -426,10 +479,12 @@ class _DiscoverScreenState extends State<DiscoverScreen>
               children: [
                 ListTile(
                   title: const Text('All Genres'),
-                  selected: false, // Pop is default, so All Genres is never selected
+                  selected:
+                      false, // Pop is default, so All Genres is never selected
                   onTap: () {
                     setState(() {
-                      _selectedGenre = 'pop'; // Default to 'pop' instead of null
+                      _selectedGenre =
+                          'pop'; // Default to 'pop' instead of null
                     });
                     Navigator.pop(context);
                   },
@@ -527,9 +582,14 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     List<Song> songs,
     UserDataProvider userDataProvider,
   ) {
-    // Initialize with provided songs if needed
+    // Initialize with provided songs if needed, but filter out any "Price tag" songs
     if (_cachedTopSongs == null) {
-      _cachedTopSongs = List<Song>.from(songs);
+      // Filter out Price tag songs which seem to appear erroneously
+      final filteredSongs =
+          songs
+              .where((song) => song.name.toLowerCase() != "price tag")
+              .toList();
+      _cachedTopSongs = filteredSongs.isNotEmpty ? filteredSongs : [];
     }
 
     return Column(
@@ -538,12 +598,9 @@ class _DiscoverScreenState extends State<DiscoverScreen>
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              'Top ${_selectedGenre.substring(0, 1).toUpperCase() + _selectedGenre.substring(1)} Songs',
-              style: const TextStyle(
-                fontSize: 20.0,
-                fontWeight: FontWeight.bold,
-              ),
+            const Text(
+              'Top Songs',
+              style: TextStyle(fontSize: 20.0, fontWeight: FontWeight.bold),
             ),
             TextButton(
               onPressed: () {
@@ -574,18 +631,19 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                         CircularProgressIndicator(),
                         SizedBox(height: 10),
                         Text(
-                          'Loading pop songs...',
+                          'Loading top songs...',
                           style: TextStyle(color: Colors.grey[400]),
                         ),
                       ],
                     ),
                   )
                   : _cachedTopSongs!.isEmpty
-                  ? Center(
-                    child: Text(
-                      'No pop songs found',
-                      style: TextStyle(color: Colors.grey[400]),
-                    ),
+                  ? ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: 10, // Show 10 placeholder cards
+                    itemBuilder: (context, index) {
+                      return _buildPlaceholderCard(context);
+                    },
                   )
                   : ListView.builder(
                     scrollDirection: Axis.horizontal,
@@ -778,10 +836,8 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                     if (!isSelected) {
                       setState(() {
                         _selectedGenre = genre.toLowerCase();
-                        // Reset cached songs to force reload when genre changes
-                        _cachedTopSongs = null;
-                        _loadingTopSongs = false;
-                        _loadTopSongsData();
+                        // Don't reset top songs when genre changes
+                        // Only reload genre-specific songs
 
                         // Reload genre-specific songs too
                         // This will trigger a reload of genreSongs in the build method
@@ -1590,6 +1646,73 @@ class _DiscoverScreenState extends State<DiscoverScreen>
           },
         );
       },
+    );
+  }
+
+  // Build a placeholder card for when no song data is available
+  Widget _buildPlaceholderCard(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.only(right: AppSpacing.l),
+      clipBehavior: Clip.antiAlias,
+      child: SizedBox(
+        width: 120.0,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Animated shimmer effect for album art placeholder
+            Container(
+              height: 120.0,
+              width: 120.0,
+              color: Colors.grey[800],
+              child: Center(
+                child: Icon(
+                  Icons.music_note,
+                  size: 40.0,
+                  color: Colors.grey[700],
+                ),
+              ),
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpacing.s),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    // Title placeholder
+                    Container(
+                      height: 14.0,
+                      width: 80.0,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[800],
+                        borderRadius: BorderRadius.circular(2.0),
+                      ),
+                    ),
+                    // Artist placeholder
+                    Container(
+                      height: 12.0,
+                      width: 60.0,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[800],
+                        borderRadius: BorderRadius.circular(2.0),
+                      ),
+                    ),
+                    // Price placeholder
+                    Container(
+                      height: 16.0,
+                      width: 40.0,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[800],
+                        borderRadius: BorderRadius.circular(2.0),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
