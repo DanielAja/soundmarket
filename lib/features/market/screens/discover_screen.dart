@@ -24,7 +24,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   final Map<String, AnimationController> _priceAnimationControllers = {};
   final Map<String, Animation<double>> _priceAnimations = {};
   late final MusicDataApiService _musicDataApi;
-  String? _selectedGenre = 'pop';
+  String? _selectedGenre;  // Not explicitly set to allow default behavior
 
   // Flag to limit how often we make API calls
   static bool _apiDataLoaded = false;
@@ -108,8 +108,9 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   void _loadTopSongsData() {
     if (_cachedTopSongs == null && !_loadingTopSongs) {
       _loadingTopSongs = true;
-      // Always use 'pop' for top songs regardless of selected genre
-      _musicDataApi.searchSongs("genre:pop year:2023-2024", limit: 10).then((topTracks) {
+      // Use the selected genre or default to 'pop' if none selected
+      final genre = _selectedGenre != null ? _selectedGenre!.toLowerCase() : 'pop';
+      _musicDataApi.searchSongs("genre:$genre year:2023-2024", limit: 10).then((topTracks) {
         if (mounted) {
           setState(() {
             _cachedTopSongs = topTracks;
@@ -311,14 +312,12 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                 _buildRisingArtistsSection(context, risingArtists),
                 const SizedBox(height: AppSpacing.xl), // Use AppSpacing.xl
                 _buildBrowseByGenreSection(context, userDataProvider),
-                if (_selectedGenre != null && _selectedGenre != 'pop') ...[
-                  const SizedBox(height: AppSpacing.xl), // Use AppSpacing.xl
-                  _buildGenreSongsSection(
-                    context,
-                    genreSongs,
-                    userDataProvider,
-                  ),
-                ],
+                const SizedBox(height: AppSpacing.xl), // Use AppSpacing.xl
+                _buildGenreSongsSection(
+                  context,
+                  genreSongs,
+                  userDataProvider,
+                ),
               ],
             ),
           );
@@ -486,9 +485,9 @@ class _DiscoverScreenState extends State<DiscoverScreen>
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text(
-              'Top Songs',
-              style: TextStyle(fontSize: 20.0, fontWeight: FontWeight.bold),
+            Text(
+              'Top ${_selectedGenre ?? 'Pop'} Songs',
+              style: const TextStyle(fontSize: 20.0, fontWeight: FontWeight.bold),
             ),
             TextButton(
               onPressed: () {
@@ -632,11 +631,12 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     List<Song> songs,
     UserDataProvider userDataProvider,
   ) {
+    final displayGenre = _selectedGenre ?? 'Pop';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Songs in $_selectedGenre',
+          'More $displayGenre Songs',
           style: const TextStyle(fontSize: 20.0, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: AppSpacing.m), // Use AppSpacing.m
@@ -646,7 +646,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
               songs.isEmpty
                   ? Center(
                     child: Text(
-                      'No songs found in this genre',
+                      'No additional songs found in ${displayGenre.toLowerCase()} genre',
                       style: TextStyle(color: Colors.grey[400]),
                     ),
                   )
@@ -692,17 +692,22 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                   onTap: () {
                     setState(() {
                       _selectedGenre = isSelected ? null : genre;
-                      // Only update the genre-specific section, not top songs
+                      // Reset cached songs to force reload when genre changes
+                      _cachedTopSongs = null;
+                      _loadingTopSongs = false;
+                      _loadTopSongsData();
                     });
                   },
                   child: Chip(
                     label: Text(genre),
                     backgroundColor:
-                        isSelected
+                        isSelected || (genre.toLowerCase() == 'pop' && _selectedGenre == null)
                             ? Theme.of(context).colorScheme.primary
                             : Colors.grey[800],
                     labelStyle: TextStyle(
-                      color: isSelected ? Colors.black : Colors.white,
+                      color: isSelected || (genre.toLowerCase() == 'pop' && _selectedGenre == null) 
+                          ? Colors.black 
+                          : Colors.white,
                     ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(30.0),
