@@ -11,19 +11,19 @@ class ErrorHandler {
   static final ErrorHandler _instance = ErrorHandler._internal();
   factory ErrorHandler() => _instance;
   ErrorHandler._internal();
-  
+
   // Error callback
   Function(String, {bool isToast})? _onError;
-  
+
   // Initialize with error callback
   void initialize(Function(String, {bool isToast}) onError) {
     _onError = onError;
   }
-  
+
   // Handle exceptions and return user-friendly messages
   String handleException(dynamic exception, [StackTrace? stackTrace]) {
     String errorMessage = StringConstants.errorOccurred;
-    
+
     if (exception is AppException) {
       errorMessage = exception.message;
     } else if (exception is SocketException || exception is TimeoutException) {
@@ -31,24 +31,24 @@ class ErrorHandler {
     } else if (exception is FormatException) {
       errorMessage = 'Invalid data format';
     }
-    
+
     // Log the error (in a real app, this would use a proper logging system)
     debugPrint('ERROR: $errorMessage');
     debugPrint('EXCEPTION: $exception');
     if (stackTrace != null) {
       debugPrint('STACK TRACE: $stackTrace');
     }
-    
+
     // Call the error callback if provided
     _onError?.call(errorMessage, isToast: true);
-    
+
     return errorMessage;
   }
-  
+
   // Handle API errors based on status code
   String handleApiError(int statusCode, String? message) {
     String errorMessage;
-    
+
     switch (statusCode) {
       case 400:
         errorMessage = message ?? 'Bad request';
@@ -70,13 +70,13 @@ class ErrorHandler {
       default:
         errorMessage = message ?? StringConstants.errorOccurred;
     }
-    
+
     // Call the error callback if provided
     _onError?.call(errorMessage, isToast: true);
-    
+
     return errorMessage;
   }
-  
+
   // Show error dialog
   Future<void> showErrorDialog(BuildContext context, String message) async {
     return showDialog<void>(
@@ -85,9 +85,7 @@ class ErrorHandler {
       builder: (BuildContext context) {
         return AlertDialog(
           title: const Text('Error'),
-          content: SingleChildScrollView(
-            child: Text(message),
-          ),
+          content: SingleChildScrollView(child: Text(message)),
           actions: <Widget>[
             TextButton(
               child: const Text('OK'),
@@ -100,7 +98,7 @@ class ErrorHandler {
       },
     );
   }
-  
+
   // Run a function with error handling
   Future<T?> runWithErrorHandling<T>(
     Future<T> Function() function, {

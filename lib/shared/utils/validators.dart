@@ -7,7 +7,7 @@ class Validators {
     );
     return emailRegExp.hasMatch(email);
   }
-  
+
   // Email validation with error message
   static String? validateEmail(String? value) {
     if (value == null || value.isEmpty) {
@@ -18,7 +18,7 @@ class Validators {
     }
     return null;
   }
-  
+
   // Password validation
   static bool isValidPassword(String password) {
     // At least 8 characters, 1 uppercase, 1 lowercase, 1 number
@@ -27,7 +27,7 @@ class Validators {
     );
     return passwordRegExp.hasMatch(password);
   }
-  
+
   // Password validation with error message
   static String? validatePassword(String? value) {
     if (value == null || value.isEmpty) {
@@ -47,7 +47,7 @@ class Validators {
     }
     return null;
   }
-  
+
   // Confirm password validation
   static String? validateConfirmPassword(String? value, String password) {
     if (value == null || value.isEmpty) {
@@ -58,7 +58,7 @@ class Validators {
     }
     return null;
   }
-  
+
   // Required field validation
   static String? validateRequired(String? value, String fieldName) {
     if (value == null || value.isEmpty) {
@@ -66,7 +66,7 @@ class Validators {
     }
     return null;
   }
-  
+
   // Name validation
   static String? validateName(String? value) {
     if (value == null || value.isEmpty) {
@@ -77,7 +77,7 @@ class Validators {
     }
     return null;
   }
-  
+
   // Number validation
   static String? validateNumber(String? value) {
     if (value == null || value.isEmpty) {
@@ -88,7 +88,7 @@ class Validators {
     }
     return null;
   }
-  
+
   // Positive number validation
   static String? validatePositiveNumber(String? value) {
     if (value == null || value.isEmpty) {
@@ -103,7 +103,7 @@ class Validators {
     }
     return null;
   }
-  
+
   // Integer validation
   static String? validateInteger(String? value) {
     if (value == null || value.isEmpty) {
@@ -114,7 +114,7 @@ class Validators {
     }
     return null;
   }
-  
+
   // Positive integer validation
   static String? validatePositiveInteger(String? value) {
     if (value == null || value.isEmpty) {
@@ -129,7 +129,7 @@ class Validators {
     }
     return null;
   }
-  
+
   // URL validation
   static bool isValidUrl(String url) {
     final urlRegExp = RegExp(
@@ -137,7 +137,7 @@ class Validators {
     );
     return urlRegExp.hasMatch(url);
   }
-  
+
   // URL validation with error message
   static String? validateUrl(String? value) {
     if (value == null || value.isEmpty) {
@@ -148,15 +148,13 @@ class Validators {
     }
     return null;
   }
-  
+
   // Phone number validation
   static bool isValidPhone(String phone) {
-    final phoneRegExp = RegExp(
-      r'^\+?[0-9]{10,15}$',
-    );
+    final phoneRegExp = RegExp(r'^\+?[0-9]{10,15}$');
     return phoneRegExp.hasMatch(phone);
   }
-  
+
   // Phone validation with error message
   static String? validatePhone(String? value) {
     if (value == null || value.isEmpty) {
@@ -167,18 +165,18 @@ class Validators {
     }
     return null;
   }
-  
+
   // Date validation
   static bool isValidDate(String date) {
     try {
       final dateTime = DateTime.parse(date);
-      return dateTime.isAfter(DateTime(1900)) && 
-             dateTime.isBefore(DateTime(2100));
+      return dateTime.isAfter(DateTime(1900)) &&
+          dateTime.isBefore(DateTime(2100));
     } catch (e) {
       return false;
     }
   }
-  
+
   // Date validation with error message
   static String? validateDate(String? value) {
     if (value == null || value.isEmpty) {
@@ -189,16 +187,16 @@ class Validators {
     }
     return null;
   }
-  
+
   // Credit card validation
   static bool isValidCreditCard(String cardNumber) {
     // Remove spaces and dashes
     cardNumber = cardNumber.replaceAll(RegExp(r'[\s-]'), '');
-    
+
     if (!RegExp(r'^[0-9]{13,19}$').hasMatch(cardNumber)) {
       return false;
     }
-    
+
     // Luhn algorithm
     int sum = 0;
     bool alternate = false;
@@ -213,10 +211,10 @@ class Validators {
       sum += n;
       alternate = !alternate;
     }
-    
+
     return (sum % 10 == 0);
   }
-  
+
   // Credit card validation with error message
   static String? validateCreditCard(String? value) {
     if (value == null || value.isEmpty) {

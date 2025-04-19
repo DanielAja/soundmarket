@@ -14,11 +14,15 @@ class AppTheme {
       colorScheme: ColorScheme.light(
         primary: ColorPalette.primary,
         secondary: ColorPalette.secondary,
-        surface: ColorPalette.background, // Use background color for surface (replacing deprecated background)
+        surface:
+            ColorPalette
+                .background, // Use background color for surface (replacing deprecated background)
         // surface: ColorPalette.surface, // Keep original surface if needed, or remove if background is the intended surface
         onPrimary: ColorPalette.onPrimary,
         onSecondary: ColorPalette.onSecondary,
-        onSurface: ColorPalette.onBackground, // Use onBackground color for onSurface (replacing deprecated onBackground)
+        onSurface:
+            ColorPalette
+                .onBackground, // Use onBackground color for onSurface (replacing deprecated onBackground)
         // onSurface: ColorPalette.onSurface, // Keep original onSurface if needed, or remove if onBackground is the intended onSurface
         error: ColorPalette.error,
         onError: ColorPalette.onError,
@@ -67,9 +71,7 @@ class AppTheme {
         titleTextStyle: AppTextStyles.titleMedium.copyWith(
           color: ColorPalette.onBackground,
         ),
-        iconTheme: IconThemeData(
-          color: ColorPalette.onBackground,
-        ),
+        iconTheme: IconThemeData(color: ColorPalette.onBackground),
       ),
       // Bottom navigation bar theme
       bottomNavigationBarTheme: BottomNavigationBarThemeData(
@@ -91,17 +93,11 @@ class AppTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12.0),
-          borderSide: BorderSide(
-            color: ColorPalette.primary,
-            width: 2.0,
-          ),
+          borderSide: BorderSide(color: ColorPalette.primary, width: 2.0),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12.0),
-          borderSide: BorderSide(
-            color: ColorPalette.error,
-            width: 2.0,
-          ),
+          borderSide: BorderSide(color: ColorPalette.error, width: 2.0),
         ),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 16.0,
@@ -121,11 +117,15 @@ class AppTheme {
       colorScheme: ColorScheme.dark(
         primary: ColorPalette.primary,
         secondary: ColorPalette.secondary,
-        surface: ColorPalette.backgroundDark, // Use background color for surface (replacing deprecated background)
+        surface:
+            ColorPalette
+                .backgroundDark, // Use background color for surface (replacing deprecated background)
         // surface: ColorPalette.surfaceDark, // Keep original surface if needed, or remove if background is the intended surface
         onPrimary: ColorPalette.onPrimary,
         onSecondary: ColorPalette.onSecondary,
-        onSurface: ColorPalette.onBackgroundDark, // Use onBackground color for onSurface (replacing deprecated onBackground)
+        onSurface:
+            ColorPalette
+                .onBackgroundDark, // Use onBackground color for onSurface (replacing deprecated onBackground)
         // onSurface: ColorPalette.onSurfaceDark, // Keep original onSurface if needed, or remove if onBackground is the intended onSurface
         error: ColorPalette.error,
         onError: ColorPalette.onError,
@@ -174,9 +174,7 @@ class AppTheme {
         titleTextStyle: AppTextStyles.titleMedium.copyWith(
           color: ColorPalette.onBackgroundDark,
         ),
-        iconTheme: IconThemeData(
-          color: ColorPalette.onBackgroundDark,
-        ),
+        iconTheme: IconThemeData(color: ColorPalette.onBackgroundDark),
       ),
       // Bottom navigation bar theme
       bottomNavigationBarTheme: BottomNavigationBarThemeData(
@@ -198,17 +196,11 @@ class AppTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12.0),
-          borderSide: BorderSide(
-            color: ColorPalette.primary,
-            width: 2.0,
-          ),
+          borderSide: BorderSide(color: ColorPalette.primary, width: 2.0),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12.0),
-          borderSide: BorderSide(
-            color: ColorPalette.error,
-            width: 2.0,
-          ),
+          borderSide: BorderSide(color: ColorPalette.error, width: 2.0),
         ),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 16.0,

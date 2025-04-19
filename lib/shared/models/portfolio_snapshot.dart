@@ -5,10 +5,7 @@ class PortfolioSnapshot {
   final DateTime timestamp;
   final double value;
 
-  const PortfolioSnapshot({
-    required this.timestamp,
-    required this.value,
-  });
+  const PortfolioSnapshot({required this.timestamp, required this.value});
 
   // Factory constructor for JSON deserialization
   factory PortfolioSnapshot.fromJson(Map<String, dynamic> json) {
@@ -20,10 +17,7 @@ class PortfolioSnapshot {
 
   // Method for JSON serialization
   Map<String, dynamic> toJson() {
-    return {
-      'timestamp': timestamp.toIso8601String(),
-      'value': value,
-    };
+    return {'timestamp': timestamp.toIso8601String(), 'value': value};
   }
 
   @override

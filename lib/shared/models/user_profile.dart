@@ -3,14 +3,14 @@ class UserProfile {
   double cashBalance;
   String? displayName;
   String? profileImageUrl;
-  
+
   UserProfile({
     required this.userId,
     this.cashBalance = 100.0, // Default starting balance
     this.displayName,
     this.profileImageUrl,
   });
-  
+
   // Create a copy of this UserProfile with given fields replaced with new values
   UserProfile copyWith({
     String? userId,
@@ -25,7 +25,7 @@ class UserProfile {
       profileImageUrl: profileImageUrl ?? this.profileImageUrl,
     );
   }
-  
+
   // Convert UserProfile to a Map for storage
   Map<String, dynamic> toJson() {
     return {
@@ -35,7 +35,7 @@ class UserProfile {
       'profileImageUrl': profileImageUrl,
     };
   }
-  
+
   // Create a UserProfile from a Map (e.g., from storage)
   factory UserProfile.fromJson(Map<String, dynamic> json) {
     return UserProfile(

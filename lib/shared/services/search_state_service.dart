@@ -9,10 +9,10 @@ class SearchStateService extends ChangeNotifier {
 
   // The current search query
   String _currentQuery = '';
-  
+
   // Getter for the current query
   String get currentQuery => _currentQuery;
-  
+
   // Update the query and notify listeners
   void updateQuery(String query) {
     if (_currentQuery != query) {

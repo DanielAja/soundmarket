@@ -5,7 +5,7 @@ class PortfolioItem {
   int quantity;
   double purchasePrice; // Average purchase price
   String? albumArtUrl;
-  
+
   PortfolioItem({
     required this.songId,
     required this.songName,
@@ -14,17 +14,17 @@ class PortfolioItem {
     required this.purchasePrice,
     this.albumArtUrl,
   });
-  
+
   // Calculate the total value at purchase
   double get totalPurchaseValue => quantity * purchasePrice;
-  
+
   // Calculate the current value (would need current price from elsewhere)
   double getCurrentValue(double currentPrice) => quantity * currentPrice;
-  
+
   // Calculate profit/loss (would need current price from elsewhere)
-  double getProfitLoss(double currentPrice) => 
+  double getProfitLoss(double currentPrice) =>
       getCurrentValue(currentPrice) - totalPurchaseValue;
-  
+
   // Create a copy with updated fields
   PortfolioItem copyWith({
     String? songId,
@@ -43,7 +43,7 @@ class PortfolioItem {
       albumArtUrl: albumArtUrl ?? this.albumArtUrl,
     );
   }
-  
+
   // Convert to JSON for storage
   Map<String, dynamic> toJson() {
     return {
@@ -55,7 +55,7 @@ class PortfolioItem {
       'albumArtUrl': albumArtUrl,
     };
   }
-  
+
   // Create from JSON (e.g., from storage)
   factory PortfolioItem.fromJson(Map<String, dynamic> json) {
     return PortfolioItem(

@@ -3,11 +3,7 @@ import 'package:provider/provider.dart';
 import '../../../shared/models/song.dart'; // Corrected path
 import '../../../shared/providers/user_data_provider.dart'; // Corrected path
 
-enum ListType {
-  topSongs,
-  topMovers,
-  byGenre,
-}
+enum ListType { topSongs, topMovers, byGenre }
 
 class TopSongsListScreen extends StatelessWidget {
   final ListType listType;
@@ -24,21 +20,16 @@ class TopSongsListScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        centerTitle: true,
-        title: Text(title),
-      ),
+      appBar: AppBar(centerTitle: true, title: Text(title)),
       body: Consumer<UserDataProvider>(
         builder: (context, userDataProvider, child) {
           // Show loading indicator when refreshing data
           if (userDataProvider.isLoading) {
-            return const Center(
-              child: CircularProgressIndicator(),
-            );
+            return const Center(child: CircularProgressIndicator());
           }
-          
+
           List<Song> songs = [];
-          
+
           switch (listType) {
             case ListType.topSongs:
               songs = userDataProvider.getTopSongs(limit: 100);
@@ -52,7 +43,7 @@ class TopSongsListScreen extends StatelessWidget {
               }
               break;
           }
-          
+
           if (songs.isEmpty) {
             return Center(
               child: Text(
@@ -61,7 +52,7 @@ class TopSongsListScreen extends StatelessWidget {
               ),
             );
           }
-          
+
           return RefreshIndicator(
             onRefresh: () => userDataProvider.refreshData(),
             child: ListView.builder(
@@ -70,7 +61,7 @@ class TopSongsListScreen extends StatelessWidget {
               itemBuilder: (context, index) {
                 final song = songs[index];
                 // Removed unused variable: final isOwned = userDataProvider.ownsSong(song.id);
-                
+
                 return Card(
                   margin: const EdgeInsets.only(bottom: 12.0),
                   child: ListTile(
@@ -81,15 +72,16 @@ class TopSongsListScreen extends StatelessWidget {
                         color: Colors.grey[700],
                         borderRadius: BorderRadius.circular(4.0),
                       ),
-                      child: song.albumArtUrl != null
-                          ? Image.network(
-                              song.albumArtUrl!,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) {
-                                return const Icon(Icons.music_note);
-                              },
-                            )
-                          : const Icon(Icons.music_note),
+                      child:
+                          song.albumArtUrl != null
+                              ? Image.network(
+                                song.albumArtUrl!,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return const Icon(Icons.music_note);
+                                },
+                              )
+                              : const Icon(Icons.music_note),
                     ),
                     title: Text(
                       song.name,
@@ -108,7 +100,9 @@ class TopSongsListScreen extends StatelessWidget {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
-                              song.isPriceUp ? Icons.arrow_upward : Icons.arrow_downward,
+                              song.isPriceUp
+                                  ? Icons.arrow_upward
+                                  : Icons.arrow_downward,
                               size: 12.0,
                               color: song.isPriceUp ? Colors.green : Colors.red,
                             ),
@@ -116,7 +110,8 @@ class TopSongsListScreen extends StatelessWidget {
                               '${song.priceChangePercent.abs().toStringAsFixed(1)}%',
                               style: TextStyle(
                                 fontSize: 12.0,
-                                color: song.isPriceUp ? Colors.green : Colors.red,
+                                color:
+                                    song.isPriceUp ? Colors.green : Colors.red,
                               ),
                             ),
                           ],
@@ -135,10 +130,14 @@ class TopSongsListScreen extends StatelessWidget {
       ),
     );
   }
-  
-  void _showSongActions(BuildContext context, Song song, UserDataProvider userDataProvider) {
+
+  void _showSongActions(
+    BuildContext context,
+    Song song,
+    UserDataProvider userDataProvider,
+  ) {
     final ownedQuantity = userDataProvider.getQuantityOwned(song.id);
-    
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.grey[900],
@@ -153,8 +152,14 @@ class TopSongsListScreen extends StatelessWidget {
                 children: [
                   CircleAvatar(
                     backgroundColor: Colors.grey[800],
-                    backgroundImage: song.albumArtUrl != null ? NetworkImage(song.albumArtUrl!) : null,
-                    child: song.albumArtUrl == null ? const Icon(Icons.music_note) : null,
+                    backgroundImage:
+                        song.albumArtUrl != null
+                            ? NetworkImage(song.albumArtUrl!)
+                            : null,
+                    child:
+                        song.albumArtUrl == null
+                            ? const Icon(Icons.music_note)
+                            : null,
                     radius: 30.0,
                   ),
                   const SizedBox(width: 16.0),
@@ -171,9 +176,7 @@ class TopSongsListScreen extends StatelessWidget {
                         ),
                         Text(
                           song.artist,
-                          style: TextStyle(
-                            color: Colors.grey[400],
-                          ),
+                          style: TextStyle(color: Colors.grey[400]),
                         ),
                         const SizedBox(height: 4.0),
                         Row(
@@ -186,7 +189,9 @@ class TopSongsListScreen extends StatelessWidget {
                             ),
                             const SizedBox(width: 8.0),
                             Icon(
-                              song.isPriceUp ? Icons.arrow_upward : Icons.arrow_downward,
+                              song.isPriceUp
+                                  ? Icons.arrow_upward
+                                  : Icons.arrow_downward,
                               color: song.isPriceUp ? Colors.green : Colors.red,
                               size: 14.0,
                             ),
@@ -194,7 +199,8 @@ class TopSongsListScreen extends StatelessWidget {
                               '${song.priceChangePercent.toStringAsFixed(1)}%',
                               style: TextStyle(
                                 fontSize: 12.0,
-                                color: song.isPriceUp ? Colors.green : Colors.red,
+                                color:
+                                    song.isPriceUp ? Colors.green : Colors.red,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -208,22 +214,19 @@ class TopSongsListScreen extends StatelessWidget {
               const SizedBox(height: 16.0),
               const Text(
                 'Song Details',
-                style: TextStyle(
-                  fontSize: 16.0,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 16.0, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8.0),
               Text('Genre: ${song.genre}'),
               const SizedBox(height: 4.0),
-              Text('Previous Price: \$${song.previousPrice.toStringAsFixed(2)}'),
+              Text(
+                'Previous Price: \$${song.previousPrice.toStringAsFixed(2)}',
+              ),
               const SizedBox(height: 16.0),
               if (ownedQuantity > 0)
                 Text(
                   'You own: $ownedQuantity ${ownedQuantity == 1 ? 'share' : 'shares'}',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
               const SizedBox(height: 16.0),
               Row(
@@ -246,7 +249,12 @@ class TopSongsListScreen extends StatelessWidget {
                       child: ElevatedButton(
                         onPressed: () {
                           Navigator.pop(context);
-                          _showSellSongDialog(context, song, userDataProvider, ownedQuantity);
+                          _showSellSongDialog(
+                            context,
+                            song,
+                            userDataProvider,
+                            ownedQuantity,
+                          );
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.red,
@@ -263,12 +271,16 @@ class TopSongsListScreen extends StatelessWidget {
       },
     );
   }
-  
-  void _showBuySongDialog(BuildContext context, Song song, UserDataProvider userDataProvider) {
+
+  void _showBuySongDialog(
+    BuildContext context,
+    Song song,
+    UserDataProvider userDataProvider,
+  ) {
     int quantity = 1;
     final cashBalance = userDataProvider.userProfile?.cashBalance ?? 0.0;
     final maxAffordable = (cashBalance / song.currentPrice).floor();
-    
+
     showDialog(
       context: context,
       builder: (context) {
@@ -276,7 +288,7 @@ class TopSongsListScreen extends StatelessWidget {
           builder: (context, setState) {
             final totalCost = song.currentPrice * quantity;
             final canAfford = totalCost <= cashBalance;
-            
+
             return AlertDialog(
               backgroundColor: Colors.grey[900],
               title: const Text('Buy Song Shares'),
@@ -286,17 +298,22 @@ class TopSongsListScreen extends StatelessWidget {
                 children: [
                   Text('Song: ${song.name} by ${song.artist}'),
                   const SizedBox(height: 8.0),
-                  Text('Price per share: \$${song.currentPrice.toStringAsFixed(2)}'),
+                  Text(
+                    'Price per share: \$${song.currentPrice.toStringAsFixed(2)}',
+                  ),
                   const SizedBox(height: 16.0),
                   Row(
                     children: [
                       IconButton(
                         icon: const Icon(Icons.remove),
-                        onPressed: quantity > 1 ? () {
-                          setState(() {
-                            quantity--;
-                          });
-                        } : null,
+                        onPressed:
+                            quantity > 1
+                                ? () {
+                                  setState(() {
+                                    quantity--;
+                                  });
+                                }
+                                : null,
                       ),
                       Expanded(
                         child: Text(
@@ -310,20 +327,21 @@ class TopSongsListScreen extends StatelessWidget {
                       ),
                       IconButton(
                         icon: const Icon(Icons.add),
-                        onPressed: quantity < maxAffordable ? () {
-                          setState(() {
-                            quantity++;
-                          });
-                        } : null,
+                        onPressed:
+                            quantity < maxAffordable
+                                ? () {
+                                  setState(() {
+                                    quantity++;
+                                  });
+                                }
+                                : null,
                       ),
                     ],
                   ),
                   const SizedBox(height: 16.0),
                   Text(
                     'Total Cost: \$${totalCost.toStringAsFixed(2)}',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                   if (!canAfford)
                     const Text(
@@ -343,26 +361,34 @@ class TopSongsListScreen extends StatelessWidget {
                   child: const Text('Cancel'),
                 ),
                 ElevatedButton(
-                  onPressed: canAfford ? () async {
-                    final success = await userDataProvider.buySong(song.id, quantity);
-                    Navigator.pop(context);
-                    
-                    if (success) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Successfully bought $quantity ${quantity == 1 ? 'share' : 'shares'} of ${song.name}'),
-                          backgroundColor: Colors.green,
-                        ),
-                      );
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Failed to buy shares'),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
-                    }
-                  } : null,
+                  onPressed:
+                      canAfford
+                          ? () async {
+                            final success = await userDataProvider.buySong(
+                              song.id,
+                              quantity,
+                            );
+                            Navigator.pop(context);
+
+                            if (success) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    'Successfully bought $quantity ${quantity == 1 ? 'share' : 'shares'} of ${song.name}',
+                                  ),
+                                  backgroundColor: Colors.green,
+                                ),
+                              );
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Failed to buy shares'),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            }
+                          }
+                          : null,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green,
                   ),
@@ -375,17 +401,22 @@ class TopSongsListScreen extends StatelessWidget {
       },
     );
   }
-  
-  void _showSellSongDialog(BuildContext context, Song song, UserDataProvider userDataProvider, int maxQuantity) {
+
+  void _showSellSongDialog(
+    BuildContext context,
+    Song song,
+    UserDataProvider userDataProvider,
+    int maxQuantity,
+  ) {
     int quantity = 1;
-    
+
     showDialog(
       context: context,
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setState) {
             final totalValue = song.currentPrice * quantity;
-            
+
             return AlertDialog(
               backgroundColor: Colors.grey[900],
               title: const Text('Sell Song Shares'),
@@ -395,17 +426,22 @@ class TopSongsListScreen extends StatelessWidget {
                 children: [
                   Text('Song: ${song.name} by ${song.artist}'),
                   const SizedBox(height: 8.0),
-                  Text('Current price per share: \$${song.currentPrice.toStringAsFixed(2)}'),
+                  Text(
+                    'Current price per share: \$${song.currentPrice.toStringAsFixed(2)}',
+                  ),
                   const SizedBox(height: 16.0),
                   Row(
                     children: [
                       IconButton(
                         icon: const Icon(Icons.remove),
-                        onPressed: quantity > 1 ? () {
-                          setState(() {
-                            quantity--;
-                          });
-                        } : null,
+                        onPressed:
+                            quantity > 1
+                                ? () {
+                                  setState(() {
+                                    quantity--;
+                                  });
+                                }
+                                : null,
                       ),
                       Expanded(
                         child: Text(
@@ -419,20 +455,21 @@ class TopSongsListScreen extends StatelessWidget {
                       ),
                       IconButton(
                         icon: const Icon(Icons.add),
-                        onPressed: quantity < maxQuantity ? () {
-                          setState(() {
-                            quantity++;
-                          });
-                        } : null,
+                        onPressed:
+                            quantity < maxQuantity
+                                ? () {
+                                  setState(() {
+                                    quantity++;
+                                  });
+                                }
+                                : null,
                       ),
                     ],
                   ),
                   const SizedBox(height: 16.0),
                   Text(
                     'Total Value: \$${totalValue.toStringAsFixed(2)}',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                 ],
               ),
@@ -445,13 +482,18 @@ class TopSongsListScreen extends StatelessWidget {
                 ),
                 ElevatedButton(
                   onPressed: () async {
-                    final success = await userDataProvider.sellSong(song.id, quantity);
+                    final success = await userDataProvider.sellSong(
+                      song.id,
+                      quantity,
+                    );
                     Navigator.pop(context);
-                    
+
                     if (success) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content: Text('Successfully sold $quantity ${quantity == 1 ? 'share' : 'shares'} of ${song.name}'),
+                          content: Text(
+                            'Successfully sold $quantity ${quantity == 1 ? 'share' : 'shares'} of ${song.name}',
+                          ),
                           backgroundColor: Colors.green,
                         ),
                       );
@@ -464,9 +506,7 @@ class TopSongsListScreen extends StatelessWidget {
                       );
                     }
                   },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red,
-                  ),
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
                   child: const Text('Sell'),
                 ),
               ],

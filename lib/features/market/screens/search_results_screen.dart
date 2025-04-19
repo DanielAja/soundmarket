@@ -25,15 +25,18 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
     super.initState();
     // Get the initial query and update the shared search state
     _searchQuery = widget.initialQuery;
-    
+
     // Update shared search state
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        final searchStateService = Provider.of<SearchStateService>(context, listen: false);
+        final searchStateService = Provider.of<SearchStateService>(
+          context,
+          listen: false,
+        );
         searchStateService.updateQuery(_searchQuery);
       }
     });
-    
+
     _performSearch();
   }
 
@@ -160,9 +163,12 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
       onPopInvoked: (didPop) {
         if (!didPop) {
           // Get the latest search state before popping
-          final searchStateService = Provider.of<SearchStateService>(context, listen: false);
+          final searchStateService = Provider.of<SearchStateService>(
+            context,
+            listen: false,
+          );
           searchStateService.updateQuery(_searchQuery);
-          
+
           // Return the current search query when navigating back for compatibility
           Navigator.pop(context, _searchQuery);
         }
@@ -172,11 +178,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
           title: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Image.asset(
-                'assets/icon/app_icon.png',
-                width: 28,
-                height: 28,
-              ),
+              Image.asset('assets/icon/app_icon.png', width: 28, height: 28),
               const SizedBox(width: 8),
               const Text('Sound Market'),
             ],
@@ -187,9 +189,12 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
             icon: const Icon(Icons.arrow_back),
             onPressed: () {
               // Get the latest search state before popping
-              final searchStateService = Provider.of<SearchStateService>(context, listen: false);
+              final searchStateService = Provider.of<SearchStateService>(
+                context,
+                listen: false,
+              );
               searchStateService.updateQuery(_searchQuery);
-              
+
               // Pass the current query back to the previous screen for compatibility
               Navigator.pop(context, _searchQuery);
             },
@@ -209,33 +214,37 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                   setState(() {
                     _searchQuery = query;
                   });
-                  
+
                   // Update shared search state
-                  final searchStateService = Provider.of<SearchStateService>(context, listen: false);
+                  final searchStateService = Provider.of<SearchStateService>(
+                    context,
+                    listen: false,
+                  );
                   searchStateService.updateQuery(query);
-                  
+
                   // Perform search with new query
                   _performSearch();
                 },
               ),
             ),
             Expanded(
-              child: _isSearching
-                ? const Center(child: CircularProgressIndicator())
-                : _searchResults.isEmpty
-                  ? Center(
-                      child: Text(
-                        'No results found for "$_searchQuery"',
-                        style: TextStyle(color: Colors.grey[400]),
+              child:
+                  _isSearching
+                      ? const Center(child: CircularProgressIndicator())
+                      : _searchResults.isEmpty
+                      ? Center(
+                        child: Text(
+                          'No results found for "$_searchQuery"',
+                          style: TextStyle(color: Colors.grey[400]),
+                        ),
+                      )
+                      : ListView.builder(
+                        itemCount: _searchResults.length,
+                        itemBuilder: (context, index) {
+                          final song = _searchResults[index];
+                          return _buildSongListItem(context, song);
+                        },
                       ),
-                    )
-                  : ListView.builder(
-                      itemCount: _searchResults.length,
-                      itemBuilder: (context, index) {
-                        final song = _searchResults[index];
-                        return _buildSongListItem(context, song);
-                      },
-                    ),
             ),
           ],
         ),

@@ -323,11 +323,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Image.asset(
-              'assets/icon/app_icon.png',
-              width: 28,
-              height: 28,
-            ),
+            Image.asset('assets/icon/app_icon.png', width: 28, height: 28),
             const SizedBox(width: 8),
             const Text('Sound Market'),
           ],
@@ -1032,9 +1028,9 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => SearchResultsScreen(
-                                initialQuery: artist,
-                              ),
+                              builder:
+                                  (context) =>
+                                      SearchResultsScreen(initialQuery: artist),
                             ),
                           );
                         },

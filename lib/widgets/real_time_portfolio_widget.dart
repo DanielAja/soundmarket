@@ -15,7 +15,8 @@ class RealTimePortfolioWidget extends StatefulWidget {
   });
 
   @override
-  State<RealTimePortfolioWidget> createState() => _RealTimePortfolioWidgetState();
+  State<RealTimePortfolioWidget> createState() =>
+      _RealTimePortfolioWidgetState();
 }
 
 class _RealTimePortfolioWidgetState extends State<RealTimePortfolioWidget> {
@@ -44,7 +45,8 @@ class _RealTimePortfolioWidgetState extends State<RealTimePortfolioWidget> {
     if (mounted) {
       setState(() {
         final now = DateTime.now();
-        _lastUpdated = '${now.hour}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}';
+        _lastUpdated =
+            '${now.hour}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}';
       });
     }
   }
@@ -98,7 +100,9 @@ class _RealTimePortfolioWidgetState extends State<RealTimePortfolioWidget> {
                   ],
                 ),
                 const SizedBox(height: 16),
-                ...portfolio.map((item) => _buildPortfolioItemTile(context, item, provider)),
+                ...portfolio.map(
+                  (item) => _buildPortfolioItemTile(context, item, provider),
+                ),
               ],
             ),
           ),
@@ -110,18 +114,19 @@ class _RealTimePortfolioWidgetState extends State<RealTimePortfolioWidget> {
   Widget _buildPortfolioItemTile(
     BuildContext context,
     PortfolioItem item,
-    UserDataProvider provider
+    UserDataProvider provider,
   ) {
     // Get the song to access current price and other details
     final song = provider.allSongs.firstWhere(
       (s) => s.id == item.songId,
-      orElse: () => Song(
-        id: item.songId,
-        name: item.songName,
-        artist: item.artistName,
-        genre: 'Unknown',
-        currentPrice: item.purchasePrice,
-      ),
+      orElse:
+          () => Song(
+            id: item.songId,
+            name: item.songName,
+            artist: item.artistName,
+            genre: 'Unknown',
+            currentPrice: item.purchasePrice,
+          ),
     );
 
     // Calculate values
@@ -145,7 +150,8 @@ class _RealTimePortfolioWidgetState extends State<RealTimePortfolioWidget> {
     }
 
     return InkWell(
-      onTap: widget.onItemTap != null ? () => widget.onItemTap!(item, song) : null,
+      onTap:
+          widget.onItemTap != null ? () => widget.onItemTap!(item, song) : null,
       borderRadius: BorderRadius.circular(8),
       child: Padding(
         padding: const EdgeInsets.only(bottom: 8),
@@ -169,18 +175,14 @@ class _RealTimePortfolioWidgetState extends State<RealTimePortfolioWidget> {
                 children: [
                   Text(
                     item.songName,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: const TextStyle(fontWeight: FontWeight.bold),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  Text( // Note: Corrected potential missing comma here from original read
+                  Text(
+                    // Note: Corrected potential missing comma here from original read
                     item.artistName,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                    ),
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -200,39 +202,33 @@ class _RealTimePortfolioWidgetState extends State<RealTimePortfolioWidget> {
                     children: [
                       // Use the PriceChange enum from the imported PortfolioService
                       if (priceChange != PriceChange.none)
-                        Icon(
-                          indicatorIcon,
-                          color: indicatorColor,
-                          size: 14,
-                        ),
+                        Icon(indicatorIcon, color: indicatorColor, size: 14),
                       const SizedBox(width: 4),
                       Text(
                         '\$${song.currentPrice.toStringAsFixed(2)}',
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           // Use the PriceChange enum from the imported PortfolioService
-                          color: priceChange == PriceChange.none
-                              ? Theme.of(context).textTheme.bodyLarge?.color // Use theme color for 'none'
-                              : indicatorColor,
+                          color:
+                              priceChange == PriceChange.none
+                                  ? Theme.of(context)
+                                      .textTheme
+                                      .bodyLarge
+                                      ?.color // Use theme color for 'none'
+                                  : indicatorColor,
                         ),
                       ),
                     ],
                   ),
                   Text(
                     '${item.quantity} ${item.quantity == 1 ? 'share' : 'shares'}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                    ),
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                   Text(
                     '\$${currentValue.toStringAsFixed(2)}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                    ),
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),

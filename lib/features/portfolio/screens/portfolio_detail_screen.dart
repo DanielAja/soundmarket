@@ -73,9 +73,7 @@ class _PortfolioDetailScreenState extends State<PortfolioDetailScreen> {
         builder: (context, provider, child) {
           // Show loading indicator when refreshing data
           if (provider.isLoading) {
-            return const Center(
-              child: CircularProgressIndicator(),
-            );
+            return const Center(child: CircularProgressIndicator());
           }
 
           final portfolio = provider.portfolio;
@@ -112,7 +110,9 @@ class _PortfolioDetailScreenState extends State<PortfolioDetailScreen> {
                   ],
                 ),
                 const SizedBox(height: 16),
-                ...portfolio.map((item) => _buildPortfolioItemCard(context, item, provider)),
+                ...portfolio.map(
+                  (item) => _buildPortfolioItemCard(context, item, provider),
+                ),
               ],
             ),
           );
@@ -145,7 +145,10 @@ class _PortfolioDetailScreenState extends State<PortfolioDetailScreen> {
     );
   }
 
-  Widget _buildPortfolioSummary(BuildContext context, UserDataProvider provider) {
+  Widget _buildPortfolioSummary(
+    BuildContext context,
+    UserDataProvider provider,
+  ) {
     final totalValue = provider.totalPortfolioValue;
     final cashBalance = provider.userProfile?.cashBalance ?? 0.0;
 
@@ -161,25 +164,25 @@ class _PortfolioDetailScreenState extends State<PortfolioDetailScreen> {
               children: [
                 const Text(
                   'Portfolio Summary',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 // Last updated indicator
                 Text(
                   'Updated: ${_getFormattedTime()}',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[600],
-                  ),
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                 ),
               ],
             ),
             const SizedBox(height: 16),
-            _buildSummaryRow('Total Portfolio Value', '\$${totalValue.toStringAsFixed(2)}'),
+            _buildSummaryRow(
+              'Total Portfolio Value',
+              '\$${totalValue.toStringAsFixed(2)}',
+            ),
             const Divider(),
-            _buildSummaryRow('Cash Balance', '\$${cashBalance.toStringAsFixed(2)}'),
+            _buildSummaryRow(
+              'Cash Balance',
+              '\$${cashBalance.toStringAsFixed(2)}',
+            ),
             const Divider(),
             _buildSummaryRow(
               'Total Balance',
@@ -225,18 +228,19 @@ class _PortfolioDetailScreenState extends State<PortfolioDetailScreen> {
   Widget _buildPortfolioItemCard(
     BuildContext context,
     PortfolioItem item,
-    UserDataProvider provider
+    UserDataProvider provider,
   ) {
     // Get the song to access current price and other details
     final song = provider.allSongs.firstWhere(
       (s) => s.id == item.songId,
-      orElse: () => Song(
-        id: item.songId,
-        name: item.songName,
-        artist: item.artistName,
-        genre: 'Unknown',
-        currentPrice: item.purchasePrice,
-      ),
+      orElse:
+          () => Song(
+            id: item.songId,
+            name: item.songName,
+            artist: item.artistName,
+            genre: 'Unknown',
+            currentPrice: item.purchasePrice,
+          ),
     );
 
     // Calculate values
@@ -244,7 +248,8 @@ class _PortfolioDetailScreenState extends State<PortfolioDetailScreen> {
     final purchaseValue = item.totalPurchaseValue;
     final profitLoss = currentValue - purchaseValue;
     // Avoid division by zero for percentage calculation
-    final profitLossPercent = purchaseValue.abs() > 0.001 ? (profitLoss / purchaseValue) * 100 : 0.0;
+    final profitLossPercent =
+        purchaseValue.abs() > 0.001 ? (profitLoss / purchaseValue) * 100 : 0.0;
 
     // Get price change indicator
     final priceChange = provider.getPriceChangeIndicator(item.songId);
@@ -278,16 +283,22 @@ class _PortfolioDetailScreenState extends State<PortfolioDetailScreen> {
                     decoration: BoxDecoration(
                       color: Colors.grey[300],
                       borderRadius: BorderRadius.circular(8),
-                      image: item.albumArtUrl != null
-                          ? DecorationImage(
-                              image: NetworkImage(item.albumArtUrl!),
-                              fit: BoxFit.cover,
-                            )
-                          : null,
+                      image:
+                          item.albumArtUrl != null
+                              ? DecorationImage(
+                                image: NetworkImage(item.albumArtUrl!),
+                                fit: BoxFit.cover,
+                              )
+                              : null,
                     ),
-                    child: item.albumArtUrl == null
-                        ? const Icon(Icons.music_note, size: 40, color: Colors.grey)
-                        : null,
+                    child:
+                        item.albumArtUrl == null
+                            ? const Icon(
+                              Icons.music_note,
+                              size: 40,
+                              color: Colors.grey,
+                            )
+                            : null,
                   ),
                   const SizedBox(width: 16),
                   // Song details
@@ -332,14 +343,23 @@ class _PortfolioDetailScreenState extends State<PortfolioDetailScreen> {
               const Divider(),
               // Financial details
               _buildDetailRow('Quantity', '${item.quantity}'),
-              _buildDetailRow('Purchase Price', '\$${item.purchasePrice.toStringAsFixed(2)}'),
+              _buildDetailRow(
+                'Purchase Price',
+                '\$${item.purchasePrice.toStringAsFixed(2)}',
+              ),
               _buildDetailRow(
                 'Current Price',
                 '\$${song.currentPrice.toStringAsFixed(2)}',
                 suffix: _buildPriceChangeIndicator(priceChange),
               ),
-              _buildDetailRow('Total Purchase Value', '\$${purchaseValue.toStringAsFixed(2)}'),
-              _buildDetailRow('Current Value', '\$${currentValue.toStringAsFixed(2)}'),
+              _buildDetailRow(
+                'Total Purchase Value',
+                '\$${purchaseValue.toStringAsFixed(2)}',
+              ),
+              _buildDetailRow(
+                'Current Value',
+                '\$${currentValue.toStringAsFixed(2)}',
+              ),
               _buildDetailRow(
                 'Profit/Loss',
                 '\$${profitLoss.toStringAsFixed(2)} (${profitLossPercent.toStringAsFixed(2)}%)',
@@ -382,16 +402,18 @@ class _PortfolioDetailScreenState extends State<PortfolioDetailScreen> {
     }
   }
 
-  Widget _buildDetailRow(String label, String value, {Color? textColor, Widget? suffix}) {
+  Widget _buildDetailRow(
+    String label,
+    String value, {
+    Color? textColor,
+    Widget? suffix,
+  }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            label,
-            style: const TextStyle(fontSize: 14),
-          ),
+          Text(label, style: const TextStyle(fontSize: 14)),
           Row(
             children: [
               Text(
@@ -402,10 +424,7 @@ class _PortfolioDetailScreenState extends State<PortfolioDetailScreen> {
                   color: textColor,
                 ),
               ),
-              if (suffix != null) ...[
-                const SizedBox(width: 4),
-                suffix,
-              ],
+              if (suffix != null) ...[const SizedBox(width: 4), suffix],
             ],
           ),
         ],
@@ -417,7 +436,7 @@ class _PortfolioDetailScreenState extends State<PortfolioDetailScreen> {
     BuildContext context,
     PortfolioItem item,
     Song song,
-    UserDataProvider provider
+    UserDataProvider provider,
   ) {
     int quantity = 1;
     final cashBalance = provider.userProfile?.cashBalance ?? 0.0;
@@ -437,7 +456,9 @@ class _PortfolioDetailScreenState extends State<PortfolioDetailScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Current Price: \$${song.currentPrice.toStringAsFixed(2)}'),
+                  Text(
+                    'Current Price: \$${song.currentPrice.toStringAsFixed(2)}',
+                  ),
                   const SizedBox(height: 8),
                   Text('Cash Balance: \$${cashBalance.toStringAsFixed(2)}'),
                   const SizedBox(height: 16),
@@ -446,16 +467,18 @@ class _PortfolioDetailScreenState extends State<PortfolioDetailScreen> {
                       const Text('Quantity: '),
                       IconButton(
                         icon: const Icon(Icons.remove),
-                        onPressed: quantity > 1
-                            ? () => setState(() => quantity--)
-                            : null,
+                        onPressed:
+                            quantity > 1
+                                ? () => setState(() => quantity--)
+                                : null,
                       ),
                       Text('$quantity'),
                       IconButton(
                         icon: const Icon(Icons.add),
-                        onPressed: quantity < maxAffordable
-                            ? () => setState(() => quantity++)
-                            : null,
+                        onPressed:
+                            quantity < maxAffordable
+                                ? () => setState(() => quantity++)
+                                : null,
                       ),
                     ],
                   ),
@@ -477,17 +500,36 @@ class _PortfolioDetailScreenState extends State<PortfolioDetailScreen> {
                   child: const Text('Cancel'),
                 ),
                 ElevatedButton(
-                  onPressed: canAfford && quantity > 0 // Ensure quantity is positive
-                      ? () async { // Make async
-                          final success = await provider.buySong(item.songId, quantity);
-                          Navigator.pop(context); // Pop regardless of success
-                          if (mounted && success) {
-                             ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Successfully bought $quantity shares'), backgroundColor: Colors.green));
-                          } else if (mounted) {
-                             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Buy failed'), backgroundColor: Colors.red));
+                  onPressed:
+                      canAfford &&
+                              quantity >
+                                  0 // Ensure quantity is positive
+                          ? () async {
+                            // Make async
+                            final success = await provider.buySong(
+                              item.songId,
+                              quantity,
+                            );
+                            Navigator.pop(context); // Pop regardless of success
+                            if (mounted && success) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    'Successfully bought $quantity shares',
+                                  ),
+                                  backgroundColor: Colors.green,
+                                ),
+                              );
+                            } else if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Buy failed'),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            }
                           }
-                        }
-                      : null,
+                          : null,
                   child: const Text('Buy'),
                 ),
               ],
@@ -502,7 +544,7 @@ class _PortfolioDetailScreenState extends State<PortfolioDetailScreen> {
     BuildContext context,
     PortfolioItem item,
     Song song,
-    UserDataProvider provider
+    UserDataProvider provider,
   ) {
     int quantity = 1;
 
@@ -519,7 +561,9 @@ class _PortfolioDetailScreenState extends State<PortfolioDetailScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Current Price: \$${song.currentPrice.toStringAsFixed(2)}'),
+                  Text(
+                    'Current Price: \$${song.currentPrice.toStringAsFixed(2)}',
+                  ),
                   const SizedBox(height: 8),
                   Text('You Own: ${item.quantity}'),
                   const SizedBox(height: 16),
@@ -528,16 +572,18 @@ class _PortfolioDetailScreenState extends State<PortfolioDetailScreen> {
                       const Text('Quantity to Sell: '),
                       IconButton(
                         icon: const Icon(Icons.remove),
-                        onPressed: quantity > 1
-                            ? () => setState(() => quantity--)
-                            : null,
+                        onPressed:
+                            quantity > 1
+                                ? () => setState(() => quantity--)
+                                : null,
                       ),
                       Text('$quantity'),
                       IconButton(
                         icon: const Icon(Icons.add),
-                        onPressed: quantity < item.quantity
-                            ? () => setState(() => quantity++)
-                            : null,
+                        onPressed:
+                            quantity < item.quantity
+                                ? () => setState(() => quantity++)
+                                : null,
                       ),
                     ],
                   ),
@@ -554,17 +600,35 @@ class _PortfolioDetailScreenState extends State<PortfolioDetailScreen> {
                   child: const Text('Cancel'),
                 ),
                 ElevatedButton(
-                  onPressed: quantity > 0 // Ensure quantity is positive
-                      ? () async { // Make async
-                          final success = await provider.sellSong(item.songId, quantity);
-                           Navigator.pop(context); // Pop regardless of success
-                          if (mounted && success) {
-                             ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Successfully sold $quantity shares'), backgroundColor: Colors.blue));
-                          } else if (mounted) {
-                             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Sell failed'), backgroundColor: Colors.red));
+                  onPressed:
+                      quantity >
+                              0 // Ensure quantity is positive
+                          ? () async {
+                            // Make async
+                            final success = await provider.sellSong(
+                              item.songId,
+                              quantity,
+                            );
+                            Navigator.pop(context); // Pop regardless of success
+                            if (mounted && success) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    'Successfully sold $quantity shares',
+                                  ),
+                                  backgroundColor: Colors.blue,
+                                ),
+                              );
+                            } else if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Sell failed'),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            }
                           }
-                        }
-                      : null,
+                          : null,
                   child: const Text('Sell'),
                 ),
               ],

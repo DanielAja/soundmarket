@@ -6,14 +6,14 @@ class LoadingIndicator extends StatelessWidget {
   final double size;
   final Color? color;
   final double strokeWidth;
-  
+
   const LoadingIndicator({
     super.key,
     this.size = 40.0,
     this.color,
     this.strokeWidth = 4.0,
   });
-  
+
   @override
   Widget build(BuildContext context) {
     return Center(
@@ -36,14 +36,14 @@ class FullScreenLoading extends StatelessWidget {
   final String? message;
   final Color? backgroundColor;
   final Color? indicatorColor;
-  
+
   const FullScreenLoading({
     super.key,
     this.message,
     this.backgroundColor,
     this.indicatorColor,
   });
-  
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -52,9 +52,7 @@ class FullScreenLoading extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            LoadingIndicator(
-              color: indicatorColor,
-            ),
+            LoadingIndicator(color: indicatorColor),
             if (message != null)
               Padding(
                 padding: const EdgeInsets.only(top: 16.0),
@@ -80,7 +78,7 @@ class LoadingOverlay extends StatelessWidget {
   final bool isLoading;
   final String? loadingMessage;
   final Color? overlayColor;
-  
+
   const LoadingOverlay({
     super.key,
     required this.child,
@@ -88,7 +86,7 @@ class LoadingOverlay extends StatelessWidget {
     this.loadingMessage,
     this.overlayColor,
   });
-  
+
   @override
   Widget build(BuildContext context) {
     return Stack(
@@ -116,7 +114,7 @@ class LoadingButton extends StatelessWidget {
   final double width;
   final double height;
   final double borderRadius;
-  
+
   const LoadingButton({
     super.key,
     required this.text,
@@ -128,7 +126,7 @@ class LoadingButton extends StatelessWidget {
     this.height = 50.0,
     this.borderRadius = 24.0,
   });
-  
+
   @override
   Widget build(BuildContext context) {
     return SizedBox(
@@ -142,27 +140,30 @@ class LoadingButton extends StatelessWidget {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(borderRadius),
           ),
-          disabledBackgroundColor: backgroundColor?.withAlpha((255 * 0.7).round()) ?? // Replaced withOpacity
-              ColorPalette.primary.withAlpha((255 * 0.7).round()), // Replaced withOpacity
+          disabledBackgroundColor:
+              backgroundColor?.withAlpha(
+                (255 * 0.7).round(),
+              ) ?? // Replaced withOpacity
+              ColorPalette.primary.withAlpha(
+                (255 * 0.7).round(),
+              ), // Replaced withOpacity
         ),
-        child: isLoading
-            ? SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(
-                    textColor ?? ColorPalette.onPrimary,
+        child:
+            isLoading
+                ? SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      textColor ?? ColorPalette.onPrimary,
+                    ),
+                    strokeWidth: 2.0,
                   ),
-                  strokeWidth: 2.0,
+                )
+                : Text(
+                  text,
+                  style: TextStyle(fontSize: 16.0, fontWeight: FontWeight.w600),
                 ),
-              )
-            : Text(
-                text,
-                style: TextStyle(
-                  fontSize: 16.0,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
       ),
     );
   }

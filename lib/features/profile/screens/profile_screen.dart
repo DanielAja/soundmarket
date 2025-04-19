@@ -18,11 +18,7 @@ class ProfileScreen extends StatelessWidget {
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Image.asset(
-              'assets/icon/app_icon.png',
-              width: 28,
-              height: 28,
-            ),
+            Image.asset('assets/icon/app_icon.png', width: 28, height: 28),
             const SizedBox(width: 8),
             const Text('Sound Market'),
           ],
@@ -34,13 +30,13 @@ class ProfileScreen extends StatelessWidget {
           if (userDataProvider.isLoading) {
             return const Center(child: CircularProgressIndicator());
           }
-          
+
           final userProfile = userDataProvider.userProfile;
-          
+
           if (userProfile == null) {
             return const Center(child: CircularProgressIndicator());
           }
-          
+
           return RefreshIndicator(
             onRefresh: () => userDataProvider.refreshData(),
             child: ListView(
@@ -68,32 +64,26 @@ class ProfileScreen extends StatelessWidget {
         CircleAvatar(
           radius: 50.0,
           backgroundColor: Theme.of(context).colorScheme.primary,
-          child: const Icon(
-            Icons.person,
-            size: 50.0,
-            color: Colors.white,
-          ),
+          child: const Icon(Icons.person, size: 50.0, color: Colors.white),
         ),
         const SizedBox(height: AppSpacing.l), // Use AppSpacing.l
         Text(
           displayName,
-          style: const TextStyle(
-            fontSize: 24.0,
-            fontWeight: FontWeight.bold,
-          ),
+          style: const TextStyle(fontSize: 24.0, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: AppSpacing.s), // Use AppSpacing.s
         Text(
           'Member since April 2025',
-          style: TextStyle(
-            color: Colors.grey[400],
-          ),
+          style: TextStyle(color: Colors.grey[400]),
         ),
       ],
     );
   }
 
-  Widget _buildBalanceCard(BuildContext context, UserDataProvider userDataProvider) {
+  Widget _buildBalanceCard(
+    BuildContext context,
+    UserDataProvider userDataProvider,
+  ) {
     return Card(
       elevation: 4.0,
       child: Padding(
@@ -103,10 +93,7 @@ class ProfileScreen extends StatelessWidget {
           children: [
             const Text(
               'Your Balance',
-              style: TextStyle(
-                fontSize: 18.0,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(fontSize: 18.0, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: AppSpacing.l), // Use AppSpacing.l
             Row(
@@ -115,12 +102,7 @@ class ProfileScreen extends StatelessWidget {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Cash',
-                      style: TextStyle(
-                        color: Colors.grey[400],
-                      ),
-                    ),
+                    Text('Cash', style: TextStyle(color: Colors.grey[400])),
                     Text(
                       '\$${userDataProvider.userProfile?.cashBalance.toStringAsFixed(2) ?? '0.00'}',
                       style: const TextStyle(
@@ -135,9 +117,7 @@ class ProfileScreen extends StatelessWidget {
                   children: [
                     Text(
                       'Portfolio Value',
-                      style: TextStyle(
-                        color: Colors.grey[400],
-                      ),
+                      style: TextStyle(color: Colors.grey[400]),
                     ),
                     Text(
                       '\$${userDataProvider.totalPortfolioValue.toStringAsFixed(2)}',
@@ -158,9 +138,7 @@ class ProfileScreen extends StatelessWidget {
               children: [
                 const Text(
                   'Total Balance',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontWeight: FontWeight.bold),
                 ),
                 Text(
                   '\$${userDataProvider.totalBalance.toStringAsFixed(2)}',
@@ -183,13 +161,14 @@ class ProfileScreen extends StatelessWidget {
       builder: (context, userDataProvider, child) {
         // Calculate statistics
         final songsOwned = userDataProvider.portfolio.length;
-        
+
         // Calculate unique artists backed
-        final artistsBacked = userDataProvider.portfolio
-            .map((item) => item.artistName)
-            .toSet()
-            .length;
-        
+        final artistsBacked =
+            userDataProvider.portfolio
+                .map((item) => item.artistName)
+                .toSet()
+                .length;
+
         // Calculate return percentage
         double returnPercentage = 0.0;
         if (userDataProvider.getTotalSpent() > 0) {
@@ -197,26 +176,27 @@ class ProfileScreen extends StatelessWidget {
           final currentValue = userDataProvider.totalPortfolioValue;
           returnPercentage = ((currentValue / totalSpent) - 1) * 100;
         }
-        
+
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
               'Your Statistics',
-              style: TextStyle(
-                fontSize: 18.0,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(fontSize: 18.0, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: AppSpacing.l), // Use AppSpacing.l
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
                 _buildStatItem(context, songsOwned.toString(), 'Songs Owned'),
-                _buildStatItem(context, artistsBacked.toString(), 'Artists Backed'),
                 _buildStatItem(
-                  context, 
-                  '${returnPercentage.toStringAsFixed(1)}%', 
+                  context,
+                  artistsBacked.toString(),
+                  'Artists Backed',
+                ),
+                _buildStatItem(
+                  context,
+                  '${returnPercentage.toStringAsFixed(1)}%',
                   'Return',
                   color: returnPercentage >= 0 ? Colors.green : Colors.red,
                 ),
@@ -229,11 +209,11 @@ class ProfileScreen extends StatelessWidget {
   }
 
   Widget _buildStatItem(
-    BuildContext context, 
-    String value, 
-    String label, 
-    {Color? color}
-  ) {
+    BuildContext context,
+    String value,
+    String label, {
+    Color? color,
+  }) {
     return Column(
       children: [
         Text(
@@ -245,13 +225,7 @@ class ProfileScreen extends StatelessWidget {
           ),
         ),
         const SizedBox(height: AppSpacing.xs), // Use AppSpacing.xs
-        Text(
-          label,
-          style: TextStyle(
-            color: Colors.grey[400],
-            fontSize: 12.0,
-          ),
-        ),
+        Text(label, style: TextStyle(color: Colors.grey[400], fontSize: 12.0)),
       ],
     );
   }
@@ -664,133 +638,144 @@ class ProfileScreen extends StatelessWidget {
   */ // End of commented out unused method
 
   // Show dialog to add funds
-  Future<void> _showAddFundsDialog(BuildContext context, UserDataProvider userDataProvider) async {
+  Future<void> _showAddFundsDialog(
+    BuildContext context,
+    UserDataProvider userDataProvider,
+  ) async {
     final virtualAmount = 100.0; // Amount of virtual dollars to add
     final realAmount = 0.99; // Amount in real dollars
 
     return showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Add Funds'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Add \$${virtualAmount.toStringAsFixed(2)} to your account',
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 16.0,
-              ),
-            ),
-            const SizedBox(height: 16.0),
-            const Text(
-              'Add funds to your account to invest in more songs and expand your portfolio.',
-              style: TextStyle(fontSize: 14.0),
-            ),
-            const SizedBox(height: 16.0),
-            Row(
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Add Funds'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(
-                  Icons.info_outline,
-                  size: 16.0,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-                const SizedBox(width: 8.0),
-                const Expanded(
-                  child: Text(
-                    'Payment is processed securely through our payment provider.',
-                    style: TextStyle(
-                      fontSize: 12.0,
-                      fontStyle: FontStyle.italic,
-                    ),
+                Text(
+                  'Add \$${virtualAmount.toStringAsFixed(2)} to your account',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16.0,
                   ),
+                ),
+                const SizedBox(height: 16.0),
+                const Text(
+                  'Add funds to your account to invest in more songs and expand your portfolio.',
+                  style: TextStyle(fontSize: 14.0),
+                ),
+                const SizedBox(height: 16.0),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.info_outline,
+                      size: 16.0,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    const SizedBox(width: 8.0),
+                    const Expanded(
+                      child: Text(
+                        'Payment is processed securely through our payment provider.',
+                        style: TextStyle(
+                          fontSize: 12.0,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              
-              // Show payment processing dialog
-              _showLoadingDialog(context, 'Processing payment...');
-              
-              // Simulate payment processing delay
-              await Future.delayed(const Duration(seconds: 1));
-              
-              // Close loading dialog
-              Navigator.pop(context);
-              
-              // Add funds to user account
-              final success = await userDataProvider.addFunds(virtualAmount);
-              
-              if (success) {
-                // Show success message
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('\$${virtualAmount.toStringAsFixed(2)} added to your account'),
-                      backgroundColor: Colors.green,
-                    ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  Navigator.pop(context);
+
+                  // Show payment processing dialog
+                  _showLoadingDialog(context, 'Processing payment...');
+
+                  // Simulate payment processing delay
+                  await Future.delayed(const Duration(seconds: 1));
+
+                  // Close loading dialog
+                  Navigator.pop(context);
+
+                  // Add funds to user account
+                  final success = await userDataProvider.addFunds(
+                    virtualAmount,
                   );
-                }
-              } else {
-                // Show error message
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Failed to add funds. Please try again.'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                }
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.primary,
-            ),
-            child: Text('\$${realAmount.toStringAsFixed(2)}'),
+
+                  if (success) {
+                    // Show success message
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            '\$${virtualAmount.toStringAsFixed(2)} added to your account',
+                          ),
+                          backgroundColor: Colors.green,
+                        ),
+                      );
+                    }
+                  } else {
+                    // Show error message
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Failed to add funds. Please try again.',
+                          ),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.primary,
+                ),
+                child: Text('\$${realAmount.toStringAsFixed(2)}'),
+              ),
+            ],
           ),
-        ],
-      ),
     );
   }
-  
+
   // Show loading dialog while processing payment
   void _showLoadingDialog(BuildContext context, String message) {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        content: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const CircularProgressIndicator(),
-            const SizedBox(width: 16.0),
-            Text(message),
-          ],
-        ),
-      ),
+      builder:
+          (context) => AlertDialog(
+            content: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const CircularProgressIndicator(),
+                const SizedBox(width: 16.0),
+                Text(message),
+              ],
+            ),
+          ),
     );
   }
 
-  Widget _buildActionButtons(BuildContext context, UserDataProvider userDataProvider) {
+  Widget _buildActionButtons(
+    BuildContext context,
+    UserDataProvider userDataProvider,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
           'Actions',
-          style: TextStyle(
-            fontSize: 18.0,
-            fontWeight: FontWeight.bold,
-          ),
+          style: TextStyle(fontSize: 18.0, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: AppSpacing.l), // Use AppSpacing.l
         ListTile(
@@ -820,27 +805,32 @@ class ProfileScreen extends StatelessWidget {
             // Show confirmation dialog before resetting
             showDialog(
               context: context,
-              builder: (context) => AlertDialog(
-                title: const Text('Reset Demo Data'),
-                content: const Text('Are you sure you want to reset all demo data? This action cannot be undone.'),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('Cancel'),
+              builder:
+                  (context) => AlertDialog(
+                    title: const Text('Reset Demo Data'),
+                    content: const Text(
+                      'Are you sure you want to reset all demo data? This action cannot be undone.',
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Cancel'),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          // Reset user data for demo purposes
+                          userDataProvider.resetData();
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Demo data has been reset'),
+                            ),
+                          );
+                        },
+                        child: const Text('Reset'),
+                      ),
+                    ],
                   ),
-                  TextButton(
-                    onPressed: () {
-                      // Reset user data for demo purposes
-                      userDataProvider.resetData();
-                      Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Demo data has been reset')),
-                      );
-                    },
-                    child: const Text('Reset'),
-                  ),
-                ],
-              ),
             );
           },
         ),

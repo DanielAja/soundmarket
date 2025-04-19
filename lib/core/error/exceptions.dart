@@ -27,7 +27,8 @@ class ServerException extends AppException {
   ServerException(super.message, {this.statusCode, super.code, super.details});
 
   @override
-  String toString() => 'ServerException: $message (Status: $statusCode, Code: $code)';
+  String toString() =>
+      'ServerException: $message (Status: $statusCode, Code: $code)';
 }
 
 /// Data-related exceptions
@@ -44,7 +45,12 @@ class CacheException extends AppException {
 class ValidationException extends AppException {
   final Map<String, String>? fieldErrors;
 
-  ValidationException(super.message, {this.fieldErrors, super.code, super.details});
+  ValidationException(
+    super.message, {
+    this.fieldErrors,
+    super.code,
+    super.details,
+  });
 
   @override
   String toString() {

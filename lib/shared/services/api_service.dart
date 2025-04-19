@@ -12,17 +12,14 @@ import '../../core/constants/api_constants.dart';
 class ApiService {
   final http.Client _client;
   final Duration _timeout;
-  
-  ApiService({
-    http.Client? client,
-    Duration? timeout,
-  }) : 
-    _client = client ?? http.Client(),
-    _timeout = timeout ?? Duration(seconds: AppConfig.apiTimeoutSeconds);
-  
+
+  ApiService({http.Client? client, Duration? timeout})
+    : _client = client ?? http.Client(),
+      _timeout = timeout ?? Duration(seconds: AppConfig.apiTimeoutSeconds);
+
   // Get the base URL from environment config
   String get baseUrl => EnvironmentConfig.apiBaseUrl;
-  
+
   // Get request
   Future<dynamic> get(
     String endpoint, {
@@ -36,7 +33,7 @@ class ApiService {
       queryParameters: queryParameters,
     );
   }
-  
+
   // Post request
   Future<dynamic> post(
     String endpoint, {
@@ -52,7 +49,7 @@ class ApiService {
       body: body,
     );
   }
-  
+
   // Put request
   Future<dynamic> put(
     String endpoint, {
@@ -68,7 +65,7 @@ class ApiService {
       body: body,
     );
   }
-  
+
   // Patch request
   Future<dynamic> patch(
     String endpoint, {
@@ -84,7 +81,7 @@ class ApiService {
       body: body,
     );
   }
-  
+
   // Delete request
   Future<dynamic> delete(
     String endpoint, {
@@ -100,7 +97,7 @@ class ApiService {
       body: body,
     );
   }
-  
+
   // Send request
   Future<dynamic> _sendRequest(
     String method,
@@ -111,34 +108,32 @@ class ApiService {
   }) async {
     try {
       // Build URL
-      final uri = Uri.parse('$baseUrl$endpoint').replace(
-        queryParameters: queryParameters,
-      );
-      
+      final uri = Uri.parse(
+        '$baseUrl$endpoint',
+      ).replace(queryParameters: queryParameters);
+
       // Build headers
       final requestHeaders = {
         ApiConstants.contentTypeHeader: ApiConstants.jsonContentType,
         ApiConstants.acceptHeader: ApiConstants.jsonContentType,
         ...?headers,
       };
-      
+
       // Build request
       final request = http.Request(method, uri);
       request.headers.addAll(requestHeaders);
-      
+
       // Add body if provided
       if (body != null) {
         request.body = json.encode(body);
       }
-      
+
       // Send request
-      final streamedResponse = await _client
-          .send(request)
-          .timeout(_timeout);
-      
+      final streamedResponse = await _client.send(request).timeout(_timeout);
+
       // Get response
       final response = await http.Response.fromStream(streamedResponse);
-      
+
       // Handle response
       return _handleResponse(response);
     } on SocketException {
@@ -149,12 +144,13 @@ class ApiService {
       throw AppException('An error occurred: $e');
     }
   }
-  
+
   // Handle response
   dynamic _handleResponse(http.Response response) {
     final statusCode = response.statusCode;
-    final responseBody = response.body.isNotEmpty ? json.decode(response.body) : null;
-    
+    final responseBody =
+        response.body.isNotEmpty ? json.decode(response.body) : null;
+
     if (statusCode >= 200 && statusCode < 300) {
       return responseBody;
     } else {
@@ -207,7 +203,7 @@ class ApiService {
       }
     }
   }
-  
+
   // Close client
   void dispose() {
     _client.close();

@@ -8,7 +8,7 @@ class Transaction {
   final double price;
   final DateTime timestamp;
   final String? albumArtUrl;
-  
+
   Transaction({
     required this.id,
     required this.songId,
@@ -20,10 +20,10 @@ class Transaction {
     required this.timestamp,
     this.albumArtUrl,
   });
-  
+
   // Calculate total value of the transaction
   double get totalValue => quantity * price;
-  
+
   // Create a copy with updated fields
   Transaction copyWith({
     String? id,
@@ -48,7 +48,7 @@ class Transaction {
       albumArtUrl: albumArtUrl ?? this.albumArtUrl,
     );
   }
-  
+
   // Convert to JSON for storage
   Map<String, dynamic> toJson() {
     return {
@@ -63,7 +63,7 @@ class Transaction {
       'albumArtUrl': albumArtUrl,
     };
   }
-  
+
   // Create from JSON
   factory Transaction.fromJson(Map<String, dynamic> json) {
     return Transaction(
@@ -71,9 +71,10 @@ class Transaction {
       songId: json['songId'],
       songName: json['songName'],
       artistName: json['artistName'],
-      type: json['type'] == 'TransactionType.buy' 
-          ? TransactionType.buy 
-          : TransactionType.sell,
+      type:
+          json['type'] == 'TransactionType.buy'
+              ? TransactionType.buy
+              : TransactionType.sell,
       quantity: json['quantity'],
       price: json['price'],
       timestamp: DateTime.fromMillisecondsSinceEpoch(json['timestamp']),
@@ -82,7 +83,4 @@ class Transaction {
   }
 }
 
-enum TransactionType {
-  buy,
-  sell,
-}
+enum TransactionType { buy, sell }

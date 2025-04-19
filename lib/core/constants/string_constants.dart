@@ -3,8 +3,9 @@ class StringConstants {
   // App name and general
   static const String appName = 'Sound Market';
   static const String appTagline = 'Trade the Tracks';
-  static const String appDescription = 'Buy and sell shares in your favorite songs';
-  
+  static const String appDescription =
+      'Buy and sell shares in your favorite songs';
+
   // Authentication
   static const String login = 'Login';
   static const String register = 'Register';
@@ -18,7 +19,7 @@ class StringConstants {
   static const String signIn = 'Sign In';
   static const String signUp = 'Sign Up';
   static const String signOut = 'Sign Out';
-  
+
   // Navigation
   static const String home = 'Home';
   static const String discover = 'Discover';
@@ -26,7 +27,7 @@ class StringConstants {
   static const String portfolio = 'Portfolio';
   static const String transactions = 'Transactions';
   static const String settings = 'Settings';
-  
+
   // Home screen
   static const String yourPortfolio = 'Your Portfolio';
   static const String portfolioValue = 'Portfolio Value';
@@ -36,7 +37,7 @@ class StringConstants {
   static const String trendingSongs = 'Trending Songs';
   static const String recentTransactions = 'Recent Transactions';
   static const String viewAll = 'View All';
-  
+
   // Discover screen
   static const String searchSongs = 'Search Songs';
   static const String filter = 'Filter';
@@ -48,7 +49,7 @@ class StringConstants {
   static const String popularity = 'Popularity';
   static const String newest = 'Newest';
   static const String recommended = 'Recommended';
-  
+
   // Profile screen
   static const String editProfile = 'Edit Profile';
   static const String displayName = 'Display Name';
@@ -59,7 +60,7 @@ class StringConstants {
   static const String termsOfService = 'Terms of Service';
   static const String helpAndSupport = 'Help & Support';
   static const String about = 'About';
-  
+
   // Transaction screen
   static const String buy = 'Buy';
   static const String sell = 'Sell';
@@ -73,7 +74,7 @@ class StringConstants {
   static const String transactionDate = 'Transaction Date';
   static const String transactionType = 'Transaction Type';
   static const String transactionStatus = 'Status';
-  
+
   // Song details
   static const String songDetails = 'Song Details';
   static const String currentPrice = 'Current Price';
@@ -83,29 +84,30 @@ class StringConstants {
   static const String releaseDate = 'Release Date';
   static const String addToPortfolio = 'Add to Portfolio';
   static const String removeFromPortfolio = 'Remove from Portfolio';
-  
+
   // Error messages
   static const String errorOccurred = 'An error occurred';
-  static const String networkError = 'Network error. Please check your connection.';
+  static const String networkError =
+      'Network error. Please check your connection.';
   static const String invalidCredentials = 'Invalid email or password';
   static const String passwordMismatch = 'Passwords do not match';
   static const String invalidEmail = 'Please enter a valid email address';
   static const String requiredField = 'This field is required';
   static const String insufficientFunds = 'Insufficient funds';
   static const String invalidQuantity = 'Please enter a valid quantity';
-  
+
   // Success messages
   static const String purchaseSuccess = 'Purchase successful!';
   static const String saleSuccess = 'Sale successful!';
   static const String profileUpdateSuccess = 'Profile updated successfully';
   static const String passwordChangeSuccess = 'Password changed successfully';
-  
+
   // Empty states
   static const String emptyPortfolio = 'Your portfolio is empty';
   static const String emptyTransactions = 'No transactions yet';
   static const String noResults = 'No results found';
   static const String startInvesting = 'Start investing in songs you love';
-  
+
   // Buttons
   static const String confirm = 'Confirm';
   static const String cancel = 'Cancel';

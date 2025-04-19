@@ -15,63 +15,78 @@ class AppRouter {
     switch (settings.name) {
       case '/':
         return MaterialPageRoute(builder: (_) => const SplashScreen());
-        
+
       case RouteConstants.splash:
         return MaterialPageRoute(builder: (_) => const SplashScreen());
-        
+
       case RouteConstants.home:
         return MaterialPageRoute(builder: (_) => const MainNavigationWrapper());
-      
+
       case RouteConstants.discover:
         return MaterialPageRoute(builder: (_) => const DiscoverScreen());
-      
+
       case RouteConstants.profile:
         return MaterialPageRoute(builder: (_) => const ProfileScreen());
-      
+
       case RouteConstants.transactions:
-        return MaterialPageRoute(builder: (_) => const TransactionHistoryScreen());
-      
+        return MaterialPageRoute(
+          builder: (_) => const TransactionHistoryScreen(),
+        );
+
       case RouteConstants.portfolioDetails:
         return MaterialPageRoute(builder: (_) => const PortfolioDetailScreen());
-      
+
       // Add more routes as needed
-      
+
       default:
         return MaterialPageRoute(
-          builder: (_) => Scaffold(
-            body: Center(
-              child: Text('No route defined for ${settings.name}'),
-            ),
-          ),
+          builder:
+              (_) => Scaffold(
+                body: Center(
+                  child: Text('No route defined for ${settings.name}'),
+                ),
+              ),
         );
     }
   }
-  
+
   // Navigation methods
-  static void navigateTo(BuildContext context, String routeName, {Object? arguments}) {
+  static void navigateTo(
+    BuildContext context,
+    String routeName, {
+    Object? arguments,
+  }) {
     Navigator.of(context).pushNamed(routeName, arguments: arguments);
   }
-  
-  static void navigateToAndRemove(BuildContext context, String routeName, {Object? arguments}) {
+
+  static void navigateToAndRemove(
+    BuildContext context,
+    String routeName, {
+    Object? arguments,
+  }) {
     Navigator.of(context).pushNamedAndRemoveUntil(
       routeName,
       (route) => false,
       arguments: arguments,
     );
   }
-  
-  static void navigateToAndReplace(BuildContext context, String routeName, {Object? arguments}) {
+
+  static void navigateToAndReplace(
+    BuildContext context,
+    String routeName, {
+    Object? arguments,
+  }) {
     Navigator.of(context).pushReplacementNamed(routeName, arguments: arguments);
   }
-  
+
   static void pop(BuildContext context, [dynamic result]) {
     Navigator.of(context).pop(result);
   }
-  
+
   static void popUntil(BuildContext context, String routeName) {
     Navigator.of(context).popUntil(ModalRoute.withName(routeName));
   }
-  
+
   // Custom transitions
   static PageRouteBuilder<dynamic> slideTransition(Widget page) {
     return PageRouteBuilder(
@@ -80,15 +95,18 @@ class AppRouter {
         const begin = Offset(1.0, 0.0);
         const end = Offset.zero;
         const curve = Curves.easeInOut;
-        
-        var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+
+        var tween = Tween(
+          begin: begin,
+          end: end,
+        ).chain(CurveTween(curve: curve));
         var offsetAnimation = animation.drive(tween);
-        
+
         return SlideTransition(position: offsetAnimation, child: child);
       },
     );
   }
-  
+
   static PageRouteBuilder<dynamic> fadeTransition(Widget page) {
     return PageRouteBuilder(
       pageBuilder: (context, animation, secondaryAnimation) => page,

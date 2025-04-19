@@ -22,18 +22,21 @@ class StorageService {
   static const String _snapshotsTable = 'portfolio_snapshots';
 
   // Getter for the database instance
-  Future<sqflite.Database> get database async { // Use prefix
+  Future<sqflite.Database> get database async {
+    // Use prefix
     if (_database != null) return _database!;
     _database = await _initDatabase();
     return _database!;
   }
 
   // Initialize the database
-  Future<sqflite.Database> _initDatabase() async { // Use prefix
+  Future<sqflite.Database> _initDatabase() async {
+    // Use prefix
     final documentsDirectory = await getApplicationDocumentsDirectory();
     final path = join(documentsDirectory.path, _dbName);
 
-    return await sqflite.openDatabase( // Use prefix
+    return await sqflite.openDatabase(
+      // Use prefix
       path,
       version: 1,
       onCreate: _onCreate,
@@ -41,7 +44,8 @@ class StorageService {
   }
 
   // Create database table
-  Future<void> _onCreate(sqflite.Database db, int version) async { // Use prefix
+  Future<void> _onCreate(sqflite.Database db, int version) async {
+    // Use prefix
     await db.execute('''
       CREATE TABLE $_snapshotsTable (
         timestamp INTEGER PRIMARY KEY,
@@ -49,9 +53,10 @@ class StorageService {
       )
     ''');
     // Add index for faster range queries
-    await db.execute('CREATE INDEX idx_timestamp ON $_snapshotsTable (timestamp)');
+    await db.execute(
+      'CREATE INDEX idx_timestamp ON $_snapshotsTable (timestamp)',
+    );
   }
-
 
   // --- User Profile, Portfolio, Transactions (using SharedPreferences) ---
 
@@ -61,16 +66,16 @@ class StorageService {
     final profileJson = jsonEncode(profile.toJson());
     await prefs.setString(_userProfileKey, profileJson);
   }
-  
+
   // Load user profile from local storage
   Future<UserProfile?> loadUserProfile() async {
     final prefs = await SharedPreferences.getInstance();
     final profileJson = prefs.getString(_userProfileKey);
-    
+
     if (profileJson == null) {
       return null;
     }
-    
+
     try {
       final Map<String, dynamic> profileMap = jsonDecode(profileJson);
       return UserProfile.fromJson(profileMap);
@@ -79,7 +84,7 @@ class StorageService {
       return null;
     }
   }
-  
+
   // Save portfolio to local storage
   Future<void> savePortfolio(List<PortfolioItem> portfolio) async {
     final prefs = await SharedPreferences.getInstance();
@@ -87,44 +92,43 @@ class StorageService {
     final portfolioJson = jsonEncode(portfolioJsonList);
     await prefs.setString(_portfolioKey, portfolioJson);
   }
-  
+
   // Load portfolio from local storage
   Future<List<PortfolioItem>> loadPortfolio() async {
     final prefs = await SharedPreferences.getInstance();
     final portfolioJson = prefs.getString(_portfolioKey);
-    
+
     if (portfolioJson == null) {
       return [];
     }
-    
+
     try {
       final List<dynamic> portfolioList = jsonDecode(portfolioJson);
-      return portfolioList
-          .map((item) => PortfolioItem.fromJson(item))
-          .toList();
+      return portfolioList.map((item) => PortfolioItem.fromJson(item)).toList();
     } catch (e) {
       print('Error loading portfolio: $e');
       return [];
     }
   }
-  
+
   // Save transactions to local storage
   Future<void> saveTransactions(List<Transaction> transactions) async {
     final prefs = await SharedPreferences.getInstance();
-    final transactionsJsonList = transactions.map((item) => item.toJson()).toList();
+    final transactionsJsonList =
+        transactions.map((item) => item.toJson()).toList();
     final transactionsJson = jsonEncode(transactionsJsonList);
     await prefs.setString(_transactionsKey, transactionsJson);
   }
-  
+
   // Load transactions from local storage
   Future<List<Transaction>> loadTransactions() async {
     final prefs = await SharedPreferences.getInstance();
     final transactionsJson = prefs.getString(_transactionsKey);
-    
+
     if (transactionsJson == null) {
       return [];
     }
-    
+
     try {
       final List<dynamic> transactionsList = jsonDecode(transactionsJson);
       return transactionsList
@@ -152,7 +156,10 @@ class StorageService {
   }
 
   // Load portfolio history snapshots within a specific date range
-  Future<List<PortfolioSnapshot>> loadPortfolioHistoryRange(DateTime start, DateTime end) async {
+  Future<List<PortfolioSnapshot>> loadPortfolioHistoryRange(
+    DateTime start,
+    DateTime end,
+  ) async {
     final db = await database;
     final startMillis = start.millisecondsSinceEpoch;
     // Ensure end time includes the whole day
@@ -177,7 +184,7 @@ class StorageService {
     });
   }
 
-   // Get the timestamp of the earliest snapshot
+  // Get the timestamp of the earliest snapshot
   Future<DateTime?> getEarliestTimestamp() async {
     final db = await database;
     final List<Map<String, dynamic>> result = await db.query(
@@ -191,9 +198,8 @@ class StorageService {
     return null;
   }
 
-
   // --- Save and Load Songs ---
-  
+
   // Save songs to local storage
   Future<void> saveSongs(List<Song> songs) async {
     final prefs = await SharedPreferences.getInstance();
@@ -201,21 +207,19 @@ class StorageService {
     final songsJson = jsonEncode(songsJsonList);
     await prefs.setString(_songsKey, songsJson);
   }
-  
+
   // Load songs from local storage
   Future<List<Song>> loadSongs() async {
     final prefs = await SharedPreferences.getInstance();
     final songsJson = prefs.getString(_songsKey);
-    
+
     if (songsJson == null) {
       return [];
     }
-    
+
     try {
       final List<dynamic> songsList = jsonDecode(songsJson);
-      return songsList
-          .map((item) => Song.fromJson(item))
-          .toList();
+      return songsList.map((item) => Song.fromJson(item)).toList();
     } catch (e) {
       print('Error loading songs: $e');
       return [];

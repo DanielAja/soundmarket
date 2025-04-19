@@ -10,7 +10,7 @@ class ErrorView extends StatelessWidget {
   final IconData icon;
   final double iconSize;
   final Color? iconColor;
-  
+
   const ErrorView({
     super.key,
     this.message = 'An error occurred',
@@ -19,7 +19,7 @@ class ErrorView extends StatelessWidget {
     this.iconSize = 64.0,
     this.iconColor,
   });
-  
+
   @override
   Widget build(BuildContext context) {
     return Center(
@@ -28,11 +28,7 @@ class ErrorView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              icon,
-              size: iconSize,
-              color: iconColor ?? ColorPalette.error,
-            ),
+            Icon(icon, size: iconSize, color: iconColor ?? ColorPalette.error),
             const SizedBox(height: 16.0),
             Text(
               message,
@@ -65,12 +61,9 @@ class ErrorView extends StatelessWidget {
 /// Network error view
 class NetworkErrorView extends StatelessWidget {
   final VoidCallback? onRetry;
-  
-  const NetworkErrorView({
-    super.key,
-    this.onRetry,
-  });
-  
+
+  const NetworkErrorView({super.key, this.onRetry});
+
   @override
   Widget build(BuildContext context) {
     return ErrorView(
@@ -89,7 +82,7 @@ class EmptyStateView extends StatelessWidget {
   final Color? iconColor;
   final VoidCallback? onAction;
   final String? actionLabel;
-  
+
   const EmptyStateView({
     super.key,
     required this.message,
@@ -99,7 +92,7 @@ class EmptyStateView extends StatelessWidget {
     this.onAction,
     this.actionLabel,
   });
-  
+
   @override
   Widget build(BuildContext context) {
     return Center(
@@ -148,7 +141,7 @@ class ErrorDialog extends StatelessWidget {
   final String message;
   final String? buttonText;
   final VoidCallback? onButtonPressed;
-  
+
   const ErrorDialog({
     super.key,
     this.title = 'Error',
@@ -156,7 +149,7 @@ class ErrorDialog extends StatelessWidget {
     this.buttonText,
     this.onButtonPressed,
   });
-  
+
   // Show the dialog
   static Future<void> show(
     BuildContext context, {
@@ -178,19 +171,13 @@ class ErrorDialog extends StatelessWidget {
       },
     );
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text(
-        title,
-        style: AppTextStyles.titleMedium,
-      ),
+      title: Text(title, style: AppTextStyles.titleMedium),
       content: SingleChildScrollView(
-        child: Text(
-          message,
-          style: AppTextStyles.bodyMedium,
-        ),
+        child: Text(message, style: AppTextStyles.bodyMedium),
       ),
       actions: <Widget>[
         TextButton(

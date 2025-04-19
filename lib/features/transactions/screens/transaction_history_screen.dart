@@ -8,21 +8,23 @@ class TransactionHistoryScreen extends StatefulWidget {
   const TransactionHistoryScreen({super.key});
 
   @override
-  State<TransactionHistoryScreen> createState() => _TransactionHistoryScreenState();
+  State<TransactionHistoryScreen> createState() =>
+      _TransactionHistoryScreenState();
 }
 
-class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> with SingleTickerProviderStateMixin {
+class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   TransactionFilter _currentFilter = TransactionFilter.all;
   final DateFormat _dateFormat = DateFormat('MMM d, yyyy');
   final DateFormat _timeFormat = DateFormat('h:mm a');
-  
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
   }
-  
+
   @override
   void dispose() {
     _tabController.dispose();
@@ -37,11 +39,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> wit
         title: const Text('Transaction History'),
         bottom: TabBar(
           controller: _tabController,
-          tabs: const [
-            Tab(text: 'All'),
-            Tab(text: 'Buys'),
-            Tab(text: 'Sells'),
-          ],
+          tabs: const [Tab(text: 'All'), Tab(text: 'Buys'), Tab(text: 'Sells')],
           onTap: (index) {
             setState(() {
               _currentFilter = TransactionFilter.values[index];
@@ -61,23 +59,17 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> wit
         builder: (context, userDataProvider, child) {
           // Show loading indicator when refreshing data
           if (userDataProvider.isLoading) {
-            return const Center(
-              child: CircularProgressIndicator(),
-            );
+            return const Center(child: CircularProgressIndicator());
           }
-          
+
           final transactions = _getFilteredTransactions(userDataProvider);
-          
+
           if (transactions.isEmpty) {
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
-                    Icons.history,
-                    size: 64.0,
-                    color: Colors.grey[600],
-                  ),
+                  Icon(Icons.history, size: 64.0, color: Colors.grey[600]),
                   const SizedBox(height: 16.0),
                   const Text(
                     'No transactions yet',
@@ -89,15 +81,13 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> wit
                   const SizedBox(height: 8.0),
                   Text(
                     'Your transaction history will appear here',
-                    style: TextStyle(
-                      color: Colors.grey[400],
-                    ),
+                    style: TextStyle(color: Colors.grey[400]),
                   ),
                 ],
               ),
             );
           }
-          
+
           return RefreshIndicator(
             onRefresh: () => userDataProvider.refreshData(),
             child: ListView.builder(
@@ -116,14 +106,16 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> wit
           final totalEarned = userDataProvider.getTotalEarned();
           final netResult = totalEarned - totalSpent;
           final isProfit = netResult >= 0;
-          
+
           return Container(
             padding: const EdgeInsets.all(16.0),
             decoration: BoxDecoration(
               color: Theme.of(context).colorScheme.surface,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withAlpha((255 * 0.1).round()), // Replaced withOpacity
+                  color: Colors.black.withAlpha(
+                    (255 * 0.1).round(),
+                  ), // Replaced withOpacity
                   blurRadius: 4.0,
                   offset: const Offset(0, -2),
                 ),
@@ -138,24 +130,16 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> wit
                   children: [
                     const Text(
                       'Total Summary',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style: TextStyle(fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 4.0),
                     Text(
                       'Spent: \$${totalSpent.toStringAsFixed(2)}',
-                      style: TextStyle(
-                        color: Colors.grey[400],
-                        fontSize: 12.0,
-                      ),
+                      style: TextStyle(color: Colors.grey[400], fontSize: 12.0),
                     ),
                     Text(
                       'Earned: \$${totalEarned.toStringAsFixed(2)}',
-                      style: TextStyle(
-                        color: Colors.grey[400],
-                        fontSize: 12.0,
-                      ),
+                      style: TextStyle(color: Colors.grey[400], fontSize: 12.0),
                     ),
                   ],
                 ),
@@ -165,9 +149,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> wit
                   children: [
                     const Text(
                       'Net Result',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style: TextStyle(fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 4.0),
                     Row(
@@ -196,7 +178,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> wit
       ),
     );
   }
-  
+
   List<Transaction> _getFilteredTransactions(UserDataProvider provider) {
     switch (_currentFilter) {
       case TransactionFilter.all:
@@ -215,12 +197,12 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> wit
         return provider.getTransactionsInDateRange(monthAgo, now);
     }
   }
-  
+
   Widget _buildTransactionItem(Transaction transaction) {
     final isBuy = transaction.type == TransactionType.buy;
     final formattedDate = _dateFormat.format(transaction.timestamp);
     final formattedTime = _timeFormat.format(transaction.timestamp);
-    
+
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
       child: Padding(
@@ -232,12 +214,14 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> wit
               children: [
                 CircleAvatar(
                   backgroundColor: Colors.grey[800],
-                  backgroundImage: transaction.albumArtUrl != null 
-                      ? NetworkImage(transaction.albumArtUrl!) 
-                      : null,
-                  child: transaction.albumArtUrl == null 
-                      ? const Icon(Icons.music_note) 
-                      : null,
+                  backgroundImage:
+                      transaction.albumArtUrl != null
+                          ? NetworkImage(transaction.albumArtUrl!)
+                          : null,
+                  child:
+                      transaction.albumArtUrl == null
+                          ? const Icon(Icons.music_note)
+                          : null,
                 ),
                 const SizedBox(width: 12.0),
                 Expanded(
@@ -246,9 +230,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> wit
                     children: [
                       Text(
                         transaction.songName,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                       Text(
                         transaction.artistName,
@@ -261,9 +243,15 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> wit
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8.0,
+                    vertical: 4.0,
+                  ),
                   decoration: BoxDecoration(
-                    color: isBuy ? Colors.green.withAlpha((255 * 0.2).round()) : Colors.red.withAlpha((255 * 0.2).round()),
+                    color:
+                        isBuy
+                            ? Colors.green.withAlpha((255 * 0.2).round())
+                            : Colors.red.withAlpha((255 * 0.2).round()),
                     borderRadius: BorderRadius.circular(4.0),
                   ),
                   child: Text(
@@ -283,16 +271,11 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> wit
               children: [
                 Text(
                   '$formattedDate at $formattedTime',
-                  style: TextStyle(
-                    color: Colors.grey[400],
-                    fontSize: 12.0,
-                  ),
+                  style: TextStyle(color: Colors.grey[400], fontSize: 12.0),
                 ),
                 Text(
                   '${transaction.quantity} ${transaction.quantity == 1 ? 'share' : 'shares'} @ \$${transaction.price.toStringAsFixed(2)}',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
               ],
             ),
@@ -302,12 +285,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> wit
               children: [
                 Row(
                   children: [
-                    Text(
-                      'Total: ',
-                      style: TextStyle(
-                        color: Colors.grey[400],
-                      ),
-                    ),
+                    Text('Total: ', style: TextStyle(color: Colors.grey[400])),
                     Text(
                       '\$${transaction.totalValue.toStringAsFixed(2)}',
                       style: TextStyle(
@@ -325,35 +303,43 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> wit
       ),
     );
   }
-  
+
   Widget _buildActionButtons(Transaction transaction) {
     return Consumer<UserDataProvider>(
       builder: (context, userDataProvider, child) {
         try {
-          final song = userDataProvider.allSongs
-              .firstWhere((s) => s.id == transaction.songId);
-          
+          final song = userDataProvider.allSongs.firstWhere(
+            (s) => s.id == transaction.songId,
+          );
+
           final isBuy = transaction.type == TransactionType.buy;
           final currentPrice = song.currentPrice;
-          final priceChange = (currentPrice - transaction.price) / transaction.price * 100;
-          
+          final priceChange =
+              (currentPrice - transaction.price) / transaction.price * 100;
+
           return Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               // Show the current price change from transaction price
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 2.0),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 6.0,
+                  vertical: 2.0,
+                ),
                 decoration: BoxDecoration(
-                  color: priceChange >= 0 
-                      ? Colors.green.withAlpha((255 * 0.1).round()) 
-                      : Colors.red.withAlpha((255 * 0.1).round()),
+                  color:
+                      priceChange >= 0
+                          ? Colors.green.withAlpha((255 * 0.1).round())
+                          : Colors.red.withAlpha((255 * 0.1).round()),
                   borderRadius: BorderRadius.circular(4.0),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
-                      priceChange >= 0 ? Icons.arrow_upward : Icons.arrow_downward,
+                      priceChange >= 0
+                          ? Icons.arrow_upward
+                          : Icons.arrow_downward,
                       size: 12.0,
                       color: priceChange >= 0 ? Colors.green : Colors.red,
                     ),
@@ -372,9 +358,18 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> wit
               // If price has changed, show appropriate action button
               if (isBuy && priceChange > 0)
                 InkWell(
-                  onTap: () => _showSellDialog(context, transaction, userDataProvider, currentPrice),
+                  onTap:
+                      () => _showSellDialog(
+                        context,
+                        transaction,
+                        userDataProvider,
+                        currentPrice,
+                      ),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8.0,
+                      vertical: 4.0,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.green.withAlpha((255 * 0.2).round()),
                       borderRadius: BorderRadius.circular(4.0),
@@ -398,9 +393,18 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> wit
                 )
               else if (isBuy && priceChange < 0)
                 InkWell(
-                  onTap: () => _showBuyDialog(context, transaction, userDataProvider, currentPrice),
+                  onTap:
+                      () => _showBuyDialog(
+                        context,
+                        transaction,
+                        userDataProvider,
+                        currentPrice,
+                      ),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8.0,
+                      vertical: 4.0,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.green.withAlpha((255 * 0.2).round()),
                       borderRadius: BorderRadius.circular(4.0),
@@ -408,7 +412,11 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> wit
                     child: const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.add_shopping_cart, size: 14.0, color: Colors.green),
+                        Icon(
+                          Icons.add_shopping_cart,
+                          size: 14.0,
+                          color: Colors.green,
+                        ),
                         SizedBox(width: 2.0),
                         Text(
                           'BUY',
@@ -424,9 +432,18 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> wit
                 )
               else if (!isBuy && priceChange < 0)
                 InkWell(
-                  onTap: () => _showBuyDialog(context, transaction, userDataProvider, currentPrice),
+                  onTap:
+                      () => _showBuyDialog(
+                        context,
+                        transaction,
+                        userDataProvider,
+                        currentPrice,
+                      ),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8.0,
+                      vertical: 4.0,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.green.withAlpha((255 * 0.2).round()),
                       borderRadius: BorderRadius.circular(4.0),
@@ -434,7 +451,11 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> wit
                     child: const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.add_shopping_cart, size: 14.0, color: Colors.green),
+                        Icon(
+                          Icons.add_shopping_cart,
+                          size: 14.0,
+                          color: Colors.green,
+                        ),
                         SizedBox(width: 2.0),
                         Text(
                           'BUY',
@@ -457,230 +478,259 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> wit
       },
     );
   }
-  
+
   Future<void> _showSellDialog(
-    BuildContext context, 
-    Transaction transaction, 
+    BuildContext context,
+    Transaction transaction,
     UserDataProvider userDataProvider,
-    double currentPrice
+    double currentPrice,
   ) async {
-    final TextEditingController quantityController = TextEditingController(text: '1');
+    final TextEditingController quantityController = TextEditingController(
+      text: '1',
+    );
     final maxQuantity = userDataProvider.getQuantityOwned(transaction.songId);
-    
+
     if (maxQuantity <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('You don\'t own any shares of this song to sell')),
+        const SnackBar(
+          content: Text('You don\'t own any shares of this song to sell'),
+        ),
       );
       return;
     }
-    
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Sell ${transaction.songName}'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Current Price: \$${currentPrice.toStringAsFixed(2)}',
-              style: const TextStyle(fontWeight: FontWeight.bold),
+      builder:
+          (context) => AlertDialog(
+            title: Text('Sell ${transaction.songName}'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Current Price: \$${currentPrice.toStringAsFixed(2)}',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8.0),
+                Text('Quantity Owned: $maxQuantity'),
+                const SizedBox(height: 16.0),
+                TextField(
+                  controller: quantityController,
+                  decoration: const InputDecoration(
+                    labelText: 'Quantity to Sell',
+                    border: OutlineInputBorder(),
+                  ),
+                  keyboardType: TextInputType.number,
+                ),
+                const SizedBox(height: 8.0),
+                Text(
+                  'Max you can sell: $maxQuantity',
+                  style: TextStyle(fontSize: 12.0, color: Colors.grey[600]),
+                ),
+                const SizedBox(height: 16.0),
+                StatefulBuilder(
+                  builder: (context, setState) {
+                    final quantity = int.tryParse(quantityController.text) ?? 0;
+                    final totalProceeds = quantity * currentPrice;
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Total Proceeds: \$${totalProceeds.toStringAsFixed(2)}',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ],
             ),
-            const SizedBox(height: 8.0),
-            Text('Quantity Owned: $maxQuantity'),
-            const SizedBox(height: 16.0),
-            TextField(
-              controller: quantityController,
-              decoration: const InputDecoration(
-                labelText: 'Quantity to Sell',
-                border: OutlineInputBorder(),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
               ),
-              keyboardType: TextInputType.number,
-            ),
-            const SizedBox(height: 8.0),
-            Text(
-              'Max you can sell: $maxQuantity',
-              style: TextStyle(
-                fontSize: 12.0,
-                color: Colors.grey[600],
+              TextButton(
+                onPressed: () async {
+                  final quantity = int.tryParse(quantityController.text) ?? 0;
+
+                  if (quantity <= 0) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Please enter a valid quantity'),
+                      ),
+                    );
+                    return;
+                  }
+
+                  if (quantity > maxQuantity) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('You don\'t own that many shares'),
+                      ),
+                    );
+                    return;
+                  }
+
+                  Navigator.pop(context);
+
+                  final success = await userDataProvider.sellSong(
+                    transaction.songId,
+                    quantity,
+                  );
+                  if (success) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          'Successfully sold $quantity shares of ${transaction.songName}',
+                        ),
+                      ),
+                    );
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Failed to complete sale')),
+                    );
+                  }
+                },
+                child: const Text('Sell'),
               ),
-            ),
-            const SizedBox(height: 16.0),
-            StatefulBuilder(
-              builder: (context, setState) {
-                final quantity = int.tryParse(quantityController.text) ?? 0;
-                final totalProceeds = quantity * currentPrice;
-                
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Total Proceeds: \$${totalProceeds.toStringAsFixed(2)}',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ],
-                );
-              },
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            ],
           ),
-          TextButton(
-            onPressed: () async {
-              final quantity = int.tryParse(quantityController.text) ?? 0;
-              
-              if (quantity <= 0) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Please enter a valid quantity')),
-                );
-                return;
-              }
-              
-              if (quantity > maxQuantity) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('You don\'t own that many shares')),
-                );
-                return;
-              }
-              
-              Navigator.pop(context);
-              
-              final success = await userDataProvider.sellSong(transaction.songId, quantity);
-              if (success) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Successfully sold $quantity shares of ${transaction.songName}')),
-                );
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Failed to complete sale')),
-                );
-              }
-            },
-            child: const Text('Sell'),
-          ),
-        ],
-      ),
     );
   }
-  
+
   Future<void> _showBuyDialog(
-    BuildContext context, 
-    Transaction transaction, 
+    BuildContext context,
+    Transaction transaction,
     UserDataProvider userDataProvider,
-    double currentPrice
+    double currentPrice,
   ) async {
-    final TextEditingController quantityController = TextEditingController(text: '1');
-    final maxQuantity = (userDataProvider.userProfile!.cashBalance / currentPrice).floor();
-    
+    final TextEditingController quantityController = TextEditingController(
+      text: '1',
+    );
+    final maxQuantity =
+        (userDataProvider.userProfile!.cashBalance / currentPrice).floor();
+
     if (maxQuantity <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('You don\'t have enough cash to buy this song')),
+        const SnackBar(
+          content: Text('You don\'t have enough cash to buy this song'),
+        ),
       );
       return;
     }
-    
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Buy ${transaction.songName}'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Current Price: \$${currentPrice.toStringAsFixed(2)}',
-              style: const TextStyle(fontWeight: FontWeight.bold),
+      builder:
+          (context) => AlertDialog(
+            title: Text('Buy ${transaction.songName}'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Current Price: \$${currentPrice.toStringAsFixed(2)}',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8.0),
+                Text(
+                  'Available Cash: \$${userDataProvider.userProfile!.cashBalance.toStringAsFixed(2)}',
+                ),
+                const SizedBox(height: 16.0),
+                TextField(
+                  controller: quantityController,
+                  decoration: const InputDecoration(
+                    labelText: 'Quantity to Buy',
+                    border: OutlineInputBorder(),
+                  ),
+                  keyboardType: TextInputType.number,
+                ),
+                const SizedBox(height: 8.0),
+                Text(
+                  'Max you can buy: $maxQuantity',
+                  style: TextStyle(fontSize: 12.0, color: Colors.grey[600]),
+                ),
+                const SizedBox(height: 16.0),
+                StatefulBuilder(
+                  builder: (context, setState) {
+                    final quantity = int.tryParse(quantityController.text) ?? 0;
+                    final totalCost = quantity * currentPrice;
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Total Cost: \$${totalCost.toStringAsFixed(2)}',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        Text(
+                          'Remaining Cash: \$${(userDataProvider.userProfile!.cashBalance - totalCost).toStringAsFixed(2)}',
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ],
             ),
-            const SizedBox(height: 8.0),
-            Text(
-              'Available Cash: \$${userDataProvider.userProfile!.cashBalance.toStringAsFixed(2)}',
-            ),
-            const SizedBox(height: 16.0),
-            TextField(
-              controller: quantityController,
-              decoration: const InputDecoration(
-                labelText: 'Quantity to Buy',
-                border: OutlineInputBorder(),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
               ),
-              keyboardType: TextInputType.number,
-            ),
-            const SizedBox(height: 8.0),
-            Text(
-              'Max you can buy: $maxQuantity',
-              style: TextStyle(
-                fontSize: 12.0,
-                color: Colors.grey[600],
+              TextButton(
+                onPressed: () async {
+                  final quantity = int.tryParse(quantityController.text) ?? 0;
+
+                  if (quantity <= 0) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Please enter a valid quantity'),
+                      ),
+                    );
+                    return;
+                  }
+
+                  if (quantity > maxQuantity) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Not enough cash for this purchase'),
+                      ),
+                    );
+                    return;
+                  }
+
+                  Navigator.pop(context);
+
+                  final success = await userDataProvider.buySong(
+                    transaction.songId,
+                    quantity,
+                  );
+                  if (success) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          'Successfully bought $quantity shares of ${transaction.songName}',
+                        ),
+                      ),
+                    );
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Failed to complete purchase'),
+                      ),
+                    );
+                  }
+                },
+                child: const Text('Buy'),
               ),
-            ),
-            const SizedBox(height: 16.0),
-            StatefulBuilder(
-              builder: (context, setState) {
-                final quantity = int.tryParse(quantityController.text) ?? 0;
-                final totalCost = quantity * currentPrice;
-                
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Total Cost: \$${totalCost.toStringAsFixed(2)}',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    Text(
-                      'Remaining Cash: \$${(userDataProvider.userProfile!.cashBalance - totalCost).toStringAsFixed(2)}',
-                    ),
-                  ],
-                );
-              },
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            ],
           ),
-          TextButton(
-            onPressed: () async {
-              final quantity = int.tryParse(quantityController.text) ?? 0;
-              
-              if (quantity <= 0) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Please enter a valid quantity')),
-                );
-                return;
-              }
-              
-              if (quantity > maxQuantity) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Not enough cash for this purchase')),
-                );
-                return;
-              }
-              
-              Navigator.pop(context);
-              
-              final success = await userDataProvider.buySong(transaction.songId, quantity);
-              if (success) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Successfully bought $quantity shares of ${transaction.songName}')),
-                );
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Failed to complete purchase')),
-                );
-              }
-            },
-            child: const Text('Buy'),
-          ),
-        ],
-      ),
     );
   }
-  
+
   void _showFilterOptions(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -694,10 +744,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> wit
             children: [
               const Text(
                 'Filter Transactions',
-                style: TextStyle(
-                  fontSize: 18.0,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 18.0, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 16.0),
               _buildFilterOption(
@@ -731,26 +778,27 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> wit
       },
     );
   }
-  
+
   Widget _buildFilterOption(
     BuildContext context,
     String title,
     TransactionFilter filter,
   ) {
     final isSelected = _currentFilter == filter;
-    
+
     return ListTile(
       title: Text(title),
-      trailing: isSelected
-          ? Icon(
-              Icons.check_circle,
-              color: Theme.of(context).colorScheme.primary,
-            )
-          : null,
+      trailing:
+          isSelected
+              ? Icon(
+                Icons.check_circle,
+                color: Theme.of(context).colorScheme.primary,
+              )
+              : null,
       onTap: () {
         setState(() {
           _currentFilter = filter;
-          
+
           // Update tab controller if filter corresponds to a tab
           if (filter == TransactionFilter.all) {
             _tabController.animateTo(0);
@@ -766,10 +814,4 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> wit
   }
 }
 
-enum TransactionFilter {
-  all,
-  buy,
-  sell,
-  lastWeek,
-  lastMonth,
-}
+enum TransactionFilter { all, buy, sell, lastWeek, lastMonth }

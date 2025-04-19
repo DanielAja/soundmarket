@@ -1047,11 +1047,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Image.asset(
-              'assets/icon/app_icon.png',
-              width: 28,
-              height: 28,
-            ),
+            Image.asset('assets/icon/app_icon.png', width: 28, height: 28),
             const SizedBox(width: 8),
             const Text('Sound Market'),
           ],

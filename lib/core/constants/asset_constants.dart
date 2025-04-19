@@ -4,12 +4,12 @@ class AssetConstants {
   static const String imagePath = 'assets/images';
   static const String iconPath = 'assets/icons';
   static const String animationPath = 'assets/animations';
-  
+
   // Logo assets
   static const String appLogo = '$imagePath/logo.png';
   static const String appLogoWhite = '$imagePath/logo_white.png';
   static const String appLogoSmall = '$imagePath/logo_small.png';
-  
+
   // Icon assets
   static const String homeIcon = '$iconPath/home.png';
   static const String discoverIcon = '$iconPath/discover.png';
@@ -31,18 +31,19 @@ class AssetConstants {
   static const String backIcon = '$iconPath/back.png';
   static const String forwardIcon = '$iconPath/forward.png';
   static const String refreshIcon = '$iconPath/refresh.png';
-  
+
   // Placeholder assets
   static const String songPlaceholder = '$imagePath/song_placeholder.png';
   static const String profilePlaceholder = '$imagePath/profile_placeholder.png';
-  static const String albumArtPlaceholder = '$imagePath/album_art_placeholder.png';
-  
+  static const String albumArtPlaceholder =
+      '$imagePath/album_art_placeholder.png';
+
   // Animation assets
   static const String loadingAnimation = '$animationPath/loading.json';
   static const String successAnimation = '$animationPath/success.json';
   static const String errorAnimation = '$animationPath/error.json';
   static const String emptyAnimation = '$animationPath/empty.json';
-  
+
   // Background assets
   static const String backgroundPattern = '$imagePath/background_pattern.png';
   static const String marketBackground = '$imagePath/market_background.png';

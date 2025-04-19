@@ -16,7 +16,8 @@ class SearchBarWithSuggestions extends StatefulWidget {
   });
 
   @override
-  State<SearchBarWithSuggestions> createState() => _SearchBarWithSuggestionsState();
+  State<SearchBarWithSuggestions> createState() =>
+      _SearchBarWithSuggestionsState();
 }
 
 class _SearchBarWithSuggestionsState extends State<SearchBarWithSuggestions> {
@@ -24,26 +25,27 @@ class _SearchBarWithSuggestionsState extends State<SearchBarWithSuggestions> {
   final FocusNode _focusNode = FocusNode();
   bool _showSuggestions = false;
   late String _searchQuery;
-  
+
   @override
   void initState() {
     super.initState();
     // Initialize with the provided query if available
     _searchQuery = widget.initialQuery ?? '';
     _controller = TextEditingController(text: _searchQuery);
-    
+
     _focusNode.addListener(() {
       setState(() {
         _showSuggestions = _focusNode.hasFocus && _searchQuery.isNotEmpty;
       });
     });
   }
-  
+
   @override
   void didUpdateWidget(SearchBarWithSuggestions oldWidget) {
     super.didUpdateWidget(oldWidget);
     // Update controller text if initialQuery changes
-    if (widget.initialQuery != oldWidget.initialQuery && widget.initialQuery != null) {
+    if (widget.initialQuery != oldWidget.initialQuery &&
+        widget.initialQuery != null) {
       _searchQuery = widget.initialQuery!;
       // Update the controller text without triggering the onChanged event
       _controller.value = TextEditingValue(
@@ -52,14 +54,14 @@ class _SearchBarWithSuggestionsState extends State<SearchBarWithSuggestions> {
       );
     }
   }
-  
+
   @override
   void dispose() {
     _controller.dispose();
     _focusNode.dispose();
     super.dispose();
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -75,18 +77,19 @@ class _SearchBarWithSuggestionsState extends State<SearchBarWithSuggestions> {
             ),
             filled: true,
             contentPadding: const EdgeInsets.symmetric(vertical: 4.0),
-            suffixIcon: _searchQuery.isNotEmpty
-                ? IconButton(
-                    icon: const Icon(Icons.clear),
-                    onPressed: () {
-                      setState(() {
-                        _controller.clear();
-                        _searchQuery = '';
-                        _showSuggestions = false;
-                      });
-                    },
-                  )
-                : null,
+            suffixIcon:
+                _searchQuery.isNotEmpty
+                    ? IconButton(
+                      icon: const Icon(Icons.clear),
+                      onPressed: () {
+                        setState(() {
+                          _controller.clear();
+                          _searchQuery = '';
+                          _showSuggestions = false;
+                        });
+                      },
+                    )
+                    : null,
           ),
           onChanged: (value) {
             setState(() {
@@ -107,21 +110,25 @@ class _SearchBarWithSuggestionsState extends State<SearchBarWithSuggestions> {
       ],
     );
   }
-  
+
   Widget _buildSuggestions() {
-    final userDataProvider = Provider.of<UserDataProvider>(context, listen: false);
+    final userDataProvider = Provider.of<UserDataProvider>(
+      context,
+      listen: false,
+    );
     final allSongs = userDataProvider.allSongs;
-    
+
     // Filter songs based on search query
-    final filteredSongs = allSongs.where((song) {
-      final songNameLower = song.name.toLowerCase();
-      final artistNameLower = song.artist.toLowerCase();
-      final queryLower = _searchQuery.toLowerCase();
-      
-      return songNameLower.contains(queryLower) || 
-             artistNameLower.contains(queryLower);
-    }).toList();
-    
+    final filteredSongs =
+        allSongs.where((song) {
+          final songNameLower = song.name.toLowerCase();
+          final artistNameLower = song.artist.toLowerCase();
+          final queryLower = _searchQuery.toLowerCase();
+
+          return songNameLower.contains(queryLower) ||
+              artistNameLower.contains(queryLower);
+        }).toList();
+
     // Sort by relevance (exact matches first)
     filteredSongs.sort((a, b) {
       final aNameLower = a.name.toLowerCase();
@@ -129,38 +136,38 @@ class _SearchBarWithSuggestionsState extends State<SearchBarWithSuggestions> {
       final aArtistLower = a.artist.toLowerCase();
       final bArtistLower = b.artist.toLowerCase();
       final queryLower = _searchQuery.toLowerCase();
-      
+
       // Exact matches first
       final aExactNameMatch = aNameLower == queryLower;
       final bExactNameMatch = bNameLower == queryLower;
       if (aExactNameMatch && !bExactNameMatch) return -1;
       if (!aExactNameMatch && bExactNameMatch) return 1;
-      
+
       // Then starts with matches
       final aStartsWithName = aNameLower.startsWith(queryLower);
       final bStartsWithName = bNameLower.startsWith(queryLower);
       if (aStartsWithName && !bStartsWithName) return -1;
       if (!aStartsWithName && bStartsWithName) return 1;
-      
+
       // Then artist exact matches
       final aExactArtistMatch = aArtistLower == queryLower;
       final bExactArtistMatch = bArtistLower == queryLower;
       if (aExactArtistMatch && !bExactArtistMatch) return -1;
       if (!aExactArtistMatch && bExactArtistMatch) return 1;
-      
+
       // Then artist starts with matches
       final aStartsWithArtist = aArtistLower.startsWith(queryLower);
       final bStartsWithArtist = bArtistLower.startsWith(queryLower);
       if (aStartsWithArtist && !bStartsWithArtist) return -1;
       if (!aStartsWithArtist && bStartsWithArtist) return 1;
-      
+
       // Default to alphabetical by name
       return aNameLower.compareTo(bNameLower);
     });
-    
+
     // Limit to top 5 results
     final suggestedSongs = filteredSongs.take(5).toList();
-    
+
     if (suggestedSongs.isEmpty) {
       return Container(
         decoration: BoxDecoration(
@@ -171,7 +178,9 @@ class _SearchBarWithSuggestionsState extends State<SearchBarWithSuggestions> {
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withAlpha((255 * 0.2).round()), // Replaced withOpacity
+              color: Colors.black.withAlpha(
+                (255 * 0.2).round(),
+              ), // Replaced withOpacity
               blurRadius: 5.0,
               offset: const Offset(0, 2),
             ),
@@ -181,19 +190,21 @@ class _SearchBarWithSuggestionsState extends State<SearchBarWithSuggestions> {
         child: const Text('No results found'),
       );
     }
-    
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.grey[800],
         borderRadius: const BorderRadius.only(
           bottomLeft: Radius.circular(8.0),
           bottomRight: Radius.circular(8.0),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withAlpha((255 * 0.2).round()), // Replaced withOpacity
-              blurRadius: 5.0,
-              offset: const Offset(0, 2),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha(
+              (255 * 0.2).round(),
+            ), // Replaced withOpacity
+            blurRadius: 5.0,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
@@ -204,30 +215,31 @@ class _SearchBarWithSuggestionsState extends State<SearchBarWithSuggestions> {
         itemBuilder: (context, index) {
           final song = suggestedSongs[index];
           return ListTile(
-            leading: song.albumArtUrl != null
-                ? ClipRRect(
-                    borderRadius: BorderRadius.circular(4.0),
-                    child: Image.network(
-                      song.albumArtUrl!,
+            leading:
+                song.albumArtUrl != null
+                    ? ClipRRect(
+                      borderRadius: BorderRadius.circular(4.0),
+                      child: Image.network(
+                        song.albumArtUrl!,
+                        width: 40.0,
+                        height: 40.0,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            width: 40.0,
+                            height: 40.0,
+                            color: Colors.grey[700],
+                            child: const Icon(Icons.music_note, size: 20.0),
+                          );
+                        },
+                      ),
+                    )
+                    : Container(
                       width: 40.0,
                       height: 40.0,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          width: 40.0,
-                          height: 40.0,
-                          color: Colors.grey[700],
-                          child: const Icon(Icons.music_note, size: 20.0),
-                        );
-                      },
+                      color: Colors.grey[700],
+                      child: const Icon(Icons.music_note, size: 20.0),
                     ),
-                  )
-                : Container(
-                    width: 40.0,
-                    height: 40.0,
-                    color: Colors.grey[700],
-                    child: const Icon(Icons.music_note, size: 20.0),
-                  ),
             title: Text(
               song.name,
               maxLines: 1,

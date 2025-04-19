@@ -12,7 +12,7 @@ class EmptyState extends StatelessWidget {
   final VoidCallback? onActionPressed;
   final String? actionLabel;
   final Widget? customAction;
-  
+
   const EmptyState({
     super.key,
     required this.message,
@@ -24,7 +24,7 @@ class EmptyState extends StatelessWidget {
     this.actionLabel,
     this.customAction,
   });
-  
+
   @override
   Widget build(BuildContext context) {
     return Center(
@@ -86,19 +86,18 @@ class EmptyState extends StatelessWidget {
 /// Empty portfolio state
 class EmptyPortfolioState extends StatelessWidget {
   final VoidCallback? onExplorePressed;
-  
-  const EmptyPortfolioState({
-    super.key,
-    this.onExplorePressed,
-  });
-  
+
+  const EmptyPortfolioState({super.key, this.onExplorePressed});
+
   @override
   Widget build(BuildContext context) {
     return EmptyState(
       message: 'Your portfolio is empty',
       subMessage: 'Start investing in songs you love',
       icon: Icons.library_music,
-      iconColor: ColorPalette.primary.withAlpha((255 * 0.7).round()), // Replaced withOpacity
+      iconColor: ColorPalette.primary.withAlpha(
+        (255 * 0.7).round(),
+      ), // Replaced withOpacity
       onActionPressed: onExplorePressed,
       actionLabel: 'Explore Songs',
     );
@@ -108,12 +107,9 @@ class EmptyPortfolioState extends StatelessWidget {
 /// Empty transactions state
 class EmptyTransactionsState extends StatelessWidget {
   final VoidCallback? onExplorePressed;
-  
-  const EmptyTransactionsState({
-    super.key,
-    this.onExplorePressed,
-  });
-  
+
+  const EmptyTransactionsState({super.key, this.onExplorePressed});
+
   @override
   Widget build(BuildContext context) {
     return EmptyState(
@@ -131,13 +127,13 @@ class EmptyTransactionsState extends StatelessWidget {
 class NoSearchResultsState extends StatelessWidget {
   final String searchTerm;
   final VoidCallback? onClearSearch;
-  
+
   const NoSearchResultsState({
     super.key,
     required this.searchTerm,
     this.onClearSearch,
   });
-  
+
   @override
   Widget build(BuildContext context) {
     return EmptyState(
@@ -155,13 +151,9 @@ class NoSearchResultsState extends StatelessWidget {
 class ComingSoonState extends StatelessWidget {
   final String feature;
   final VoidCallback? onBackPressed;
-  
-  const ComingSoonState({
-    super.key,
-    required this.feature,
-    this.onBackPressed,
-  });
-  
+
+  const ComingSoonState({super.key, required this.feature, this.onBackPressed});
+
   @override
   Widget build(BuildContext context) {
     return EmptyState(
