@@ -1,6 +1,7 @@
 /// Named route constants
 class RouteConstants {
   // Main navigation routes
+  static const String splash = '/splash';
   static const String home = '/home';
   static const String discover = '/discover';
   static const String profile = '/profile';

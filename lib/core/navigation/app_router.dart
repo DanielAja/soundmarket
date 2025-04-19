@@ -5,6 +5,7 @@ import '../../features/market/screens/discover_screen.dart';
 import '../../features/profile/screens/profile_screen.dart';
 import '../../features/transactions/screens/transaction_history_screen.dart';
 import '../../features/portfolio/screens/portfolio_detail_screen.dart'; // Corrected path
+import '../../features/auth/screens/splash_screen.dart'; // Import for SplashScreen
 import '../../main.dart'; // Import for MainNavigationWrapper
 
 /// Route definitions and navigation logic
@@ -13,10 +14,13 @@ class AppRouter {
   static Route<dynamic> generateRoute(RouteSettings settings) {
     switch (settings.name) {
       case '/':
-        return MaterialPageRoute(builder: (_) => const MainNavigationWrapper());
+        return MaterialPageRoute(builder: (_) => const SplashScreen());
+        
+      case RouteConstants.splash:
+        return MaterialPageRoute(builder: (_) => const SplashScreen());
         
       case RouteConstants.home:
-        return MaterialPageRoute(builder: (_) => HomeScreen()); // Removed const
+        return MaterialPageRoute(builder: (_) => const MainNavigationWrapper());
       
       case RouteConstants.discover:
         return MaterialPageRoute(builder: (_) => const DiscoverScreen());

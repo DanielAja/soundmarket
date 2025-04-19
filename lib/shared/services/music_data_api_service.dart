@@ -30,12 +30,12 @@ class MusicDataApiService {
   // Store recent prices for moving average calculation
   final Map<String, Queue<double>> _recentPrices = {};
   
-  // Price calculation factors with reduced volatility
-  final double _basePrice = 15.0;
-  final double _streamMultiplier = 0.00005; // Half the previous value
-  final double _volatilityFactor = 0.005; // Quarter of the previous value
-  final int _movingAveragePeriod = 10; // Doubled to smooth price changes
-  final double _maxPriceChangePercent = 0.5; // Quarter of the previous value
+  // Price calculation factors for $10-$1000 range with reduced volatility
+  final double _basePrice = 10.0;
+  final double _streamMultiplier = 0.0002; // Increased to match new price scale
+  final double _volatilityFactor = 0.004; // Low volatility for stability
+  final int _movingAveragePeriod = 10; // Smooth price changes
+  final double _maxPriceChangePercent = 0.4; // Low percentage change for stability
   
   // Initialize with real data
   Future<void> initialize(List<Song> initialSongs) async {

@@ -1,5 +1,6 @@
 import 'dart:async';
-import 'dart:math';
+import 'dart:math' as math;
+import 'dart:math' show Random;
 import '../../../shared/models/song.dart';
 import '../../../shared/models/portfolio_item.dart'; // Import PortfolioItem
 import '../../../shared/services/spotify_api_service.dart'; // Import SpotifyApiService
@@ -193,9 +194,9 @@ class MarketService {
           // Calculate new price based directly on popularity with no random fluctuation
           song.currentPrice = _calculatePriceFromPopularity(popularity);
           
-          // Ensure price doesn't go below a minimum (e.g., $1)
-          if (song.currentPrice < 1.0) {
-            song.currentPrice = 1.0;
+          // Ensure price doesn't go below the minimum of $10
+          if (song.currentPrice < 10.0) {
+            song.currentPrice = 10.0;
           }
           
           hasUpdates = true;
@@ -268,8 +269,8 @@ class MarketService {
         double newPrice = song.currentPrice * (1 + (streamChange * 0.8));
         
         // Ensure price doesn't drop below minimum
-        if (newPrice < 5.0) {
-          newPrice = 5.0;
+        if (newPrice < 10.0) {
+          newPrice = 10.0;
         }
         
         // Only apply price change if it exceeds minimum threshold (0.005 instead of 0.001)
@@ -500,23 +501,24 @@ class MarketService {
     return artists;
   }
 
-  // Helper method to calculate price based on popularity with more stability
+  // Helper method to calculate price based on popularity with new range $10-$1000
   double _calculatePriceFromPopularity(int popularity) {
-    // Convert popularity (0-100) to a price between $10 and $100
-    // Formula: base price ($15) + compressed scaling factor based on popularity
-    // Popular songs (80-100): $65-$75
-    // Mid-tier songs (40-79): $35-$64
-    // Niche songs (0-39): $15-$34
+    // Convert popularity (0-100) to a price between $10 and $1000
+    // Formula: base price ($10) + exponential scaling factor based on popularity
+    // Popular songs (80-100): $500-$1000
+    // Mid-tier songs (40-79): $50-$400
+    // Niche songs (0-39): $10-$45
     
     if (popularity >= 80) {
-      // High popularity - premium pricing with compressed range
-      return 15.0 + (popularity * 0.6); // $65-$75 for popular songs
+      // High popularity - premium pricing with higher range
+      // Exponential formula for top tier: starts at ~$500 and scales up to $1000
+      return 10.0 + (math.pow(popularity - 79, 2) * 0.5); // $500-$1000 for popular songs
     } else if (popularity >= 40) {
-      // Medium popularity - standard pricing with compressed range
-      return 15.0 + (popularity * 0.5); // $35-$64 for mid-tier songs
+      // Medium popularity - standard pricing
+      return 10.0 + (popularity * popularity * 0.12); // $50-$400 for mid-tier songs
     } else {
-      // Lower popularity - value pricing with compressed range
-      return 15.0 + (popularity * 0.4); // $15-$34 for niche songs
+      // Lower popularity - value pricing
+      return 10.0 + (popularity * 0.9); // $10-$45 for niche songs
     }
   }
   

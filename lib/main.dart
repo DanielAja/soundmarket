@@ -11,6 +11,7 @@ import 'shared/services/search_state_service.dart'; // Import for search state
 import 'shared/services/portfolio_background_service.dart'; // Import for background service
 import 'core/navigation/app_router.dart'; // Import for route generation
 import 'core/navigation/route_constants.dart'; // Import for route constants
+import 'shared/widgets/app_logo.dart'; // Import AppLogo widget
 
 void main() async {
   // Ensure Flutter bindings are initialized for services like shared_preferences
