@@ -466,23 +466,23 @@ class SpotifyApiService {
     }
   }
   
-  // Calculate price based on popularity
+  // Calculate price based on popularity with more stability
   double _calculatePrice(int popularity) {
-    // Convert popularity (0-100) to a price between $10 and $100
-    // Formula: base price ($10) + scaling factor based on popularity
-    // Popular songs (80-100): $82-$100
-    // Mid-tier songs (40-79): $28-$81.1
-    // Niche songs (0-39): $10-$27.1
+    // Convert popularity (0-100) to a price between $15 and $75
+    // Formula: base price ($15) + compressed scaling factor based on popularity
+    // Popular songs (80-100): $65-$75
+    // Mid-tier songs (40-79): $35-$64
+    // Niche songs (0-39): $15-$34
     
     if (popularity >= 80) {
-      // High popularity - premium pricing
-      return 10.0 + (popularity * 1.1); // $82-$100 for popular songs
+      // High popularity - premium pricing with compressed range
+      return 15.0 + (popularity * 0.6); // $65-$75 for popular songs
     } else if (popularity >= 40) {
-      // Medium popularity - standard pricing
-      return 10.0 + (popularity * 0.9); // $28-$81.1 for mid-tier songs
+      // Medium popularity - standard pricing with compressed range
+      return 15.0 + (popularity * 0.5); // $35-$64 for mid-tier songs
     } else {
-      // Lower popularity - value pricing
-      return 10.0 + (popularity * 0.7); // $10-$27.1 for niche songs
+      // Lower popularity - value pricing with compressed range
+      return 15.0 + (popularity * 0.4); // $15-$34 for niche songs
     }
   }
   

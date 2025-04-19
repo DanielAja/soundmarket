@@ -30,12 +30,12 @@ class MusicDataApiService {
   // Store recent prices for moving average calculation
   final Map<String, Queue<double>> _recentPrices = {};
   
-  // Price calculation factors
-  final double _basePrice = 5.0;
-  final double _streamMultiplier = 0.0001;
-  final double _volatilityFactor = 0.02;
-  final int _movingAveragePeriod = 5;
-  final double _maxPriceChangePercent = 2.0;
+  // Price calculation factors with reduced volatility
+  final double _basePrice = 15.0;
+  final double _streamMultiplier = 0.00005; // Half the previous value
+  final double _volatilityFactor = 0.005; // Quarter of the previous value
+  final int _movingAveragePeriod = 10; // Doubled to smooth price changes
+  final double _maxPriceChangePercent = 0.5; // Quarter of the previous value
   
   // Initialize with real data
   Future<void> initialize(List<Song> initialSongs) async {
@@ -100,14 +100,14 @@ class MusicDataApiService {
     return max(1000, baseStreamCount);
   }
   
-  // Start real-time updates
+  // Start real-time updates with reduced frequency for stability
   void _startRealtimeUpdates() {
     // Cancel any existing timer
     _updateTimer?.cancel();
     
     // Create a new timer that fires periodically
-    // Update more frequently for a real-time feel
-    _updateTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+    // Update less frequently (20 seconds instead of 2) for better price stability
+    _updateTimer = Timer.periodic(const Duration(seconds: 20), (_) {
       _updateStreamCounts();
       _updatePrices();
     });
@@ -124,9 +124,9 @@ class MusicDataApiService {
     final random = Random();
     
     _songStreams.forEach((songId, streamCount) {
-      // Removed unused variable: final popularity = streamCount / 1000000;
-      final baseIncrease = max(10, (streamCount * 0.001).round());
-      final increase = (baseIncrease * (0.5 + random.nextDouble())).round();
+      // Reduced stream count increases for more stable prices
+      final baseIncrease = max(5, (streamCount * 0.0005).round()); // Half the previous values
+      final increase = (baseIncrease * (0.3 + random.nextDouble() * 0.5)).round(); // Reduced randomness
       
       _songStreams[songId] = streamCount + increase;
     });

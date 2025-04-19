@@ -147,11 +147,12 @@ class MarketService {
     }
   }
 
-  // Start the price simulation timer
+  // Start the price simulation timer with increased interval for stability
   void _startPriceSimulation() {
     _priceUpdateTimer?.cancel(); // Cancel existing timer
-    _priceUpdateTimer = Timer.periodic(const Duration(minutes: 3), (timer) async {
-      // Simulate price changes less frequently to avoid rate limiting
+    _priceUpdateTimer = Timer.periodic(const Duration(minutes: 10), (timer) async {
+      // Simulate price changes much less frequently (10 minutes instead of 3)
+      // This significantly reduces how often popularity-based price updates occur
       await _simulatePriceChanges();
     });
   }
@@ -220,17 +221,17 @@ class MarketService {
   // Continuous real-time price updates based on stream counts
   Timer? _continuousUpdateTimer;
   
-  // Start continuous real-time price updates
+  // Start continuous real-time price updates with reduced frequency for stability
   void startContinuousUpdates() {
     stopContinuousUpdates(); // Stop any existing timer
     
-    // Update prices every 10 seconds to simulate real-time stream count changes
-    // This reduces API load and relies more on client-side simulation
-    _continuousUpdateTimer = Timer.periodic(const Duration(seconds: 10), (timer) async {
+    // Update prices every 30 seconds (instead of 10) to improve price stability
+    // This significantly reduces the frequency of price changes
+    _continuousUpdateTimer = Timer.periodic(const Duration(seconds: 30), (timer) async {
       await _updatePricesBasedOnStreams();
     });
     
-    print('Started continuous real-time price updates based on stream counts');
+    print('Started stabilized price updates with reduced frequency for better price stability');
   }
   
   // Stop continuous updates
@@ -239,14 +240,14 @@ class MarketService {
     _continuousUpdateTimer = null;
   }
   
-  // Update prices based on simulated stream counts
+  // Update prices based on simulated stream counts with increased stability
   Future<void> _updatePricesBasedOnStreams() async {
     if (_songs.isEmpty) return; // Don't update if no songs loaded
     
     bool hasUpdates = false;
     
-    // Update a random subset of songs (30%) to avoid updating all songs at once
-    final songsToUpdate = (_songs.length * 0.3).ceil();
+    // Update a smaller subset of songs (15% instead of 30%) to reduce volatility
+    final songsToUpdate = (_songs.length * 0.15).ceil();
     final shuffledSongs = List<Song>.from(_songs)..shuffle();
     final songsSubset = shuffledSongs.take(songsToUpdate).toList();
     
@@ -255,24 +256,25 @@ class MarketService {
       
       try {
         // Simulate stream count change based on song popularity
-        // More popular songs get more streams on average
-        final basePopularity = song.currentPrice > 50 ? 2.0 : 1.0;
+        // More popular songs get more streams on average but with reduced volatility
+        final basePopularity = song.currentPrice > 50 ? 1.5 : 1.0;
         
-        // Calculate stream impact (small random change based on popularity)
-        // Range: -2% to +3% for popular songs, -1% to +2% for less popular songs
+        // Calculate stream impact (significantly smaller random change)
+        // Range: -0.75% to +1.25% for popular songs, -0.5% to +1% for less popular songs
         final random = Random();
-        final streamChange = basePopularity * (random.nextDouble() * 5 - 2) / 100;
+        final streamChange = basePopularity * (random.nextDouble() * 2 - 0.75) / 100;
         
-        // Apply change to current price
-        double newPrice = song.currentPrice * (1 + streamChange);
+        // Apply change to current price with dampening factor (0.8) to further reduce volatility
+        double newPrice = song.currentPrice * (1 + (streamChange * 0.8));
         
         // Ensure price doesn't drop below minimum
-        if (newPrice < 1.0) {
-          newPrice = 1.0;
+        if (newPrice < 5.0) {
+          newPrice = 5.0;
         }
         
-        // Apply price change if it's different
-        if ((newPrice - song.currentPrice).abs() > 0.001) {
+        // Only apply price change if it exceeds minimum threshold (0.005 instead of 0.001)
+        // This will ignore very small changes, further stabilizing prices
+        if ((newPrice - song.currentPrice).abs() > 0.005) {
           song.currentPrice = newPrice;
           hasUpdates = true;
         }
@@ -286,10 +288,10 @@ class MarketService {
       _updateCachedLists();
       _songUpdateController.add(List.from(_songs));
       
-      // Save updated songs to storage periodically (every 5 updates)
-      // This is to avoid saving too frequently during continuous updates
+      // Save updated songs to storage periodically (every 10 updates instead of 5)
+      // This reduces the frequency of storage operations
       _streamUpdateSaveCounter++;
-      if (_streamUpdateSaveCounter >= 5) {
+      if (_streamUpdateSaveCounter >= 10) {
         _streamUpdateSaveCounter = 0;
         try {
           await _storageService.saveSongs(_songs);
@@ -498,23 +500,23 @@ class MarketService {
     return artists;
   }
 
-  // Helper method to calculate price based on popularity (similar to SpotifyApiService._calculatePrice)
+  // Helper method to calculate price based on popularity with more stability
   double _calculatePriceFromPopularity(int popularity) {
     // Convert popularity (0-100) to a price between $10 and $100
-    // Formula: base price ($10) + scaling factor based on popularity
-    // Popular songs (80-100): $82-$100
-    // Mid-tier songs (40-79): $28-$81.1
-    // Niche songs (0-39): $10-$27.1
+    // Formula: base price ($15) + compressed scaling factor based on popularity
+    // Popular songs (80-100): $65-$75
+    // Mid-tier songs (40-79): $35-$64
+    // Niche songs (0-39): $15-$34
     
     if (popularity >= 80) {
-      // High popularity - premium pricing
-      return 10.0 + (popularity * 1.1); // $82-$100 for popular songs
+      // High popularity - premium pricing with compressed range
+      return 15.0 + (popularity * 0.6); // $65-$75 for popular songs
     } else if (popularity >= 40) {
-      // Medium popularity - standard pricing
-      return 10.0 + (popularity * 0.9); // $28-$81.1 for mid-tier songs
+      // Medium popularity - standard pricing with compressed range
+      return 15.0 + (popularity * 0.5); // $35-$64 for mid-tier songs
     } else {
-      // Lower popularity - value pricing
-      return 10.0 + (popularity * 0.7); // $10-$27.1 for niche songs
+      // Lower popularity - value pricing with compressed range
+      return 15.0 + (popularity * 0.4); // $15-$34 for niche songs
     }
   }
   
