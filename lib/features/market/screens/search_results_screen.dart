@@ -169,8 +169,19 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
       },
       child: Scaffold(
         appBar: AppBar(
-          title: Text('Search Results: $_searchQuery'),
-          elevation: 0,
+          title: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Image.asset(
+                'assets/icon/app_icon.png',
+                width: 28,
+                height: 28,
+              ),
+              const SizedBox(width: 8),
+              const Text('Sound Market'),
+            ],
+          ),
+          centerTitle: true,
           // Add a custom back button to handle returning with search data
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),

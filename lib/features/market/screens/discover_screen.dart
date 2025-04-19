@@ -319,7 +319,9 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        centerTitle: true,
         title: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
             Image.asset(
               'assets/icon/app_icon.png',
@@ -330,14 +332,6 @@ class _DiscoverScreenState extends State<DiscoverScreen>
             const Text('Sound Market'),
           ],
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.filter_list),
-            onPressed: () {
-              _showGenreFilterDialog(context);
-            },
-          ),
-        ],
       ),
       body: Consumer<UserDataProvider>(
         builder: (context, userDataProvider, child) {

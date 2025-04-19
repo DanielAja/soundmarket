@@ -1043,7 +1043,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        centerTitle: true,
         title: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
             Image.asset(
               'assets/icon/app_icon.png',
@@ -1054,42 +1056,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             const Text('Sound Market'),
           ],
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () {
-              // Trigger a manual refresh of the song service and chart
-              final userDataProvider = Provider.of<UserDataProvider>(
-                context,
-                listen: false,
-              );
-              // Use then() to ensure chart update happens after data refresh completes
-              userDataProvider
-                  .refreshData()
-                  .then((_) {
-                    if (mounted) {
-                      _updateChartData(
-                        _selectedTimeFilter,
-                      ); // Refresh chart after data refresh
-                    }
-                  })
-                  .catchError((error) {
-                    // Handle potential errors during refresh
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Error refreshing data: $error'),
-                        ),
-                      );
-                    }
-                  });
-
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Refreshing market data...')),
-              );
-            },
-          ),
-        ],
       ),
       body: Consumer<UserDataProvider>(
         builder: (context, userDataProvider, child) {

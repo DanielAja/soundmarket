@@ -14,7 +14,9 @@ class ProfileScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        centerTitle: true,
         title: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
             Image.asset(
               'assets/icon/app_icon.png',
@@ -25,24 +27,6 @@ class ProfileScreen extends StatelessWidget {
             const Text('Sound Market'),
           ],
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () {
-              // Refresh data to get latest prices
-              context.read<UserDataProvider>().refreshData();
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: () {
-              // TODO: Navigate to settings screen
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Settings coming soon!')),
-              );
-            },
-          ),
-        ],
       ),
       body: Consumer<UserDataProvider>(
         builder: (context, userDataProvider, child) {

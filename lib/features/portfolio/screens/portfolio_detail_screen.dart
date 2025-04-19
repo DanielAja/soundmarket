@@ -57,6 +57,7 @@ class _PortfolioDetailScreenState extends State<PortfolioDetailScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        centerTitle: true,
         title: const Text('My Portfolio'),
         actions: [
           IconButton(
