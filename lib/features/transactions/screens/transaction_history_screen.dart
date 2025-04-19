@@ -262,7 +262,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> wit
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
                   decoration: BoxDecoration(
-                    color: isBuy ? Colors.green.withAlpha((255 * 0.2).round()) : Colors.red.withAlpha((255 * 0.2).round()), // Replaced withOpacity
+                    color: isBuy ? Colors.green.withAlpha((255 * 0.2).round()) : Colors.red.withAlpha((255 * 0.2).round()),
                     borderRadius: BorderRadius.circular(4.0),
                   ),
                   child: Text(
@@ -297,25 +297,385 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> wit
             ),
             const SizedBox(height: 8.0),
             Row(
-              mainAxisAlignment: MainAxisAlignment.end,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Total: ',
-                  style: TextStyle(
-                    color: Colors.grey[400],
-                  ),
+                Row(
+                  children: [
+                    Text(
+                      'Total: ',
+                      style: TextStyle(
+                        color: Colors.grey[400],
+                      ),
+                    ),
+                    Text(
+                      '\$${transaction.totalValue.toStringAsFixed(2)}',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: isBuy ? Colors.red : Colors.green,
+                      ),
+                    ),
+                  ],
                 ),
-                Text(
-                  '\$${transaction.totalValue.toStringAsFixed(2)}',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: isBuy ? Colors.red : Colors.green,
-                  ),
-                ),
+                _buildActionButtons(transaction),
               ],
             ),
           ],
         ),
+      ),
+    );
+  }
+  
+  Widget _buildActionButtons(Transaction transaction) {
+    return Consumer<UserDataProvider>(
+      builder: (context, userDataProvider, child) {
+        try {
+          final song = userDataProvider.allSongs
+              .firstWhere((s) => s.id == transaction.songId);
+          
+          final isBuy = transaction.type == TransactionType.buy;
+          final currentPrice = song.currentPrice;
+          final priceChange = (currentPrice - transaction.price) / transaction.price * 100;
+          
+          return Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Show the current price change from transaction price
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 2.0),
+                decoration: BoxDecoration(
+                  color: priceChange >= 0 
+                      ? Colors.green.withAlpha((255 * 0.1).round()) 
+                      : Colors.red.withAlpha((255 * 0.1).round()),
+                  borderRadius: BorderRadius.circular(4.0),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      priceChange >= 0 ? Icons.arrow_upward : Icons.arrow_downward,
+                      size: 12.0,
+                      color: priceChange >= 0 ? Colors.green : Colors.red,
+                    ),
+                    const SizedBox(width: 2.0),
+                    Text(
+                      '${priceChange.abs().toStringAsFixed(1)}%',
+                      style: TextStyle(
+                        fontSize: 12.0,
+                        color: priceChange >= 0 ? Colors.green : Colors.red,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8.0),
+              // If price has changed, show appropriate action button
+              if (isBuy && priceChange > 0)
+                InkWell(
+                  onTap: () => _showSellDialog(context, transaction, userDataProvider, currentPrice),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withAlpha((255 * 0.2).round()),
+                      borderRadius: BorderRadius.circular(4.0),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.sell, size: 14.0, color: Colors.green),
+                        SizedBox(width: 2.0),
+                        Text(
+                          'SELL',
+                          style: TextStyle(
+                            fontSize: 12.0,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.green,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              else if (isBuy && priceChange < 0)
+                InkWell(
+                  onTap: () => _showBuyDialog(context, transaction, userDataProvider, currentPrice),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withAlpha((255 * 0.2).round()),
+                      borderRadius: BorderRadius.circular(4.0),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.add_shopping_cart, size: 14.0, color: Colors.green),
+                        SizedBox(width: 2.0),
+                        Text(
+                          'BUY',
+                          style: TextStyle(
+                            fontSize: 12.0,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.green,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              else if (!isBuy && priceChange < 0)
+                InkWell(
+                  onTap: () => _showBuyDialog(context, transaction, userDataProvider, currentPrice),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withAlpha((255 * 0.2).round()),
+                      borderRadius: BorderRadius.circular(4.0),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.add_shopping_cart, size: 14.0, color: Colors.green),
+                        SizedBox(width: 2.0),
+                        Text(
+                          'BUY',
+                          style: TextStyle(
+                            fontSize: 12.0,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.green,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          );
+        } catch (e) {
+          // If song is not found, or there's any other error, return an empty widget
+          return const SizedBox.shrink();
+        }
+      },
+    );
+  }
+  
+  Future<void> _showSellDialog(
+    BuildContext context, 
+    Transaction transaction, 
+    UserDataProvider userDataProvider,
+    double currentPrice
+  ) async {
+    final TextEditingController quantityController = TextEditingController(text: '1');
+    final maxQuantity = userDataProvider.getQuantityOwned(transaction.songId);
+    
+    if (maxQuantity <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You don\'t own any shares of this song to sell')),
+      );
+      return;
+    }
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Sell ${transaction.songName}'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Current Price: \$${currentPrice.toStringAsFixed(2)}',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8.0),
+            Text('Quantity Owned: $maxQuantity'),
+            const SizedBox(height: 16.0),
+            TextField(
+              controller: quantityController,
+              decoration: const InputDecoration(
+                labelText: 'Quantity to Sell',
+                border: OutlineInputBorder(),
+              ),
+              keyboardType: TextInputType.number,
+            ),
+            const SizedBox(height: 8.0),
+            Text(
+              'Max you can sell: $maxQuantity',
+              style: TextStyle(
+                fontSize: 12.0,
+                color: Colors.grey[600],
+              ),
+            ),
+            const SizedBox(height: 16.0),
+            StatefulBuilder(
+              builder: (context, setState) {
+                final quantity = int.tryParse(quantityController.text) ?? 0;
+                final totalProceeds = quantity * currentPrice;
+                
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Total Proceeds: \$${totalProceeds.toStringAsFixed(2)}',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              final quantity = int.tryParse(quantityController.text) ?? 0;
+              
+              if (quantity <= 0) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Please enter a valid quantity')),
+                );
+                return;
+              }
+              
+              if (quantity > maxQuantity) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('You don\'t own that many shares')),
+                );
+                return;
+              }
+              
+              Navigator.pop(context);
+              
+              final success = await userDataProvider.sellSong(transaction.songId, quantity);
+              if (success) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Successfully sold $quantity shares of ${transaction.songName}')),
+                );
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Failed to complete sale')),
+                );
+              }
+            },
+            child: const Text('Sell'),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  Future<void> _showBuyDialog(
+    BuildContext context, 
+    Transaction transaction, 
+    UserDataProvider userDataProvider,
+    double currentPrice
+  ) async {
+    final TextEditingController quantityController = TextEditingController(text: '1');
+    final maxQuantity = (userDataProvider.userProfile!.cashBalance / currentPrice).floor();
+    
+    if (maxQuantity <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You don\'t have enough cash to buy this song')),
+      );
+      return;
+    }
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Buy ${transaction.songName}'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Current Price: \$${currentPrice.toStringAsFixed(2)}',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8.0),
+            Text(
+              'Available Cash: \$${userDataProvider.userProfile!.cashBalance.toStringAsFixed(2)}',
+            ),
+            const SizedBox(height: 16.0),
+            TextField(
+              controller: quantityController,
+              decoration: const InputDecoration(
+                labelText: 'Quantity to Buy',
+                border: OutlineInputBorder(),
+              ),
+              keyboardType: TextInputType.number,
+            ),
+            const SizedBox(height: 8.0),
+            Text(
+              'Max you can buy: $maxQuantity',
+              style: TextStyle(
+                fontSize: 12.0,
+                color: Colors.grey[600],
+              ),
+            ),
+            const SizedBox(height: 16.0),
+            StatefulBuilder(
+              builder: (context, setState) {
+                final quantity = int.tryParse(quantityController.text) ?? 0;
+                final totalCost = quantity * currentPrice;
+                
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Total Cost: \$${totalCost.toStringAsFixed(2)}',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    Text(
+                      'Remaining Cash: \$${(userDataProvider.userProfile!.cashBalance - totalCost).toStringAsFixed(2)}',
+                    ),
+                  ],
+                );
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              final quantity = int.tryParse(quantityController.text) ?? 0;
+              
+              if (quantity <= 0) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Please enter a valid quantity')),
+                );
+                return;
+              }
+              
+              if (quantity > maxQuantity) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Not enough cash for this purchase')),
+                );
+                return;
+              }
+              
+              Navigator.pop(context);
+              
+              final success = await userDataProvider.buySong(transaction.songId, quantity);
+              if (success) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Successfully bought $quantity shares of ${transaction.songName}')),
+                );
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Failed to complete purchase')),
+                );
+              }
+            },
+            child: const Text('Buy'),
+          ),
+        ],
       ),
     );
   }

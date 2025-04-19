@@ -5,12 +5,16 @@ import '../../features/market/screens/discover_screen.dart';
 import '../../features/profile/screens/profile_screen.dart';
 import '../../features/transactions/screens/transaction_history_screen.dart';
 import '../../features/portfolio/screens/portfolio_detail_screen.dart'; // Corrected path
+import '../../main.dart'; // Import for MainNavigationWrapper
 
 /// Route definitions and navigation logic
 class AppRouter {
   // Route generator
   static Route<dynamic> generateRoute(RouteSettings settings) {
     switch (settings.name) {
+      case '/':
+        return MaterialPageRoute(builder: (_) => const MainNavigationWrapper());
+        
       case RouteConstants.home:
         return MaterialPageRoute(builder: (_) => HomeScreen()); // Removed const
       

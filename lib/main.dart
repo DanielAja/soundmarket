@@ -7,6 +7,8 @@ import 'features/market/screens/discover_screen.dart'; // Corrected path
 import 'features/profile/screens/profile_screen.dart'; // Corrected path
 // transaction_history_screen was moved but not used directly here, so removing import
 import 'shared/services/music_data_api_service.dart'; // Corrected path
+import 'core/navigation/app_router.dart'; // Import for route generation
+import 'core/navigation/route_constants.dart'; // Import for route constants
 
 void main() {
   // Ensure Flutter bindings are initialized for services like shared_preferences
@@ -27,6 +29,10 @@ class SoundMarketApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Sound Market',
+      // Configure routes using our AppRouter
+      onGenerateRoute: AppRouter.generateRoute,
+      initialRoute: '/',
+      // Home is defined in the routes in AppRouter now
       theme: ThemeData(
         // Cash App inspired theme
         brightness: Brightness.dark,
@@ -100,7 +106,7 @@ class SoundMarketApp extends StatelessWidget {
         ),
         useMaterial3: true,
       ),
-      home: const MainNavigationWrapper(),
+      // home removed - using initialRoute and onGenerateRoute instead
     );
   }
 }
