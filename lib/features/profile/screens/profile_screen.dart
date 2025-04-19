@@ -694,16 +694,6 @@ class ProfileScreen extends StatelessWidget {
         ),
         const Divider(),
         ListTile(
-          leading: const Icon(Icons.pie_chart),
-          title: const Text('View Portfolio'),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () {
-            // Navigate to portfolio details screen
-            Navigator.pushNamed(context, RouteConstants.portfolioDetails);
-          },
-        ),
-        const Divider(),
-        ListTile(
           leading: const Icon(Icons.history),
           title: const Text('Transaction History'),
           trailing: const Icon(Icons.chevron_right),
@@ -718,10 +708,30 @@ class ProfileScreen extends StatelessWidget {
           title: const Text('Reset Demo Data'),
           trailing: const Icon(Icons.chevron_right),
           onTap: () {
-            // Reset user data for demo purposes
-            userDataProvider.resetData();
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Demo data has been reset')),
+            // Show confirmation dialog before resetting
+            showDialog(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: const Text('Reset Demo Data'),
+                content: const Text('Are you sure you want to reset all demo data? This action cannot be undone.'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Cancel'),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      // Reset user data for demo purposes
+                      userDataProvider.resetData();
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Demo data has been reset')),
+                      );
+                    },
+                    child: const Text('Reset'),
+                  ),
+                ],
+              ),
             );
           },
         ),
