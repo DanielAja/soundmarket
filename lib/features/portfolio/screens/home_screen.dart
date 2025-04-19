@@ -258,9 +258,70 @@ class _PortfolioItemDetailsSheetContentState extends State<_PortfolioItemDetails
                           Column( crossAxisAlignment: CrossAxisAlignment.start, children: [
                               Text('Current Price', style: TextStyle(color: Colors.grey[400], fontSize: 14)),
                               const SizedBox(height: AppSpacing.xs),
-                              Text('\$${widget.song.currentPrice.toStringAsFixed(2)}', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-                              const SizedBox(height: AppSpacing.xs),
-                              Row(children: [ Icon(widget.song.isPriceUp ? Icons.arrow_upward : Icons.arrow_downward, color: widget.song.isPriceUp ? Colors.green : Colors.red, size: 14), const SizedBox(width: AppSpacing.xs), Text('${widget.song.isPriceUp ? "+" : ""}${widget.song.priceChangePercent.toStringAsFixed(2)}%', style: TextStyle(color: widget.song.isPriceUp ? Colors.green : Colors.red, fontSize: 14))])
+                              StreamBuilder<List<Song>>(
+                                stream: Provider.of<UserDataProvider>(context, listen: false).songUpdatesStream,
+                                initialData: const [],
+                                builder: (context, snapshot) {
+                                  // Find the current song in the updates if available
+                                  Song? updatedSong;
+                                  if (snapshot.hasData) {
+                                    updatedSong = snapshot.data!.firstWhere(
+                                      (s) => s.id == widget.song.id,
+                                      orElse: () => widget.song,
+                                    );
+                                  }
+                                  
+                                  // Use updated song data if available, otherwise use widget.song
+                                  final displaySong = updatedSong ?? widget.song;
+                                  
+                                  return Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        '\$${displaySong.currentPrice.toStringAsFixed(2)}',
+                                        style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                                      ),
+                                      const SizedBox(height: AppSpacing.xs),
+                                      Row(
+                                        children: [
+                                          Icon(
+                                            displaySong.isPriceUp ? Icons.arrow_upward : Icons.arrow_downward,
+                                            color: displaySong.isPriceUp ? Colors.green : Colors.red,
+                                            size: 14,
+                                          ),
+                                          const SizedBox(width: AppSpacing.xs),
+                                          Text(
+                                            '${displaySong.isPriceUp ? "+" : ""}${displaySong.priceChangePercent.toStringAsFixed(2)}%',
+                                            style: TextStyle(
+                                              color: displaySong.isPriceUp ? Colors.green : Colors.red,
+                                              fontSize: 14,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      // Stream count indicator (new)
+                                      const SizedBox(height: AppSpacing.xs),
+                                      Row(
+                                        children: [
+                                          Icon(
+                                            Icons.trending_up,
+                                            color: Colors.blue,
+                                            size: 14,
+                                          ),
+                                          const SizedBox(width: AppSpacing.xs),
+                                          Text(
+                                            'Live stream updates',
+                                            style: TextStyle(
+                                              color: Colors.blue,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  );
+                                },
+                              ),
                           ]),
                           Column( crossAxisAlignment: CrossAxisAlignment.end, children: [
                               Text('Your Position', style: TextStyle(color: Colors.grey[400], fontSize: 14)),
@@ -380,15 +441,25 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 } // Moved closing brace
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   String _selectedTimeFilter = '1W'; // Default to 1 week
   List<PortfolioSnapshot> _chartData = []; // Store fetched snapshots
   bool _isChartLoading = true;
   Timer? _liveUpdateTimer; // Timer for 1D updates
 
+  // Animation controllers for live price pulse effect
+  late AnimationController _pulseAnimationController;
+  
   @override
   void initState() {
     super.initState();
+    
+    // Initialize animation controller for pulse effect
+    _pulseAnimationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..repeat(reverse: true);
+    
     // Fetch initial chart data after the first frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -400,6 +471,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _liveUpdateTimer?.cancel(); // Cancel timer on dispose
+    _pulseAnimationController.dispose(); // Dispose animation controller
     super.dispose();
   }
 
@@ -679,7 +751,50 @@ class _HomeScreenState extends State<HomeScreen> {
                               color: Colors.grey[400],
                             ),
                           ),
-                          // Removed Stream Count Display
+                          const SizedBox(width: AppSpacing.xs),
+                      // Stream count icon/indicator for real-time updates with pulse animation
+                      Tooltip(
+                        message: 'Real-time stream count updates',
+                        child: AnimatedBuilder(
+                          animation: _pulseAnimationController,
+                          builder: (context, child) {
+                            // Create a pulsing effect with the animation controller
+                            return Container(
+                              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.blue.withOpacity(0.2 + (0.2 * _pulseAnimationController.value)),
+                                borderRadius: BorderRadius.circular(10),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.blue.withOpacity(0.2 * _pulseAnimationController.value),
+                                    blurRadius: 4.0 * _pulseAnimationController.value,
+                                    spreadRadius: 1.0 * _pulseAnimationController.value,
+                                  ),
+                                ],
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.trending_up, 
+                                    color: Colors.blue.withOpacity(0.7 + (0.3 * _pulseAnimationController.value)), 
+                                    size: 12
+                                  ),
+                                  const SizedBox(width: 2),
+                                  Text(
+                                    'LIVE', 
+                                    style: TextStyle(
+                                      color: Colors.blue.withOpacity(0.7 + (0.3 * _pulseAnimationController.value)),
+                                      fontSize: 10, 
+                                      fontWeight: FontWeight.bold
+                                    )
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                      )
                         ],
                       ),
                       // Corrected: Removed the duplicate AnimatedSwitcher

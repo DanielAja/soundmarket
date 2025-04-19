@@ -184,7 +184,51 @@ class _RealTimePortfolioWidgetState extends State<RealTimePortfolioWidget> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                // Removed Stream Count Row
+                // Stream Count Indicator
+                Row(
+                  children: [
+                    Icon(
+                      Icons.graphic_eq,
+                      size: 12,
+                      color: Colors.blue,
+                    ),
+                    const SizedBox(width: 4),
+                    // Animated pulsing dot for live data
+                    StreamBuilder<List<Song>>(
+                      stream: Provider.of<UserDataProvider>(context, listen: false).songUpdatesStream,
+                      builder: (context, snapshot) {
+                        return Row(
+                          children: [
+                            AnimatedContainer(
+                              duration: const Duration(milliseconds: 500),
+                              width: 4,
+                              height: 4,
+                              decoration: BoxDecoration(
+                                color: Colors.blue,
+                                borderRadius: BorderRadius.circular(2),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.blue.withOpacity(0.5),
+                                    blurRadius: 4,
+                                    spreadRadius: 1,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 2),
+                            Text(
+                              'Live stream data',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: Colors.blue,
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ],
+                ),
                 ],
               ),
             ),
@@ -206,15 +250,49 @@ class _RealTimePortfolioWidgetState extends State<RealTimePortfolioWidget> {
                           size: 14,
                         ),
                       const SizedBox(width: 4),
-                      Text(
-                        '\$${song.currentPrice.toStringAsFixed(2)}',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          // Use the PriceChange enum from the imported PortfolioService
-                          color: priceChange == PriceChange.none
-                              ? Theme.of(context).textTheme.bodyLarge?.color // Use theme color for 'none'
-                              : indicatorColor,
-                        ),
+                      StreamBuilder<List<Song>>(
+                        stream: Provider.of<UserDataProvider>(context, listen: false).songUpdatesStream,
+                        initialData: const [],
+                        builder: (context, snapshot) {
+                          // Find the current song in the updates if available
+                          Song? updatedSong;
+                          if (snapshot.hasData) {
+                            updatedSong = snapshot.data!.firstWhere(
+                              (s) => s.id == song.id,
+                              orElse: () => song,
+                            );
+                          }
+                          
+                          // Use updated song data if available, otherwise use original song
+                          final displaySong = updatedSong ?? song;
+                          
+                          return AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 500),
+                            transitionBuilder: (Widget child, Animation<double> animation) {
+                              return FadeTransition(
+                                opacity: animation,
+                                child: SlideTransition(
+                                  position: Tween<Offset>(
+                                    begin: const Offset(0.0, -0.5),
+                                    end: Offset.zero,
+                                  ).animate(animation),
+                                  child: child,
+                                ),
+                              );
+                            },
+                            child: Text(
+                              '\$${displaySong.currentPrice.toStringAsFixed(2)}',
+                              key: ValueKey<String>(displaySong.currentPrice.toStringAsFixed(2)),
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                // Use the PriceChange enum from the imported PortfolioService
+                                color: priceChange == PriceChange.none
+                                    ? Theme.of(context).textTheme.bodyLarge?.color // Use theme color for 'none'
+                                    : indicatorColor,
+                              ),
+                            ),
+                          );
+                        },
                       ),
                     ],
                   ),

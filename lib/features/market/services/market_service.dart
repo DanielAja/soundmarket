@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:math';
 import '../../../shared/models/song.dart';
+import '../../../shared/models/portfolio_item.dart'; // Import PortfolioItem
 import '../../../shared/services/spotify_api_service.dart'; // Import SpotifyApiService
 
 class MarketService {
@@ -29,6 +31,8 @@ class MarketService {
 
   MarketService._internal() {
     _initializeSpotifyApi();
+    // Start continuous real-time price updates immediately
+    startContinuousUpdates();
   }
 
   // Initialize the Spotify API service and fetch initial data
@@ -37,15 +41,19 @@ class MarketService {
 
     try {
       print('Initializing MarketService with Spotify data...');
-      // Fetch initial songs from Spotify
-      final apiSongs = await _spotifyApi.getTopTracks(limit: 50); // Fetch 50 top tracks
+      // Fetch top popular tracks based on current trends
+      final apiSongs = await _spotifyApi.getTopTracks(limit: 100); // Fetch 100 top tracks
 
       if (apiSongs.isNotEmpty) {
         _songs.clear();
         _songs.addAll(apiSongs);
+
+        // Fetch additional songs in various genres for better diversity
+        await _enrichWithMoreGenres();
+        
         _updateCachedLists();
         _isInitialized = true; // Mark as initialized
-        print('MarketService initialized successfully with ${apiSongs.length} songs.');
+        print('MarketService initialized successfully with ${_songs.length} songs.');
         // Start the price simulation timer only after successful initialization
         _startPriceSimulation();
         // Notify listeners with initial data
@@ -59,6 +67,41 @@ class MarketService {
       // Handle initialization error (e.g., retry later, show error message)
     }
   }
+  
+  // Enriches the song collection with more diverse genres and related songs
+  Future<void> _enrichWithMoreGenres() async {
+    try {
+      // Add trending songs from specific genres for diversity
+      final genresToFetch = ['rock', 'electronic', 'hip-hop', 'indie', 'r&b'];
+      
+      for (final genre in genresToFetch) {
+        final genreSongs = await _spotifyApi.searchTracks('genre:$genre', limit: 20);
+        if (genreSongs.isNotEmpty) {
+          print('Adding ${genreSongs.length} songs from $genre genre');
+          _songs.addAll(genreSongs);
+        }
+      }
+      
+      // Add newest releases
+      final newReleases = await _spotifyApi.getNewReleases(limit: 40);
+      if (newReleases.isNotEmpty) {
+        print('Adding ${newReleases.length} new releases');
+        _songs.addAll(newReleases);
+      }
+
+      // Remove duplicates (in case the same song appears in multiple search results)
+      final uniqueSongs = <String, Song>{};
+      for (final song in _songs) {
+        uniqueSongs[song.id] = song;
+      }
+      _songs.clear();
+      _songs.addAll(uniqueSongs.values);
+      
+      print('Total songs after enrichment: ${_songs.length}');
+    } catch (e) {
+      print('Error enriching song catalog with additional genres: $e');
+    }
+  }
 
   // Start the price simulation timer
   void _startPriceSimulation() {
@@ -68,7 +111,7 @@ class MarketService {
     });
   }
 
-  // Update song prices based on Spotify popularity
+  // Update song prices based on Spotify popularity and stream counts
   Future<void> _simulatePriceChanges() async {
     if (_songs.isEmpty) return; // Don't simulate if no songs loaded
 
@@ -110,6 +153,83 @@ class MarketService {
       _songUpdateController.add(List.from(_songs));
     }
   }
+  
+  // Continuous real-time price updates based on stream counts
+  Timer? _continuousUpdateTimer;
+  
+  // Start continuous real-time price updates
+  void startContinuousUpdates() {
+    stopContinuousUpdates(); // Stop any existing timer
+    
+    // Update prices every 3 seconds to simulate real-time stream count changes
+    _continuousUpdateTimer = Timer.periodic(const Duration(seconds: 3), (timer) async {
+      await _updatePricesBasedOnStreams();
+    });
+    
+    print('Started continuous real-time price updates based on stream counts');
+  }
+  
+  // Stop continuous updates
+  void stopContinuousUpdates() {
+    _continuousUpdateTimer?.cancel();
+    _continuousUpdateTimer = null;
+  }
+  
+  // Update prices based on simulated stream counts
+  Future<void> _updatePricesBasedOnStreams() async {
+    if (_songs.isEmpty) return; // Don't update if no songs loaded
+    
+    bool hasUpdates = false;
+    
+    // Update a random subset of songs (30%) to avoid updating all songs at once
+    final songsToUpdate = (_songs.length * 0.3).ceil();
+    final shuffledSongs = List<Song>.from(_songs)..shuffle();
+    final songsSubset = shuffledSongs.take(songsToUpdate).toList();
+    
+    for (final song in songsSubset) {
+      song.previousPrice = song.currentPrice; // Store previous price
+      
+      try {
+        // Simulate stream count change based on song popularity
+        // More popular songs get more streams on average
+        final basePopularity = song.currentPrice > 50 ? 2.0 : 1.0;
+        
+        // Calculate stream impact (small random change based on popularity)
+        // Range: -2% to +3% for popular songs, -1% to +2% for less popular songs
+        final random = Random();
+        final streamChange = basePopularity * (random.nextDouble() * 5 - 2) / 100;
+        
+        // Apply change to current price
+        double newPrice = song.currentPrice * (1 + streamChange);
+        
+        // Ensure price doesn't drop below minimum
+        if (newPrice < 1.0) {
+          newPrice = 1.0;
+        }
+        
+        // Apply price change if it's different
+        if ((newPrice - song.currentPrice).abs() > 0.001) {
+          song.currentPrice = newPrice;
+          hasUpdates = true;
+        }
+      } catch (e) {
+        print('Error updating stream-based price for song ${song.name}: $e');
+        // On error, maintain the current price
+      }
+    }
+    
+    if (hasUpdates) {
+      _updateCachedLists();
+      _songUpdateController.add(List.from(_songs));
+    }
+  }
+  
+  // Dispose resources
+  void dispose() {
+    stopContinuousUpdates(); // Ensure timer is stopped
+    _priceUpdateTimer?.cancel(); // Cancel the timer
+    _songUpdateController.close();
+  }
 
 
   // Update cached lists
@@ -139,6 +259,78 @@ class MarketService {
     // Re-initialize to fetch fresh data
     _isInitialized = false; // Allow re-initialization
     await _initializeSpotifyApi();
+  }
+  
+  // Load songs similar to a user's portfolio
+  Future<void> loadRelatedSongsForPortfolio(List<PortfolioItem> portfolio) async {
+    if (portfolio.isEmpty) return; // No portfolio items to find related songs for
+    
+    try {
+      print('Loading songs related to user portfolio...');
+      final artistsInPortfolio = portfolio.map((item) => item.artistName).toSet().toList();
+      final songsInPortfolio = portfolio.map((item) => item.songId).toSet().toList();
+      
+      // Limit to top 5 artists to avoid too many API calls
+      final topArtists = artistsInPortfolio.take(5).toList();
+      
+      // Create a map to avoid duplicates
+      final Map<String, Song> newSongs = {};
+      
+      // For each artist in portfolio, find their popular songs
+      for (final artist in topArtists) {
+        final artistSongs = await _spotifyApi.searchTracks('artist:"$artist"', limit: 10);
+        for (final song in artistSongs) {
+          // Skip songs already in portfolio
+          if (!songsInPortfolio.contains(song.id)) {
+            newSongs[song.id] = song;
+          }
+        }
+      }
+      
+      // Add similar genres based on portfolio
+      final genresInPortfolio = portfolio
+          .map((item) {
+            final song = _songs.firstWhere(
+              (s) => s.id == item.songId,
+              orElse: () => Song(
+                id: item.songId,
+                name: item.songName,
+                artist: item.artistName,
+                genre: 'Unknown',
+                currentPrice: item.purchasePrice,
+              ),
+            );
+            return song.genre;
+          })
+          .where((genre) => genre != 'Unknown')
+          .toSet()
+          .toList();
+      
+      // For each genre in portfolio, find popular songs
+      for (final genre in genresInPortfolio) {
+        final genreSongs = await _spotifyApi.searchTracks('genre:"$genre"', limit: 10);
+        for (final song in genreSongs) {
+          if (!songsInPortfolio.contains(song.id)) {
+            newSongs[song.id] = song;
+          }
+        }
+      }
+      
+      // Add the new songs to our collection if they're not already there
+      if (newSongs.isNotEmpty) {
+        print('Adding ${newSongs.length} songs related to user portfolio');
+        final uniqueIds = _songs.map((s) => s.id).toSet();
+        final newSongsToAdd = newSongs.values.where((s) => !uniqueIds.contains(s.id)).toList();
+        
+        if (newSongsToAdd.isNotEmpty) {
+          _songs.addAll(newSongsToAdd);
+          _updateCachedLists();
+          _songUpdateController.add(List.from(_songs));
+        }
+      }
+    } catch (e) {
+      print('Error loading portfolio-related songs: $e');
+    }
   }
 
   // --- Stream Count methods removed as Spotify API doesn't provide this directly ---
@@ -291,10 +483,6 @@ class MarketService {
     return _cachedRisingArtists!.take(limit).toList();
   }
 
-  // Dispose resources
-  void dispose() {
-    _priceUpdateTimer?.cancel(); // Cancel the timer
-    _songUpdateController.close();
-    // _spotifyApi.dispose(); // SpotifyApiService doesn't have a dispose method in the provided code
-  }
+  // This previous dispose method is now replaced by the enhanced version above
+  // that also handles continuous updates timer
 }

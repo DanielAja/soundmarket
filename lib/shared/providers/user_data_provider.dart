@@ -182,6 +182,14 @@ class UserDataProvider with ChangeNotifier {
 
       // Initialize portfolio service with loaded data
       _portfolioService.initialize(_portfolio, _marketService.getAllSongs()); // Renamed variable
+      
+      // Load songs related to user's existing portfolio
+      if (_portfolio.isNotEmpty) {
+        // Use a delayed call to avoid slowing down the initial loading
+        Future.delayed(const Duration(milliseconds: 100), () {
+          _marketService.loadRelatedSongsForPortfolio(_portfolio);
+        });
+      }
 
       notifyListeners();
     } catch (e) {
@@ -309,6 +317,21 @@ class UserDataProvider with ChangeNotifier {
 
     // Update portfolio service with new data
     _portfolioService.updatePortfolioData(_portfolio, _marketService.getAllSongs());
+    
+    // When a user buys a new song, load related songs to that artist/genre in the background
+    // This creates a more personalized experience as the catalog adapts to user preferences
+    Future.delayed(const Duration(milliseconds: 500), () {
+      // We're only interested in loading related songs for the artist of the just-purchased song
+      final relevantPortfolio = [PortfolioItem(
+        songId: song.id,
+        songName: song.name,
+        artistName: song.artist,
+        quantity: quantity,
+        purchasePrice: song.currentPrice,
+        albumArtUrl: song.albumArtUrl,
+      )];
+      _marketService.loadRelatedSongsForPortfolio(relevantPortfolio);
+    });
 
     // Save data (which now includes history)
     await _saveData();
@@ -491,6 +514,11 @@ class UserDataProvider with ChangeNotifier {
 
       // Trigger a manual update of song prices
       _marketService.triggerPriceUpdate(); // Renamed variable
+      
+      // Load songs related to the user's portfolio
+      if (_portfolio.isNotEmpty) {
+        await _marketService.loadRelatedSongsForPortfolio(_portfolio);
+      }
 
       // Force portfolio update
       _portfolioService.forceUpdate(); // Renamed variable
@@ -511,6 +539,9 @@ class UserDataProvider with ChangeNotifier {
   PriceChange getPriceChangeIndicator(String songId) {
     return _priceChangeIndicators[songId] ?? PriceChange.none;
   }
+  
+  // Expose the song updates stream for real-time price updates
+  Stream<List<Song>> get songUpdatesStream => _marketService.songUpdates;
 }
 
 // Removed duplicate PriceChange enum definition from here

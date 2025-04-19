@@ -554,29 +554,38 @@ class _DiscoverScreenState extends State<DiscoverScreen> with TickerProviderStat
                                 return Row(
                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
-                                    Text(
-                                      '\$${_priceAnimations[song.id]!.value.toStringAsFixed(2)}',
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16.0,
+                                    Flexible(
+                                      child: Text(
+                                        '\$${_priceAnimations[song.id]!.value.toStringAsFixed(2)}',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 16.0,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
                                     if (showPriceChange && song.previousPrice > 0)
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: AppSpacing.xs, // Use AppSpacing.xs
-                                          vertical: AppSpacing.xxs, // Use AppSpacing.xxs
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: priceChangeColor.withAlpha((255 * 0.2).round()), // Replaced withOpacity
-                                          borderRadius: BorderRadius.circular(AppSpacing.xs), // Use AppSpacing.xs
-                                        ),
-                                        child: Text(
-                                          '${priceChangePercent >= 0 ? '+' : ''}${priceChangePercent.toStringAsFixed(1)}%',
-                                          style: TextStyle(
-                                            color: priceChangeColor,
-                                            fontSize: 12.0,
-                                            fontWeight: FontWeight.bold,
+                                      Flexible(
+                                        child: Padding(
+                                          padding: const EdgeInsets.only(left: AppSpacing.xs),
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: AppSpacing.xs,
+                                              vertical: AppSpacing.xxs,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: priceChangeColor.withAlpha((255 * 0.2).round()),
+                                              borderRadius: BorderRadius.circular(AppSpacing.xs),
+                                            ),
+                                            child: Text(
+                                              '${priceChangePercent >= 0 ? '+' : ''}${priceChangePercent.toStringAsFixed(1)}%',
+                                              style: TextStyle(
+                                                color: priceChangeColor,
+                                                fontSize: 12.0,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
                                           ),
                                         ),
                                       ),
@@ -587,33 +596,41 @@ class _DiscoverScreenState extends State<DiscoverScreen> with TickerProviderStat
                           : Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Text(
-                                  '\$${song.currentPrice.toStringAsFixed(2)}',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16.0,
+                                Flexible(
+                                  child: Text(
+                                    '\$${song.currentPrice.toStringAsFixed(2)}',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16.0,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
                                 if (showPriceChange && song.previousPrice > 0)
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: AppSpacing.xs, // Use AppSpacing.xs
-                                    vertical: AppSpacing.xxs, // Use AppSpacing.xxs
+                                  Flexible(
+                                    child: Padding(
+                                      padding: const EdgeInsets.only(left: AppSpacing.xs),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: AppSpacing.xs,
+                                          vertical: AppSpacing.xxs,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: priceChangeColor.withAlpha((255 * 0.2).round()),
+                                          borderRadius: BorderRadius.circular(AppSpacing.xs),
+                                        ),
+                                        child: Text(
+                                          '${priceChangePercent >= 0 ? '+' : ''}${priceChangePercent.toStringAsFixed(1)}%',
+                                          style: TextStyle(
+                                            color: priceChangeColor,
+                                            fontSize: 12.0,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ),
                                   ),
-                                  decoration: BoxDecoration(
-                                    color: priceChangeColor.withAlpha((255 * 0.2).round()), // Replaced withOpacity
-                                    borderRadius: BorderRadius.circular(AppSpacing.xs), // Use AppSpacing.xs
-                                  ),
-                                  child: Text(
-                                      '${priceChangePercent >= 0 ? '+' : ''}${priceChangePercent.toStringAsFixed(1)}%',
-                                      style: TextStyle(
-                                        color: priceChangeColor,
-                                        fontSize: 12.0,
-                                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                 Spacer(), // Add Spacer to push content up
               ],
             ),
                       

@@ -90,38 +90,113 @@ class SpotifyApiService {
     }
   }
   
-  // Get top tracks using search API with a simpler approach
+  // Get top tracks using search API with a more comprehensive approach
   Future<List<Song>> getTopTracks({int limit = 50}) async {
     try {
-      // Use a simple search for popular music instead of artist-specific search
-      print('Using simplified search API to get top tracks...');
+      // Use a more comprehensive approach to get a diverse set of popular tracks
+      print('Using enhanced search API to get diverse top tracks...');
       
-      // Search for popular tracks using a generic term
-      final searchData = await _makeRequest(
-        ApiConstants.spotifySearch,
-        queryParams: {
-          'q': 'year:2023-2024', // Recent tracks
-          'type': 'track',
-          'limit': limit.toString(),
-        },
-      );
+      // Search parameters for diversity
+      final searchParams = [
+        'year:2023-2024', // Recent tracks
+        'tag:new', // New releases
+        'tag:hipster', // Less mainstream tracks for diversity
+      ];
       
-      // If we get no results, try a different approach
-      if (searchData['tracks']['items'].isEmpty) {
-        print('No tracks found with year search, trying popular term...');
-        final fallbackData = await _makeRequest(
+      final songs = <Song>[];
+      final trackIds = <String>{}; // Set to avoid duplicates
+      
+      // Determine how many tracks to fetch per query to reach the limit
+      final perQueryLimit = (limit / searchParams.length).ceil();
+      
+      // Make multiple requests with different search parameters for diversity
+      for (final param in searchParams) {
+        try {
+          final searchData = await _makeRequest(
+            ApiConstants.spotifySearch,
+            queryParams: {
+              'q': param,
+              'type': 'track',
+              'limit': perQueryLimit.toString(),
+            },
+          );
+          
+          if (searchData['tracks'] != null && searchData['tracks']['items'].isNotEmpty) {
+            final paramSongs = _processTrackResults(searchData);
+            for (final song in paramSongs) {
+              if (!trackIds.contains(song.id)) {
+                songs.add(song);
+                trackIds.add(song.id);
+              }
+            }
+          }
+        } catch (queryError) {
+          print('Error with query "$param": $queryError');
+          // Continue with other queries even if one fails
+        }
+      }
+      
+      // If we still need more tracks to reach the limit, use more generic searches
+      if (songs.length < limit) {
+        print('Not enough tracks found with specific queries, trying generic search...');
+        try {
+          // Use term searches for popular genres to fill remaining slots
+          final popularGenres = ['pop', 'hip hop', 'rock', 'electronic', 'r&b'];
+          final remainingLimit = limit - songs.length;
+          final perGenreLimit = (remainingLimit / popularGenres.length).ceil();
+          
+          for (final genre in popularGenres) {
+            try {
+              final genreData = await _makeRequest(
+                ApiConstants.spotifySearch,
+                queryParams: {
+                  'q': 'genre:$genre',
+                  'type': 'track',
+                  'limit': perGenreLimit.toString(),
+                },
+              );
+              
+              if (genreData['tracks'] != null && genreData['tracks']['items'].isNotEmpty) {
+                final genreSongs = _processTrackResults(genreData);
+                for (final song in genreSongs) {
+                  if (!trackIds.contains(song.id)) {
+                    songs.add(song);
+                    trackIds.add(song.id);
+                    // Break early if we've reached the limit
+                    if (songs.length >= limit) break;
+                  }
+                }
+              }
+              
+              // Break outer loop if we've reached the limit
+              if (songs.length >= limit) break;
+            } catch (genreError) {
+              print('Error with genre "$genre": $genreError');
+              // Continue with other genres even if one fails
+            }
+          }
+        } catch (fallbackError) {
+          print('Error in genre-based fallback: $fallbackError');
+        }
+      }
+      
+      // Last resort: If we still don't have enough tracks, use a very generic search
+      if (songs.isEmpty) {
+        print('No tracks found with any specific search, trying generic term...');
+        final lastResortData = await _makeRequest(
           ApiConstants.spotifySearch,
           queryParams: {
-            'q': 'popular', // Generic term that should return results
+            'q': 'popular', // Very generic search that should return something
             'type': 'track',
             'limit': limit.toString(),
           },
         );
         
-        return _processTrackResults(fallbackData);
+        return _processTrackResults(lastResortData);
       }
       
-      return _processTrackResults(searchData);
+      print('Successfully fetched ${songs.length} diverse tracks');
+      return songs;
     } catch (e) {
       print('Error fetching top tracks: $e');
       
