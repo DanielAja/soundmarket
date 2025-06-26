@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import '../models/user_profile.dart';
@@ -23,6 +24,11 @@ class UserDataProvider with ChangeNotifier {
 
   // Loading state
   bool _isLoading = false;
+
+  // Error state
+  String? _errorMessage;
+  bool get hasError => _errorMessage != null;
+  String? get errorMessage => _errorMessage;
   // Removed _portfolioValueAtSessionStart as it's replaced by history
 
   // Subscriptions
@@ -265,23 +271,38 @@ class UserDataProvider with ChangeNotifier {
 
   @override
   void dispose() {
-    // Cancel subscriptions when the provider is disposed
+    // Cancel all subscriptions and timers to prevent memory leaks
     _songUpdateSubscription?.cancel();
+    _songUpdateSubscription = null;
+
     _portfolioUpdateSubscription?.cancel();
-    _snapshotTimer?.cancel(); // Cancel the snapshot timer
-    _songStreamController?.close(); // Close stream controller
+    _portfolioUpdateSubscription = null;
+
+    _snapshotTimer?.cancel();
+    _snapshotTimer = null;
+
+    // Properly close stream controller
+    if (_songStreamController != null && !_songStreamController!.isClosed) {
+      _songStreamController!.close();
+    }
+    _songStreamController = null;
+
+    // Dispose portfolio service
     _portfolioService.dispose();
+
     super.dispose();
   }
 
   // Load user data from storage
   Future<void> _loadData() async {
+    _setLoading(true);
+    _clearError();
+
     try {
       final data = await _storageService.loadUserData();
       _userProfile = data['profile'] as UserProfile?;
       _portfolio = (data['portfolio'] as List<PortfolioItem>?) ?? [];
       _transactions = (data['transactions'] as List<Transaction>?) ?? [];
-      // _portfolioHistory = (data['history'] as List<PortfolioSnapshot>?) ?? []; // Removed history loading
 
       // Initialize with default data if nothing is loaded
       _userProfile ??= UserProfile(
@@ -309,10 +330,10 @@ class UserDataProvider with ChangeNotifier {
 
       // Update the background service with current portfolio data
       _updateBackgroundService();
-
-      notifyListeners();
     } catch (e) {
-      print('Error loading data: $e');
+      _setError('Failed to load user data: $e');
+      debugPrint('Error loading data: $e');
+
       // Initialize with default data on error
       _userProfile = UserProfile(
         userId: 'defaultUser',
@@ -321,11 +342,11 @@ class UserDataProvider with ChangeNotifier {
       );
       _portfolio = [];
       _transactions = [];
-      // _portfolioHistory = []; // Removed history reset
 
       // Initialize portfolio service with default data
       _portfolioService.initialize(_portfolio, _marketService.getAllSongs());
-
+    } finally {
+      _setLoading(false);
       notifyListeners();
     }
   }
@@ -366,7 +387,7 @@ class UserDataProvider with ChangeNotifier {
         }
       }
     } catch (e) {
-      print('Error loading background snapshots: $e');
+      debugPrint('Error loading background snapshots: $e');
     }
   }
 
@@ -460,7 +481,7 @@ class UserDataProvider with ChangeNotifier {
         _updateBackgroundService();
       }
     } catch (e) {
-      print('Error saving data: $e');
+      debugPrint('Error saving data: $e');
     }
   }
 
@@ -698,7 +719,7 @@ class UserDataProvider with ChangeNotifier {
     try {
       await _storageService.savePortfolioSnapshot(snapshot);
     } catch (e) {
-      print('Error saving portfolio snapshot: $e');
+      debugPrint('Error saving portfolio snapshot: $e');
     }
   }
 
@@ -710,7 +731,7 @@ class UserDataProvider with ChangeNotifier {
     try {
       return await _storageService.loadPortfolioHistoryRange(start, end);
     } catch (e) {
-      print('Error fetching portfolio history range: $e');
+      debugPrint('Error fetching portfolio history range: $e');
       return [];
     }
   }
@@ -720,7 +741,7 @@ class UserDataProvider with ChangeNotifier {
     try {
       return await _storageService.getEarliestTimestamp();
     } catch (e) {
-      print('Error fetching earliest timestamp: $e');
+      debugPrint('Error fetching earliest timestamp: $e');
       return null;
     }
   }
@@ -974,6 +995,25 @@ class UserDataProvider with ChangeNotifier {
     }
 
     return song;
+  }
+
+  // Helper methods for state management
+  void _setLoading(bool loading) {
+    _isLoading = loading;
+  }
+
+  void _setError(String error) {
+    _errorMessage = error;
+  }
+
+  void _clearError() {
+    _errorMessage = null;
+  }
+
+  // Clear error state (for UI to call)
+  void clearError() {
+    _clearError();
+    notifyListeners();
   }
 }
 

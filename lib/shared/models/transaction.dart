@@ -75,8 +75,8 @@ class Transaction {
           json['type'] == 'TransactionType.buy'
               ? TransactionType.buy
               : TransactionType.sell,
-      quantity: json['quantity'],
-      price: json['price'],
+      quantity: (json['quantity'] as num).toInt(),
+      price: (json['price'] as num).toDouble(),
       timestamp: DateTime.fromMillisecondsSinceEpoch(json['timestamp']),
       albumArtUrl: json['albumArtUrl'],
     );

@@ -7,7 +7,9 @@ import '../models/user_profile.dart';
 import '../models/portfolio_item.dart';
 import '../models/transaction.dart';
 import '../models/portfolio_snapshot.dart';
-import '../models/song.dart'; // Import Song model
+import '../models/song.dart';
+import '../models/stream_history.dart';
+import '../models/pricing_metrics.dart';
 
 class StorageService {
   // Keys for SharedPreferences (Profile, Portfolio, Transactions, Songs)
@@ -20,6 +22,8 @@ class StorageService {
   static sqflite.Database? _database; // Use prefix
   static const String _dbName = 'soundmarket.db';
   static const String _snapshotsTable = 'portfolio_snapshots';
+  static const String _streamHistoryTable = 'stream_history';
+  static const String _pricingMetricsTable = 'pricing_metrics';
 
   // Getter for the database instance
   Future<sqflite.Database> get database async {
@@ -38,8 +42,9 @@ class StorageService {
     return await sqflite.openDatabase(
       // Use prefix
       path,
-      version: 1,
+      version: 2, // Updated version for new tables
       onCreate: _onCreate,
+      onUpgrade: _onUpgrade,
     );
   }
 
@@ -56,6 +61,103 @@ class StorageService {
     await db.execute(
       'CREATE INDEX idx_timestamp ON $_snapshotsTable (timestamp)',
     );
+
+    // Create stream history table
+    await db.execute('''
+      CREATE TABLE $_streamHistoryTable (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        song_id TEXT NOT NULL,
+        timestamp INTEGER NOT NULL,
+        stream_count INTEGER NOT NULL,
+        period TEXT NOT NULL
+      )
+    ''');
+    // Add indexes for stream history
+    await db.execute(
+      'CREATE INDEX idx_stream_song_id ON $_streamHistoryTable (song_id)',
+    );
+    await db.execute(
+      'CREATE INDEX idx_stream_timestamp ON $_streamHistoryTable (timestamp)',
+    );
+    await db.execute(
+      'CREATE INDEX idx_stream_period ON $_streamHistoryTable (period)',
+    );
+
+    // Create pricing metrics table
+    await db.execute('''
+      CREATE TABLE $_pricingMetricsTable (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        song_id TEXT NOT NULL,
+        timestamp INTEGER NOT NULL,
+        calculated_price REAL NOT NULL,
+        previous_price REAL NOT NULL,
+        price_change REAL NOT NULL,
+        price_change_percent REAL NOT NULL,
+        stream_breakdown TEXT NOT NULL,
+        weighted_contributions TEXT NOT NULL,
+        volatility_score REAL NOT NULL,
+        was_price_clamped INTEGER NOT NULL
+      )
+    ''');
+    // Add indexes for pricing metrics
+    await db.execute(
+      'CREATE INDEX idx_pricing_song_id ON $_pricingMetricsTable (song_id)',
+    );
+    await db.execute(
+      'CREATE INDEX idx_pricing_timestamp ON $_pricingMetricsTable (timestamp)',
+    );
+  }
+
+  // Handle database upgrades
+  Future<void> _onUpgrade(
+    sqflite.Database db,
+    int oldVersion,
+    int newVersion,
+  ) async {
+    if (oldVersion < 2) {
+      // Add stream history table
+      await db.execute('''
+        CREATE TABLE $_streamHistoryTable (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          song_id TEXT NOT NULL,
+          timestamp INTEGER NOT NULL,
+          stream_count INTEGER NOT NULL,
+          period TEXT NOT NULL
+        )
+      ''');
+      await db.execute(
+        'CREATE INDEX idx_stream_song_id ON $_streamHistoryTable (song_id)',
+      );
+      await db.execute(
+        'CREATE INDEX idx_stream_timestamp ON $_streamHistoryTable (timestamp)',
+      );
+      await db.execute(
+        'CREATE INDEX idx_stream_period ON $_streamHistoryTable (period)',
+      );
+
+      // Add pricing metrics table
+      await db.execute('''
+        CREATE TABLE $_pricingMetricsTable (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          song_id TEXT NOT NULL,
+          timestamp INTEGER NOT NULL,
+          calculated_price REAL NOT NULL,
+          previous_price REAL NOT NULL,
+          price_change REAL NOT NULL,
+          price_change_percent REAL NOT NULL,
+          stream_breakdown TEXT NOT NULL,
+          weighted_contributions TEXT NOT NULL,
+          volatility_score REAL NOT NULL,
+          was_price_clamped INTEGER NOT NULL
+        )
+      ''');
+      await db.execute(
+        'CREATE INDEX idx_pricing_song_id ON $_pricingMetricsTable (song_id)',
+      );
+      await db.execute(
+        'CREATE INDEX idx_pricing_timestamp ON $_pricingMetricsTable (timestamp)',
+      );
+    }
   }
 
   // --- User Profile, Portfolio, Transactions (using SharedPreferences) ---
@@ -219,11 +321,51 @@ class StorageService {
 
     try {
       final List<dynamic> songsList = jsonDecode(songsJson);
-      return songsList.map((item) => Song.fromJson(item)).toList();
+      final allSongs = songsList.map((item) => Song.fromJson(item)).toList();
+
+      // Debug: Check how many songs have preview URLs
+      int songsWithPreview = 0;
+      int songsWithoutPreview = 0;
+
+      for (final song in allSongs) {
+        if (song.previewUrl != null && song.previewUrl!.isNotEmpty) {
+          songsWithPreview++;
+        } else {
+          songsWithoutPreview++;
+        }
+      }
+
+      print(
+        '💾 Loaded ${allSongs.length} cached songs: $songsWithPreview with preview, $songsWithoutPreview without',
+      );
+
+      return allSongs;
     } catch (e) {
       print('Error loading songs: $e');
       return [];
     }
+  }
+
+  // Clear all cached songs
+  Future<void> clearSongs() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_songsKey);
+    print('🗑️ Cleared all cached songs');
+  }
+
+  // Filter and save only songs with preview URLs
+  Future<void> savePlayableSongs(List<Song> songs) async {
+    final playableSongs =
+        songs
+            .where(
+              (song) => song.previewUrl != null && song.previewUrl!.isNotEmpty,
+            )
+            .toList();
+
+    print(
+      '💾 Saving ${playableSongs.length} playable songs out of ${songs.length} total',
+    );
+    await saveSongs(playableSongs);
   }
 
   // --- Combined Load/Save/Clear ---
@@ -270,17 +412,256 @@ class StorageService {
     await prefs.remove(_transactionsKey);
     await prefs.remove(_songsKey); // Also clear saved songs
 
-    // Clear SQLite table
+    // Clear SQLite tables
     try {
       final db = await database;
       await db.delete(_snapshotsTable);
+      await db.delete(_streamHistoryTable);
+      await db.delete(_pricingMetricsTable);
     } catch (e) {
-      print('Error clearing portfolio snapshots table: $e');
+      print('Error clearing database tables: $e');
       // Optionally delete the whole database file if clearing fails consistently
       // final documentsDirectory = await getApplicationDocumentsDirectory();
       // final path = join(documentsDirectory.path, _dbName);
       // await deleteDatabase(path);
       // _database = null; // Reset database instance
     }
+  }
+
+  // --- Stream History Operations ---
+
+  // Save stream history entry
+  Future<void> saveStreamHistory(StreamHistory streamHistory) async {
+    final db = await database;
+    await db.insert(_streamHistoryTable, {
+      'song_id': streamHistory.songId,
+      'timestamp': streamHistory.timestamp.millisecondsSinceEpoch,
+      'stream_count': streamHistory.streamCount,
+      'period': streamHistory.period,
+    }, conflictAlgorithm: sqflite.ConflictAlgorithm.replace);
+  }
+
+  // Save multiple stream history entries
+  Future<void> saveStreamHistoryBatch(
+    List<StreamHistory> streamHistories,
+  ) async {
+    final db = await database;
+    final batch = db.batch();
+
+    for (final history in streamHistories) {
+      batch.insert(_streamHistoryTable, {
+        'song_id': history.songId,
+        'timestamp': history.timestamp.millisecondsSinceEpoch,
+        'stream_count': history.streamCount,
+        'period': history.period,
+      }, conflictAlgorithm: sqflite.ConflictAlgorithm.replace);
+    }
+
+    await batch.commit();
+  }
+
+  // Load stream history for a specific song
+  Future<List<StreamHistory>> loadStreamHistory(
+    String songId, {
+    int? limit,
+  }) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      _streamHistoryTable,
+      where: 'song_id = ?',
+      whereArgs: [songId],
+      orderBy: 'timestamp DESC',
+      limit: limit,
+    );
+
+    return maps
+        .map(
+          (map) => StreamHistory(
+            songId: map['song_id'],
+            timestamp: DateTime.fromMillisecondsSinceEpoch(map['timestamp']),
+            streamCount: map['stream_count'],
+            period: map['period'],
+          ),
+        )
+        .toList();
+  }
+
+  // Load stream history within date range
+  Future<List<StreamHistory>> loadStreamHistoryRange(
+    String songId,
+    DateTime start,
+    DateTime end,
+  ) async {
+    final db = await database;
+    final startMillis = start.millisecondsSinceEpoch;
+    final endMillis = end.millisecondsSinceEpoch;
+
+    final List<Map<String, dynamic>> maps = await db.query(
+      _streamHistoryTable,
+      where: 'song_id = ? AND timestamp >= ? AND timestamp <= ?',
+      whereArgs: [songId, startMillis, endMillis],
+      orderBy: 'timestamp ASC',
+    );
+
+    return maps
+        .map(
+          (map) => StreamHistory(
+            songId: map['song_id'],
+            timestamp: DateTime.fromMillisecondsSinceEpoch(map['timestamp']),
+            streamCount: map['stream_count'],
+            period: map['period'],
+          ),
+        )
+        .toList();
+  }
+
+  // Load all stream history for all songs (useful for pricing calculations)
+  Future<List<StreamHistory>> loadAllStreamHistory({int? limit}) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      _streamHistoryTable,
+      orderBy: 'timestamp DESC',
+      limit: limit,
+    );
+
+    return maps
+        .map(
+          (map) => StreamHistory(
+            songId: map['song_id'],
+            timestamp: DateTime.fromMillisecondsSinceEpoch(map['timestamp']),
+            streamCount: map['stream_count'],
+            period: map['period'],
+          ),
+        )
+        .toList();
+  }
+
+  // --- Pricing Metrics Operations ---
+
+  // Save pricing metrics
+  Future<void> savePricingMetrics(PricingMetrics metrics) async {
+    final db = await database;
+    await db.insert(_pricingMetricsTable, {
+      'song_id': metrics.songId,
+      'timestamp': metrics.timestamp.millisecondsSinceEpoch,
+      'calculated_price': metrics.calculatedPrice,
+      'previous_price': metrics.previousPrice,
+      'price_change': metrics.priceChange,
+      'price_change_percent': metrics.priceChangePercent,
+      'stream_breakdown': jsonEncode(metrics.streamBreakdown),
+      'weighted_contributions': jsonEncode(metrics.weightedContributions),
+      'volatility_score': metrics.volatilityScore,
+      'was_price_clamped': metrics.wasPriceClamped ? 1 : 0,
+    }, conflictAlgorithm: sqflite.ConflictAlgorithm.replace);
+  }
+
+  // Load pricing metrics for a specific song
+  Future<List<PricingMetrics>> loadPricingMetrics(
+    String songId, {
+    int? limit,
+  }) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      _pricingMetricsTable,
+      where: 'song_id = ?',
+      whereArgs: [songId],
+      orderBy: 'timestamp DESC',
+      limit: limit,
+    );
+
+    return maps
+        .map(
+          (map) => PricingMetrics(
+            songId: map['song_id'],
+            timestamp: DateTime.fromMillisecondsSinceEpoch(map['timestamp']),
+            calculatedPrice: map['calculated_price'],
+            previousPrice: map['previous_price'],
+            priceChange: map['price_change'],
+            priceChangePercent: map['price_change_percent'],
+            streamBreakdown: Map<String, int>.from(
+              jsonDecode(map['stream_breakdown']),
+            ),
+            weightedContributions: Map<String, double>.from(
+              jsonDecode(map['weighted_contributions']),
+            ),
+            volatilityScore: map['volatility_score'],
+            wasPriceClamped: map['was_price_clamped'] == 1,
+          ),
+        )
+        .toList();
+  }
+
+  // Load latest pricing metrics for all songs
+  Future<List<PricingMetrics>> loadLatestPricingMetrics() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.rawQuery('''
+      SELECT p1.* FROM $_pricingMetricsTable p1
+      INNER JOIN (
+        SELECT song_id, MAX(timestamp) as max_timestamp
+        FROM $_pricingMetricsTable
+        GROUP BY song_id
+      ) p2 ON p1.song_id = p2.song_id AND p1.timestamp = p2.max_timestamp
+      ORDER BY p1.timestamp DESC
+    ''');
+
+    return maps
+        .map(
+          (map) => PricingMetrics(
+            songId: map['song_id'],
+            timestamp: DateTime.fromMillisecondsSinceEpoch(map['timestamp']),
+            calculatedPrice: map['calculated_price'],
+            previousPrice: map['previous_price'],
+            priceChange: map['price_change'],
+            priceChangePercent: map['price_change_percent'],
+            streamBreakdown: Map<String, int>.from(
+              jsonDecode(map['stream_breakdown']),
+            ),
+            weightedContributions: Map<String, double>.from(
+              jsonDecode(map['weighted_contributions']),
+            ),
+            volatilityScore: map['volatility_score'],
+            wasPriceClamped: map['was_price_clamped'] == 1,
+          ),
+        )
+        .toList();
+  }
+
+  // Get pricing metrics within date range
+  Future<List<PricingMetrics>> loadPricingMetricsRange(
+    String songId,
+    DateTime start,
+    DateTime end,
+  ) async {
+    final db = await database;
+    final startMillis = start.millisecondsSinceEpoch;
+    final endMillis = end.millisecondsSinceEpoch;
+
+    final List<Map<String, dynamic>> maps = await db.query(
+      _pricingMetricsTable,
+      where: 'song_id = ? AND timestamp >= ? AND timestamp <= ?',
+      whereArgs: [songId, startMillis, endMillis],
+      orderBy: 'timestamp ASC',
+    );
+
+    return maps
+        .map(
+          (map) => PricingMetrics(
+            songId: map['song_id'],
+            timestamp: DateTime.fromMillisecondsSinceEpoch(map['timestamp']),
+            calculatedPrice: map['calculated_price'],
+            previousPrice: map['previous_price'],
+            priceChange: map['price_change'],
+            priceChangePercent: map['price_change_percent'],
+            streamBreakdown: Map<String, int>.from(
+              jsonDecode(map['stream_breakdown']),
+            ),
+            weightedContributions: Map<String, double>.from(
+              jsonDecode(map['weighted_contributions']),
+            ),
+            volatilityScore: map['volatility_score'],
+            wasPriceClamped: map['was_price_clamped'] == 1,
+          ),
+        )
+        .toList();
   }
 }

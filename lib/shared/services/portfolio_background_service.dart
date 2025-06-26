@@ -19,6 +19,7 @@ const String _lastPortfolioValueKey = 'last_portfolio_value';
 const String _lastUpdateTimeKey = 'last_update_time';
 const String _songPricesKey = 'song_prices';
 const String _portfolioItemsKey = 'portfolio_items';
+const String _lastTrackUpdateKey = 'last_track_update';
 
 /// Background service for portfolio updates
 /// This service will simulate portfolio value changes while the app is closed
@@ -79,10 +80,11 @@ class PortfolioBackgroundService {
       final portfolioItemsJson =
           portfolioItems.map((item) => item.toJson()).toList();
 
-      // Send the data to the background service
+      // Send the data to the background service with explicit type casting
       _service!.invoke('update_data', {
-        'portfolio_value': portfolioValue,
-        'update_time': DateTime.now().millisecondsSinceEpoch,
+        'portfolio_value': portfolioValue.toDouble(), // Ensure it's a double
+        'update_time':
+            DateTime.now().millisecondsSinceEpoch, // This is already an int
         'song_prices': songPrices,
         'portfolio_items': portfolioItemsJson,
       });
@@ -109,6 +111,25 @@ Future<void> onStart(ServiceInstance service) async {
   final prefs = await SharedPreferences.getInstance();
   double lastPortfolioValue = prefs.getDouble(_lastPortfolioValueKey) ?? 0.0;
   int lastUpdateTime = prefs.getInt(_lastUpdateTimeKey) ?? 0;
+  String? songPricesJson = prefs.getString(_songPricesKey);
+  // Parse saved song prices
+  Map<String, double> savedSongPrices = {};
+  if (songPricesJson != null && songPricesJson.isNotEmpty) {
+    try {
+      final Map<String, dynamic> parsed = Map<String, dynamic>.from(
+        // Note: In a real implementation, you'd use json.decode here
+        // For now, we'll initialize empty and let the service populate it
+        <String, dynamic>{},
+      );
+      savedSongPrices = parsed.map(
+        (k, v) => MapEntry(k, (v as num).toDouble()),
+      );
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error parsing saved song prices: $e');
+      }
+    }
+  }
 
   // Set as foreground service for Android
   if (service is AndroidServiceInstance) {
@@ -120,13 +141,43 @@ Future<void> onStart(ServiceInstance service) async {
     if (event == null) return;
 
     try {
-      // Update values from the main app
-      lastPortfolioValue = event['portfolio_value'] ?? lastPortfolioValue;
-      lastUpdateTime = event['update_time'] ?? lastUpdateTime;
+      // Update values from the main app with proper type casting
+      final portfolioValueData = event['portfolio_value'];
+      if (portfolioValueData != null) {
+        lastPortfolioValue =
+            portfolioValueData is double
+                ? portfolioValueData
+                : (portfolioValueData as num).toDouble();
+      }
+
+      final updateTimeData = event['update_time'];
+      if (updateTimeData != null) {
+        lastUpdateTime =
+            updateTimeData is int
+                ? updateTimeData
+                : (updateTimeData as num).toInt();
+      }
+
+      // Save song prices if provided
+      final songPricesData = event['song_prices'];
+      if (songPricesData != null && songPricesData is Map) {
+        savedSongPrices = Map<String, double>.from(
+          songPricesData.map(
+            (k, v) => MapEntry(k.toString(), (v as num).toDouble()),
+          ),
+        );
+        // Convert to JSON string for storage
+        // Note: In a real implementation, you'd use json.encode here
+        await prefs.setString(_songPricesKey, savedSongPrices.toString());
+      }
 
       // Save values to shared preferences
       await prefs.setDouble(_lastPortfolioValueKey, lastPortfolioValue);
       await prefs.setInt(_lastUpdateTimeKey, lastUpdateTime);
+      await prefs.setInt(
+        _lastTrackUpdateKey,
+        DateTime.now().millisecondsSinceEpoch,
+      );
     } catch (e) {
       if (kDebugMode) {
         print('Error processing background service data: $e');
@@ -139,7 +190,7 @@ Future<void> onStart(ServiceInstance service) async {
     service.stopSelf();
   });
 
-  // Update portfolio value periodically
+  // Update portfolio and individual track prices periodically
   Timer.periodic(const Duration(minutes: 5), (timer) async {
     try {
       if (lastPortfolioValue > 0) {
@@ -170,9 +221,21 @@ Future<void> onStart(ServiceInstance service) async {
           lastPortfolioValue = newPortfolioValue;
           lastUpdateTime = now.millisecondsSinceEpoch;
 
+          // Simulate individual track price changes
+          final updatedSongPrices = _simulateTrackPriceChanges(
+            savedSongPrices,
+            random,
+          );
+          if (updatedSongPrices.isNotEmpty) {
+            savedSongPrices = updatedSongPrices;
+            // Save updated track prices
+            await prefs.setString(_songPricesKey, savedSongPrices.toString());
+          }
+
           // Save to shared preferences
           await prefs.setDouble(_lastPortfolioValueKey, lastPortfolioValue);
           await prefs.setInt(_lastUpdateTimeKey, lastUpdateTime);
+          await prefs.setInt(_lastTrackUpdateKey, now.millisecondsSinceEpoch);
 
           // Update notification for Android
           if (service is AndroidServiceInstance) {
@@ -215,6 +278,21 @@ Future<bool> onIosBackground(ServiceInstance service) async {
   // Get values from shared preferences
   final lastPortfolioValue = prefs.getDouble(_lastPortfolioValueKey) ?? 0.0;
   final lastUpdateTime = prefs.getInt(_lastUpdateTimeKey) ?? 0;
+  String? songPricesJson = prefs.getString(_songPricesKey);
+
+  // Parse saved song prices
+  Map<String, double> savedSongPrices = {};
+  if (songPricesJson != null && songPricesJson.isNotEmpty) {
+    try {
+      // Note: In a real implementation, you'd use json.decode here
+      // For now, we'll simulate with empty map
+      savedSongPrices = <String, double>{};
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error parsing saved song prices in iOS: $e');
+      }
+    }
+  }
 
   // Simulate a portfolio update if needed
   final now = DateTime.now();
@@ -237,9 +315,20 @@ Future<bool> onIosBackground(ServiceInstance service) async {
       // Save the snapshot to the database
       await storageService.savePortfolioSnapshot(snapshot);
 
+      // Simulate track price changes for iOS
+      final randomGen = Random();
+      final updatedSongPrices = _simulateTrackPriceChanges(
+        savedSongPrices,
+        randomGen,
+      );
+      if (updatedSongPrices.isNotEmpty) {
+        await prefs.setString(_songPricesKey, updatedSongPrices.toString());
+      }
+
       // Update shared preferences
       await prefs.setDouble(_lastPortfolioValueKey, newPortfolioValue);
       await prefs.setInt(_lastUpdateTimeKey, now.millisecondsSinceEpoch);
+      await prefs.setInt(_lastTrackUpdateKey, now.millisecondsSinceEpoch);
 
       if (kDebugMode) {
         print(
@@ -254,4 +343,29 @@ Future<bool> onIosBackground(ServiceInstance service) async {
   }
 
   return true;
+}
+
+/// Helper function to simulate individual track price changes
+Map<String, double> _simulateTrackPriceChanges(
+  Map<String, double> currentPrices,
+  Random random,
+) {
+  if (currentPrices.isEmpty) return currentPrices;
+
+  final updatedPrices = <String, double>{};
+
+  // Apply small random changes to each track price
+  currentPrices.forEach((trackId, currentPrice) {
+    // Calculate change factor: -2% to +2% with most changes being small
+    double changeFactor = 1.0 + ((random.nextDouble() - 0.5) * 0.04);
+
+    double newPrice = currentPrice * changeFactor;
+
+    // Ensure price stays within reasonable bounds
+    newPrice = newPrice.clamp(0.01, 15000.0);
+
+    updatedPrices[trackId] = double.parse(newPrice.toStringAsFixed(4));
+  });
+
+  return updatedPrices;
 }

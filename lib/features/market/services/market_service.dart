@@ -5,6 +5,9 @@ import '../../../shared/models/song.dart';
 import '../../../shared/models/portfolio_item.dart'; // Import PortfolioItem
 import '../../../shared/services/spotify_api_service.dart'; // Import SpotifyApiService
 import '../../../shared/services/storage_service.dart'; // Import StorageService
+import '../../../shared/services/pricing_engine.dart'; // Import PricingEngine
+import '../../../shared/models/stream_history.dart'; // Import StreamHistory
+import '../../../shared/models/pricing_metrics.dart'; // Import PricingMetrics
 
 class MarketService {
   // Singleton pattern
@@ -58,15 +61,37 @@ class MarketService {
       final savedSongs = await _storageService.loadSongs();
 
       if (savedSongs.isNotEmpty) {
-        print('Loaded ${savedSongs.length} saved songs from storage.');
-        _songs.clear();
-        _songs.addAll(savedSongs);
-        _updateCachedLists();
-        _isInitialized = true;
-        // Start the price simulation timer after loading saved songs
-        _startPriceSimulation();
-        // Notify listeners with loaded data
-        _songUpdateController.add(List.from(_songs));
+        // Check how many cached songs have preview URLs
+        final playableSongs =
+            savedSongs
+                .where(
+                  (song) =>
+                      song.previewUrl != null && song.previewUrl!.isNotEmpty,
+                )
+                .toList();
+
+        final playablePercentage =
+            playableSongs.length / savedSongs.length * 100;
+        print(
+          'Loaded ${savedSongs.length} saved songs: ${playableSongs.length} playable (${playablePercentage.round()}%)',
+        );
+
+        // If less than 50% of cached songs are playable, refresh from API
+        if (playablePercentage < 50) {
+          print(
+            '⚠️ Too few playable songs in cache (${playablePercentage.round()}%). Refreshing from API...',
+          );
+          await _fetchSongsFromSpotify();
+        } else {
+          _songs.clear();
+          _songs.addAll(savedSongs);
+          _updateCachedLists();
+          _isInitialized = true;
+          // Start the price simulation timer after loading saved songs
+          _startPriceSimulation();
+          // Notify listeners with loaded data
+          _songUpdateController.add(List.from(_songs));
+        }
       } else {
         // If no saved songs, fetch from Spotify API
         print('No saved songs found. Fetching from Spotify API...');
@@ -83,10 +108,14 @@ class MarketService {
   Future<void> _fetchSongsFromSpotify() async {
     try {
       print('Initializing MarketService with Spotify data...');
-      // Fetch top popular tracks based on current trends
-      final apiSongs = await _spotifyApi.getTopTracks(
+
+      // Clear any cached songs first to get fresh data
+      await _storageService.clearSongs();
+
+      // Fetch top popular tracks with preview URLs only
+      final apiSongs = await _spotifyApi.getTopTracksWithPreviews(
         limit: 100,
-      ); // Fetch 100 top tracks
+      ); // Fetch 100 playable tracks
 
       if (apiSongs.isNotEmpty) {
         _songs.clear();
@@ -101,9 +130,8 @@ class MarketService {
           'MarketService initialized successfully with ${_songs.length} songs.',
         );
 
-        // Save songs to storage
-        await _storageService.saveSongs(_songs);
-        print('Saved ${_songs.length} songs to storage.');
+        // Save only playable songs to storage
+        await _storageService.savePlayableSongs(_songs);
 
         // Start the price simulation timer only after successful initialization
         _startPriceSimulation();
@@ -205,15 +233,18 @@ class MarketService {
           // Update stream counts based on popularity (simulating real-world stream changes)
           _updateStreamCounts(song, popularity);
 
-          // Calculate new price based on popularity and stream counts
-          song.currentPrice = _calculatePriceFromPopularity(
-            popularity,
-            song: song,
-          );
+          // Use PricingEngine to calculate new price based on weighted streaming algorithm
+          final updatedSong = PricingEngine.updateSongPrice(song);
+          song.currentPrice = updatedSong.currentPrice;
+          song.basePricePerStream =
+              updatedSong.basePricePerStream; // Update dynamic base price
 
-          // Ensure price doesn't go below the minimum of $10
-          if (song.currentPrice < 10.0) {
-            song.currentPrice = 10.0;
+          // Save pricing metrics for analysis
+          _savePricingMetrics(song);
+
+          // Apply consistent minimum price (using PricingEngine's minimum)
+          if (song.currentPrice < 0.01) {
+            song.currentPrice = 0.01;
           }
 
           hasUpdates = true;
@@ -224,9 +255,9 @@ class MarketService {
         _updateCachedLists();
         _songUpdateController.add(List.from(_songs));
 
-        // Save updated songs to storage
+        // Save updated songs to storage (only playable ones)
         try {
-          await _storageService.saveSongs(_songs);
+          await _storageService.savePlayableSongs(_songs);
         } catch (e) {
           print('Error saving updated song prices: $e');
         }
@@ -277,45 +308,36 @@ class MarketService {
       song.previousPrice = song.currentPrice; // Store previous price
 
       try {
-        // Estimate popularity from current price (reverse engineering)
-        int estimatedPopularity = 50; // Default to middle
-        if (song.currentPrice >= 500) {
-          // High tier pricing ($500+) corresponds to 80+ popularity
-          estimatedPopularity = (79 +
-                  math.sqrt((song.currentPrice - 10.0) / 0.5))
-              .round()
-              .clamp(80, 100);
-        } else if (song.currentPrice >= 50) {
-          // Mid tier pricing ($50-$400) corresponds to 40-79 popularity
-          estimatedPopularity = math
-              .sqrt((song.currentPrice - 10.0) / 0.12)
-              .round()
-              .clamp(40, 79);
-        } else {
-          // Low tier pricing ($10-$45) corresponds to 0-39 popularity
-          estimatedPopularity = ((song.currentPrice - 10.0) / 0.9)
-              .round()
-              .clamp(0, 39);
-        }
+        // Estimate popularity from current price using bell curve inverse mapping
+        int estimatedPopularity = _estimatePopularityFromBellCurvePrice(
+          song.currentPrice,
+        );
 
         // Update stream counts based on popularity
         _updateStreamCounts(song, estimatedPopularity);
 
-        // Calculate new price using our stream-based algorithm
-        double newPrice = _calculatePriceFromPopularity(
-          estimatedPopularity,
-          song: song,
-        );
+        // Use PricingEngine to calculate new price based on weighted streaming algorithm
+        double newPrice = PricingEngine.calculatePrice(song);
 
-        // Ensure price doesn't drop below minimum
-        if (newPrice < 10.0) {
-          newPrice = 10.0;
+        // Apply consistent minimum price for bell curve distribution
+        if (newPrice < 0.10) {
+          newPrice = 0.10;
         }
 
-        // Only apply price change if it exceeds minimum threshold (0.005 instead of 0.001)
-        // This will ignore very small changes, further stabilizing prices
-        if ((newPrice - song.currentPrice).abs() > 0.005) {
+        // Dynamic threshold based on price range for bell curve distribution
+        double threshold = _calculatePriceChangeThreshold(song.currentPrice);
+        if ((newPrice - song.currentPrice).abs() > threshold) {
           song.currentPrice = newPrice;
+
+          // Update dynamic base price per stream
+          song.basePricePerStream =
+              PricingEngine.calculateDynamicBasePricePerStream(
+                song.allTimeStreams,
+              );
+
+          // Save pricing metrics for significant price changes
+          _savePricingMetrics(song);
+
           hasUpdates = true;
         }
       } catch (e) {
@@ -334,7 +356,7 @@ class MarketService {
       if (_streamUpdateSaveCounter >= 10) {
         _streamUpdateSaveCounter = 0;
         try {
-          await _storageService.saveSongs(_songs);
+          await _storageService.savePlayableSongs(_songs);
         } catch (e) {
           print('Error saving stream-updated song prices: $e');
         }
@@ -563,81 +585,9 @@ class MarketService {
     return artists;
   }
 
-  // Helper method to calculate price based on popularity and stream counts
-  double _calculatePriceFromPopularity(int popularity, {Song? song}) {
-    // Base price calculation using popularity (75% weight)
-    double basePrice;
+  // Legacy pricing method removed - replaced by bell curve pricing in PricingEngine
 
-    if (popularity >= 80) {
-      // High popularity - premium pricing with higher range
-      // Exponential formula for top tier: starts at ~$500 and scales up to $1000
-      basePrice =
-          10.0 +
-          (math.pow(popularity - 79, 2) * 0.5); // $500-$1000 for popular songs
-    } else if (popularity >= 40) {
-      // Medium popularity - standard pricing
-      basePrice =
-          10.0 +
-          (popularity * popularity * 0.12); // $50-$400 for mid-tier songs
-    } else {
-      // Lower popularity - value pricing
-      basePrice = 10.0 + (popularity * 0.9); // $10-$45 for niche songs
-    }
-
-    // If no song object is provided, return just the popularity-based price
-    if (song == null) {
-      return basePrice;
-    }
-
-    // Calculate stream-based price adjustments (25% weight)
-
-    // Formula uses the distribution specified:
-    // - Yearly streams: 10% weight
-    // - Monthly streams: 5% weight
-    // - Weekly streams: 3% weight
-    // - Daily streams: 7% weight
-    // - Total streams: 75% weight (remaining)
-
-    // Scale factors to normalize stream counts to reasonable range
-    final double yearlyFactor = 0.10;
-    final double monthlyFactor = 0.05;
-    final double weeklyFactor = 0.03;
-    final double dailyFactor = 0.07;
-    final double totalFactor = 0.75;
-
-    // Calculate score based on stream counts (normalized to avoid extreme values)
-    double yearlyScore = _normalizeStreamScore(song.yearlyStreams);
-    double monthlyScore = _normalizeStreamScore(song.monthlyStreams);
-    double weeklyScore = _normalizeStreamScore(song.weeklyStreams);
-    double dailyScore = _normalizeStreamScore(song.dailyStreams);
-    double totalScore = _normalizeStreamScore(song.totalStreams);
-
-    // Weighted average of stream scores
-    double streamScore =
-        (yearlyScore * yearlyFactor) +
-        (monthlyScore * monthlyFactor) +
-        (weeklyScore * weeklyFactor) +
-        (dailyScore * dailyFactor) +
-        (totalScore * totalFactor);
-
-    // Combine popularity price (75%) with stream-based adjustment (25%)
-    double finalPrice = (basePrice * 0.75) + (basePrice * streamScore * 0.25);
-
-    // Ensure price doesn't go below the minimum of $10
-    return finalPrice < 10.0 ? 10.0 : finalPrice;
-  }
-
-  // Helper method to normalize stream counts to a 0-1 scale
-  double _normalizeStreamScore(int streams) {
-    if (streams <= 0) return 0.0;
-
-    // Logarithmic scaling to handle wide range of stream counts
-    // Maps 0 to 0, 100,000 to ~0.5, 10,000,000 to ~0.8, 100,000,000 to ~1.0
-    double normalized = math.log(streams) / math.log(100000000);
-
-    // Clamp to range 0.0 - 1.0
-    return normalized.clamp(0.0, 1.0);
-  }
+  // Legacy stream scoring method removed - replaced by bell curve pricing
 
   // Calculate rising artists (helper method)
   List<String> _calculateRisingArtists() {
@@ -683,62 +633,292 @@ class MarketService {
     return _cachedRisingArtists!.take(limit).toList();
   }
 
-  // Helper method to update stream counts for a song
+  // Helper method to update stream counts with realistic patterns
   void _updateStreamCounts(Song song, int popularity) {
     final random = Random();
 
-    // Calculate growth/decline rates based on popularity
-    double growthFactor = 1.0;
-
-    // More popular songs tend to grow faster
-    if (popularity >= 80) {
-      // High popularity songs: 1-3% growth
-      growthFactor = 1.0 + (0.01 + (random.nextDouble() * 0.02));
-    } else if (popularity >= 60) {
-      // Medium-high popularity: 0.5-2% growth
-      growthFactor = 1.0 + (0.005 + (random.nextDouble() * 0.015));
-    } else if (popularity >= 40) {
-      // Medium popularity: 0-1% growth
-      growthFactor = 1.0 + (random.nextDouble() * 0.01);
-    } else if (popularity >= 20) {
-      // Lower popularity: -0.5-0.5% change (might decline)
-      growthFactor = 1.0 + (random.nextDouble() * 0.01 - 0.005);
-    } else {
-      // Very low popularity: -1-0% change (likely decline)
-      growthFactor = 1.0 + (random.nextDouble() * 0.01 - 0.01);
+    // Initialize realistic stream counts if they're zero or too low
+    if (song.allTimeStreams == 0 || song.allTimeStreams < 1000) {
+      _initializeRealisticStreamCounts(song, popularity);
     }
 
-    // Update daily streams (most volatile)
-    song.dailyStreams =
-        (song.dailyStreams *
-                (growthFactor + (random.nextDouble() * 0.1 - 0.05)))
-            .round();
-    if (song.dailyStreams < 0) song.dailyStreams = 0;
+    // Calculate growth/decline rates based on popularity with more realistic patterns
+    double baseGrowthFactor = _calculateRealisticGrowthFactor(
+      popularity,
+      random,
+    );
 
-    // Update weekly streams (less volatile)
-    song.weeklyStreams =
-        (song.weeklyStreams *
-                (growthFactor + (random.nextDouble() * 0.05 - 0.025)))
-            .round();
-    if (song.weeklyStreams < 0) song.weeklyStreams = 0;
+    // Add market sentiment and volatility
+    double sentimentFactor = _calculateMarketSentiment(song, random);
+    double growthFactor = baseGrowthFactor * sentimentFactor;
 
-    // Update monthly streams (more stable)
-    song.monthlyStreams =
-        (song.monthlyStreams *
-                (growthFactor + (random.nextDouble() * 0.02 - 0.01)))
-            .round();
-    if (song.monthlyStreams < 0) song.monthlyStreams = 0;
+    // Update streams with realistic decay patterns
+    _updateDailyStreams(song, growthFactor, random);
+    _updateWeeklyStreams(song, growthFactor, random);
+    _updateMonthlyStreams(song, growthFactor, random);
+    _updateYearlyStreams(song, growthFactor, random);
+    _updateLongTermStreams(song, growthFactor, random);
 
-    // Update yearly streams (very stable)
-    song.yearlyStreams =
-        (song.yearlyStreams *
-                (growthFactor + (random.nextDouble() * 0.01 - 0.005)))
-            .round();
-    if (song.yearlyStreams < 0) song.yearlyStreams = 0;
+    // Ensure logical consistency between time periods
+    _ensureStreamConsistency(song);
 
-    // Update total streams (sum of all additions)
-    int streamAddition = song.dailyStreams;
-    song.totalStreams += streamAddition;
+    // Update total streams for backward compatibility
+    song.totalStreams = song.allTimeStreams;
+
+    // Save stream history for analytics (every 10th update to avoid excessive data)
+    if (random.nextInt(10) == 0) {
+      _saveStreamHistoryEntry(song);
+    }
+  }
+
+  // Save stream history entry asynchronously
+  void _saveStreamHistoryEntry(Song song) {
+    // Don't await this to avoid blocking the price update process
+    _storageService
+        .saveStreamHistory(
+          StreamHistory(
+            songId: song.id,
+            timestamp: DateTime.now(),
+            streamCount: song.dailyStreams,
+            period: 'daily',
+          ),
+        )
+        .catchError((error) {
+          print('Error saving stream history for ${song.name}: $error');
+        });
+  }
+
+  // Save pricing metrics entry asynchronously
+  void _savePricingMetrics(Song song) {
+    // Don't await this to avoid blocking the price update process
+    try {
+      final breakdown = PricingEngine.getPricingBreakdown(song);
+      final metrics = PricingMetrics.fromBreakdown(
+        breakdown,
+        song.previousPrice,
+        0.0, // Volatility score calculation would go here
+      );
+
+      _storageService.savePricingMetrics(metrics).catchError((error) {
+        print('Error saving pricing metrics for ${song.name}: $error');
+      });
+    } catch (error) {
+      print('Error creating pricing metrics for ${song.name}: $error');
+    }
+  }
+
+  // Initialize realistic stream counts based on popularity
+  void _initializeRealisticStreamCounts(Song song, int popularity) {
+    final random = Random();
+
+    // Base stream counts on realistic Spotify distribution
+    int baseAllTimeStreams;
+    if (popularity >= 90) {
+      // Ultra-viral tracks: 50M-500M+ streams
+      baseAllTimeStreams = 50000000 + random.nextInt(450000000);
+    } else if (popularity >= 80) {
+      // Very popular: 10M-50M streams
+      baseAllTimeStreams = 10000000 + random.nextInt(40000000);
+    } else if (popularity >= 70) {
+      // Popular: 1M-10M streams
+      baseAllTimeStreams = 1000000 + random.nextInt(9000000);
+    } else if (popularity >= 50) {
+      // Moderate: 100K-1M streams
+      baseAllTimeStreams = 100000 + random.nextInt(900000);
+    } else if (popularity >= 30) {
+      // Emerging: 10K-100K streams
+      baseAllTimeStreams = 10000 + random.nextInt(90000);
+    } else {
+      // Niche: 1K-10K streams
+      baseAllTimeStreams = 1000 + random.nextInt(9000);
+    }
+
+    song.allTimeStreams = baseAllTimeStreams;
+    song.lastFiveYearsStreams = (baseAllTimeStreams * 0.85).round();
+    song.yearlyStreams = (baseAllTimeStreams * 0.15).round();
+    song.monthlyStreams = (song.yearlyStreams * 0.1).round();
+    song.weeklyStreams = (song.monthlyStreams * 0.3).round();
+    song.dailyStreams = (song.weeklyStreams * 0.2).round();
+  }
+
+  // Calculate realistic growth factor based on popularity
+  double _calculateRealisticGrowthFactor(int popularity, Random random) {
+    if (popularity >= 85) {
+      // Viral tracks: high but volatile growth
+      return 1.0 + (0.005 + (random.nextDouble() * 0.02 - 0.01));
+    } else if (popularity >= 70) {
+      // Popular tracks: steady growth
+      return 1.0 + (0.002 + (random.nextDouble() * 0.008 - 0.004));
+    } else if (popularity >= 50) {
+      // Moderate tracks: slight growth or decline
+      return 1.0 + (random.nextDouble() * 0.006 - 0.003);
+    } else if (popularity >= 30) {
+      // Emerging tracks: can have growth spurts
+      return 1.0 + (random.nextDouble() * 0.01 - 0.005);
+    } else {
+      // Niche tracks: mostly stable or declining
+      return 1.0 + (random.nextDouble() * 0.004 - 0.004);
+    }
+  }
+
+  // Calculate market sentiment factor
+  double _calculateMarketSentiment(Song song, Random random) {
+    // Add genre-based momentum
+    double genreFactor = 1.0;
+    switch (song.genre.toLowerCase()) {
+      case 'pop':
+      case 'hip-hop':
+      case 'rap':
+        genreFactor = 1.0 + (random.nextDouble() * 0.004 - 0.002);
+        break;
+      case 'rock':
+      case 'alternative':
+        genreFactor = 1.0 + (random.nextDouble() * 0.002 - 0.001);
+        break;
+      case 'electronic':
+      case 'dance':
+        genreFactor = 1.0 + (random.nextDouble() * 0.006 - 0.003);
+        break;
+      default:
+        genreFactor = 1.0 + (random.nextDouble() * 0.002 - 0.001);
+    }
+
+    // Add time-based cycles (weekends vs weekdays, etc.)
+    double timeFactor = 1.0;
+    final hour = DateTime.now().hour;
+    if (hour >= 17 && hour <= 23) {
+      // Peak listening hours
+      timeFactor = 1.0 + (random.nextDouble() * 0.002);
+    }
+
+    return genreFactor * timeFactor;
+  }
+
+  // Update daily streams with volatility
+  void _updateDailyStreams(Song song, double growthFactor, Random random) {
+    double volatility = 0.15; // Higher volatility for daily
+    double factor =
+        growthFactor + (random.nextDouble() * volatility - volatility / 2);
+    int newDailyStreams = (song.dailyStreams * factor).round();
+    song.dailyStreams = math.max(0, newDailyStreams);
+  }
+
+  // Update weekly streams with moderate volatility
+  void _updateWeeklyStreams(Song song, double growthFactor, Random random) {
+    double volatility = 0.08;
+    double factor =
+        growthFactor + (random.nextDouble() * volatility - volatility / 2);
+    int newWeeklyStreams = (song.weeklyStreams * factor).round();
+    song.weeklyStreams = math.max(song.dailyStreams, newWeeklyStreams);
+  }
+
+  // Update monthly streams with low volatility
+  void _updateMonthlyStreams(Song song, double growthFactor, Random random) {
+    double volatility = 0.04;
+    double factor =
+        growthFactor + (random.nextDouble() * volatility - volatility / 2);
+    int newMonthlyStreams = (song.monthlyStreams * factor).round();
+    song.monthlyStreams = math.max(song.weeklyStreams, newMonthlyStreams);
+  }
+
+  // Update yearly streams with very low volatility
+  void _updateYearlyStreams(Song song, double growthFactor, Random random) {
+    double volatility = 0.02;
+    double factor =
+        growthFactor + (random.nextDouble() * volatility - volatility / 2);
+    int newYearlyStreams = (song.yearlyStreams * factor).round();
+    song.yearlyStreams = math.max(song.monthlyStreams * 4, newYearlyStreams);
+  }
+
+  // Update long-term streams (5 years and all-time)
+  void _updateLongTermStreams(Song song, double growthFactor, Random random) {
+    double volatility = 0.01;
+    double factor =
+        growthFactor + (random.nextDouble() * volatility - volatility / 2);
+
+    // Five years streams
+    int newFiveYearStreams = (song.lastFiveYearsStreams * factor).round();
+    song.lastFiveYearsStreams = math.max(
+      song.yearlyStreams,
+      newFiveYearStreams,
+    );
+
+    // All-time streams (accumulative)
+    int dailyGrowth = math.max(
+      0,
+      song.dailyStreams - (song.allTimeStreams * 0.000001).round(),
+    ); // Very small daily addition
+    song.allTimeStreams = math.max(
+      song.lastFiveYearsStreams,
+      song.allTimeStreams + dailyGrowth,
+    );
+  }
+
+  // Ensure logical consistency between time periods
+  void _ensureStreamConsistency(Song song) {
+    // Ensure hierarchy: daily <= weekly <= monthly <= yearly <= 5years <= allTime
+    song.weeklyStreams = math.max(song.dailyStreams, song.weeklyStreams);
+    song.monthlyStreams = math.max(song.weeklyStreams, song.monthlyStreams);
+    song.yearlyStreams = math.max(song.monthlyStreams, song.yearlyStreams);
+    song.lastFiveYearsStreams = math.max(
+      song.yearlyStreams,
+      song.lastFiveYearsStreams,
+    );
+    song.allTimeStreams = math.max(
+      song.lastFiveYearsStreams,
+      song.allTimeStreams,
+    );
+  }
+
+  /// Calculate dynamic price change threshold based on current price
+  /// Higher priced songs need larger changes to be significant
+  double _calculatePriceChangeThreshold(double currentPrice) {
+    if (currentPrice >= 1000) {
+      // High-priced songs: 1-2% change threshold
+      return currentPrice * 0.015; // 1.5%
+    } else if (currentPrice >= 100) {
+      // Mid-priced songs: 2-3% change threshold
+      return currentPrice * 0.025; // 2.5%
+    } else if (currentPrice >= 20) {
+      // Low-mid priced songs: 3-5% change threshold
+      return currentPrice * 0.04; // 4%
+    } else {
+      // Very low priced songs: minimum absolute threshold
+      return math.max(currentPrice * 0.05, 0.50); // 5% or $0.50 minimum
+    }
+  }
+
+  /// Estimate popularity from bell curve price using inverse mapping
+  /// Maps price ranges back to estimated Spotify popularity scores
+  int _estimatePopularityFromBellCurvePrice(double currentPrice) {
+    // Bell curve inverse mapping for new price distribution
+    // Mean: $500, Std Dev: $800
+
+    if (currentPrice >= 2500) {
+      // Very high prices: 90-100 popularity (viral hits)
+      double factor = math.min((currentPrice - 2500) / 2500, 1.0);
+      return (90 + factor * 10).round().clamp(90, 100);
+    } else if (currentPrice >= 1000) {
+      // High prices: 75-89 popularity (very popular)
+      double factor = (currentPrice - 1000) / 1500;
+      return (75 + factor * 14).round().clamp(75, 89);
+    } else if (currentPrice >= 300) {
+      // Mid-high prices: 55-74 popularity (popular)
+      double factor = (currentPrice - 300) / 700;
+      return (55 + factor * 19).round().clamp(55, 74);
+    } else if (currentPrice >= 100) {
+      // Mid prices: 35-54 popularity (moderate)
+      double factor = (currentPrice - 100) / 200;
+      return (35 + factor * 19).round().clamp(35, 54);
+    } else if (currentPrice >= 20) {
+      // Low-mid prices: 15-34 popularity (emerging)
+      double factor = (currentPrice - 20) / 80;
+      return (15 + factor * 19).round().clamp(15, 34);
+    } else {
+      // Low prices: 0-14 popularity (niche)
+      double factor = math.max(currentPrice / 20, 0.0);
+      return (factor * 14).round().clamp(0, 14);
+    }
   }
 
   // This previous dispose method is now replaced by the enhanced version above

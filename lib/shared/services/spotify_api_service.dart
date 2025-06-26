@@ -281,6 +281,34 @@ class SpotifyApiService {
     }
   }
 
+  // Get top tracks with preview URLs only
+  Future<List<Song>> getTopTracksWithPreviews({int limit = 50}) async {
+    try {
+      // Fetch more tracks than needed to account for filtering
+      final allTracks = await getTopTracks(limit: limit * 3);
+
+      // Filter only tracks with preview URLs
+      final tracksWithPreviews =
+          allTracks
+              .where(
+                (song) =>
+                    song.previewUrl != null && song.previewUrl!.isNotEmpty,
+              )
+              .toList();
+
+      // Return up to the requested limit
+      final result = tracksWithPreviews.take(limit).toList();
+      print(
+        '🎵 Filtered ${result.length} playable tracks from ${allTracks.length} total tracks',
+      );
+
+      return result;
+    } catch (e) {
+      print('Error fetching tracks with previews: $e');
+      return [];
+    }
+  }
+
   // Get top tracks using search API with a more comprehensive approach
   Future<List<Song>> getTopTracks({int limit = 50}) async {
     try {
@@ -428,52 +456,109 @@ class SpotifyApiService {
 
     print('Successfully retrieved ${items.length} tracks from Spotify API');
 
-    return items.map((track) {
-      final int popularity = track['popularity'] ?? 50;
+    // Debug: Count tracks with preview URLs
+    int tracksWithPreview = 0;
+    int tracksWithoutPreview = 0;
 
-      // Simulate stream counts based on popularity
-      // Using popularity as a base and adding some randomness
-      final random = math.Random();
+    final songs =
+        items.map((track) {
+          final int popularity = track['popularity'] ?? 50;
+          final String? previewUrl = track['preview_url'];
 
-      // Total streams: For very popular songs (80+), millions of streams, for less popular, thousands
-      final baseStreams =
-          popularity >= 80 ? 10000000 : (popularity >= 50 ? 1000000 : 100000);
-      final totalStreams = (baseStreams * (0.5 + random.nextDouble())).round();
+          // Debug: Count preview URLs
+          if (previewUrl != null && previewUrl.isNotEmpty) {
+            tracksWithPreview++;
+          } else {
+            tracksWithoutPreview++;
+          }
 
-      // Yearly streams: 60-80% of total streams
-      final yearlyStreams =
-          (totalStreams * (0.6 + (random.nextDouble() * 0.2))).round();
+          // Simulate stream counts based on popularity
+          // Using popularity as a base and adding some randomness
+          final random = math.Random();
 
-      // Monthly streams: 5-15% of total streams
-      final monthlyStreams =
-          (totalStreams * (0.05 + (random.nextDouble() * 0.1))).round();
+          // Total streams: For very popular songs (80+), millions of streams, for less popular, thousands
+          final baseStreams =
+              popularity >= 80
+                  ? 10000000
+                  : (popularity >= 50 ? 1000000 : 100000);
+          final totalStreams =
+              (baseStreams * (0.5 + random.nextDouble())).round();
 
-      // Weekly streams: 1-3% of total streams
-      final weeklyStreams =
-          (totalStreams * (0.01 + (random.nextDouble() * 0.02))).round();
+          // Yearly streams: 60-80% of total streams
+          final yearlyStreams =
+              (totalStreams * (0.6 + (random.nextDouble() * 0.2))).round();
 
-      // Daily streams: 0.1-0.5% of total streams
-      final dailyStreams =
-          (totalStreams * (0.001 + (random.nextDouble() * 0.004))).round();
+          // Monthly streams: 5-15% of total streams
+          final monthlyStreams =
+              (totalStreams * (0.05 + (random.nextDouble() * 0.1))).round();
 
-      return Song(
-        id: track['id'],
-        name: track['name'],
-        artist: track['artists'][0]['name'],
-        genre: _getGenreFromPopularity(popularity),
-        currentPrice: _calculatePrice(popularity),
-        previousPrice: 0.0,
-        albumArtUrl:
-            track['album']['images'].isNotEmpty
-                ? track['album']['images'][0]['url']
-                : null,
-        totalStreams: totalStreams,
-        yearlyStreams: yearlyStreams,
-        monthlyStreams: monthlyStreams,
-        weeklyStreams: weeklyStreams,
-        dailyStreams: dailyStreams,
-      );
-    }).toList();
+          // Weekly streams: 1-3% of total streams
+          final weeklyStreams =
+              (totalStreams * (0.01 + (random.nextDouble() * 0.02))).round();
+
+          // Daily streams: 0.1-0.5% of total streams
+          final dailyStreams =
+              (totalStreams * (0.001 + (random.nextDouble() * 0.004))).round();
+
+          return Song(
+            id: track['id'],
+            name: track['name'],
+            artist: track['artists'][0]['name'],
+            genre: _getGenreFromPopularity(popularity),
+            currentPrice: _calculatePrice(popularity),
+            previousPrice: 0.0,
+            albumArtUrl:
+                track['album']['images'].isNotEmpty
+                    ? track['album']['images'][0]['url']
+                    : null,
+            previewUrl: previewUrl,
+            spotifyExternalUrl: track['external_urls']?['spotify'],
+            totalStreams: totalStreams,
+            yearlyStreams: yearlyStreams,
+            monthlyStreams: monthlyStreams,
+            weeklyStreams: weeklyStreams,
+            dailyStreams: dailyStreams,
+          );
+        }).toList();
+
+    // Debug: Log preview URL statistics
+    print(
+      'Preview URL Stats: $tracksWithPreview with preview, $tracksWithoutPreview without preview',
+    );
+    final percentage =
+        tracksWithPreview > 0
+            ? (tracksWithPreview /
+                    (tracksWithPreview + tracksWithoutPreview) *
+                    100)
+                .round()
+            : 0;
+    print(
+      'Preview availability: $percentage% of tracks have playable previews',
+    );
+
+    // Filter and prioritize songs with preview URLs
+    final songsWithPreview =
+        songs
+            .where(
+              (song) => song.previewUrl != null && song.previewUrl!.isNotEmpty,
+            )
+            .toList();
+
+    final songsWithoutPreview =
+        songs
+            .where(
+              (song) => song.previewUrl == null || song.previewUrl!.isEmpty,
+            )
+            .toList();
+
+    // Return songs with preview URLs first, then others if needed
+    final prioritizedSongs = [...songsWithPreview, ...songsWithoutPreview];
+
+    print(
+      '🎵 Returning ${songsWithPreview.length} playable songs first, ${songsWithoutPreview.length} non-playable songs after',
+    );
+
+    return prioritizedSongs;
   }
 
   // Search for tracks
@@ -491,12 +576,17 @@ class SpotifyApiService {
     }
   }
 
-  // Get new releases
-  Future<List<Song>> getNewReleases({int limit = 20}) async {
+  // Get new releases with market support
+  Future<List<Song>> getNewReleases({int limit = 20, String? market}) async {
     try {
+      final queryParams = {'limit': limit.toString()};
+      if (market != null) {
+        queryParams['market'] = market;
+      }
+
       final data = await _makeRequest(
         ApiConstants.spotifyNewReleases,
-        queryParams: {'limit': limit.toString()},
+        queryParams: queryParams,
       );
 
       final List<dynamic> albums = data['albums']['items'];
@@ -552,6 +642,8 @@ class SpotifyApiService {
               currentPrice: _calculatePrice(popularity),
               previousPrice: 0.0,
               albumArtUrl: album['images'][0]['url'],
+              previewUrl: track['preview_url'],
+              spotifyExternalUrl: track['external_urls']?['spotify'],
               totalStreams: totalStreams,
               yearlyStreams: yearlyStreams,
               monthlyStreams: monthlyStreams,
@@ -682,6 +774,142 @@ class SpotifyApiService {
     // Wait for all requests to complete
     await Future.wait(futures);
     return results;
+  }
+
+  // Get top tracks for specific country using charts/top lists
+  Future<List<Song>> getTopTracksForCountry({
+    int limit = 50,
+    String? market,
+  }) async {
+    try {
+      // Since Spotify doesn't provide country-specific top tracks directly,
+      // we'll use search with market parameter and sort by popularity
+      final queryParams = {
+        'q': 'year:2023-2024', // Recent popular tracks
+        'type': 'track',
+        'limit': limit.toString(),
+      };
+
+      if (market != null) {
+        queryParams['market'] = market;
+      }
+
+      final data = await _makeRequest(
+        ApiConstants.spotifySearch,
+        queryParams: queryParams,
+      );
+
+      final tracks = _processTrackResults(data);
+
+      // Sort by popularity (descending)
+      tracks.sort((a, b) => b.currentPrice.compareTo(a.currentPrice));
+
+      return tracks.take(limit).toList();
+    } catch (e) {
+      print('Error getting top tracks for country: $e');
+      return [];
+    }
+  }
+
+  // Get featured playlists for country (proxy for trending content)
+  Future<List<Map<String, dynamic>>> getFeaturedPlaylists({
+    int limit = 5,
+    String? market,
+  }) async {
+    try {
+      final queryParams = {'limit': limit.toString()};
+      if (market != null) {
+        queryParams['market'] = market;
+      }
+
+      final data = await _makeRequest(
+        ApiConstants.spotifyFeaturedPlaylists,
+        queryParams: queryParams,
+      );
+
+      final List<dynamic> playlists = data['playlists']['items'];
+      return playlists
+          .map(
+            (playlist) => {
+              'id': playlist['id'],
+              'name': playlist['name'],
+              'description': playlist['description'],
+              'image':
+                  playlist['images'].isNotEmpty
+                      ? playlist['images'][0]['url']
+                      : null,
+            },
+          )
+          .toList();
+    } catch (e) {
+      print('Error getting featured playlists: $e');
+      return [];
+    }
+  }
+
+  // Get tracks from a specific playlist
+  Future<List<Song>> getPlaylistTracks(
+    String playlistId, {
+    int limit = 10,
+  }) async {
+    try {
+      final data = await _makeRequest(
+        '${ApiConstants.spotifyBaseUrl}/playlists/$playlistId/tracks',
+        queryParams: {'limit': limit.toString()},
+      );
+
+      final List<dynamic> items = data['items'];
+      final songs = <Song>[];
+
+      for (var item in items) {
+        final track = item['track'];
+        if (track == null || track['id'] == null) continue;
+
+        final int popularity = track['popularity'] ?? 50;
+        final random = math.Random();
+
+        // Simulate stream counts based on popularity
+        final baseStreams =
+            popularity >= 80 ? 10000000 : (popularity >= 50 ? 1000000 : 100000);
+        final totalStreams =
+            (baseStreams * (0.5 + random.nextDouble())).round();
+        final yearlyStreams =
+            (totalStreams * (0.6 + (random.nextDouble() * 0.2))).round();
+        final monthlyStreams =
+            (totalStreams * (0.05 + (random.nextDouble() * 0.1))).round();
+        final weeklyStreams =
+            (totalStreams * (0.01 + (random.nextDouble() * 0.02))).round();
+        final dailyStreams =
+            (totalStreams * (0.001 + (random.nextDouble() * 0.004))).round();
+
+        songs.add(
+          Song(
+            id: track['id'],
+            name: track['name'],
+            artist: track['artists'][0]['name'],
+            genre: _getGenreFromPopularity(popularity),
+            currentPrice: _calculatePrice(popularity),
+            previousPrice: 0.0,
+            albumArtUrl:
+                track['album']['images'].isNotEmpty
+                    ? track['album']['images'][0]['url']
+                    : null,
+            previewUrl: track['preview_url'],
+            spotifyExternalUrl: track['external_urls']?['spotify'],
+            totalStreams: totalStreams,
+            yearlyStreams: yearlyStreams,
+            monthlyStreams: monthlyStreams,
+            weeklyStreams: weeklyStreams,
+            dailyStreams: dailyStreams,
+          ),
+        );
+      }
+
+      return songs;
+    } catch (e) {
+      print('Error getting playlist tracks: $e');
+      return [];
+    }
   }
 
   // Dispose resources

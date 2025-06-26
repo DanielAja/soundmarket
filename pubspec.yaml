@@ -49,6 +49,8 @@ dependencies:
   flutter_background_service_ios: ^5.0.0 # For iOS-specific background service
   flutter_local_notifications: ^19.1.0 # For notifications from background service
   cached_network_image: ^3.3.1 # For local image caching
+  audioplayers: ^6.0.0 # For audio playback functionality
+  url_launcher: ^6.2.5 # For opening external URLs
 
 dev_dependencies:
   flutter_test:
@@ -61,6 +63,11 @@ dev_dependencies:
   # rules and activating additional ones.
   flutter_lints: ^5.0.0
   flutter_launcher_icons: ^0.13.1
+  
+  # Testing packages
+  mocktail: ^1.0.3
+  mockito: ^5.4.4
+  build_runner: ^2.4.9
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

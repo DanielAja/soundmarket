@@ -11,6 +11,7 @@ import '../../../shared/models/song.dart'; // Corrected path
 // Removed unused import: import '../../../shared/models/transaction.dart';
 import '../../../shared/models/portfolio_snapshot.dart'; // Import Snapshot model
 import '../../../shared/widgets/real_time_portfolio_widget.dart'; // Corrected path
+import '../../../shared/services/audio_player_service.dart'; // Audio player service
 import '../../../core/theme/app_spacing.dart'; // Corrected path
 
 // New StatefulWidget to manage the state and controllers for the bottom sheet content
@@ -358,22 +359,68 @@ class _PortfolioItemDetailsSheetContentState
                         vertical: AppSpacing.m,
                       ),
                       child: ElevatedButton.icon(
-                        onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                'Opening ${widget.item.songName}... (Not implemented)',
-                              ),
-                            ),
+                        onPressed: () async {
+                          final audioPlayerService = AudioPlayerService();
+
+                          if (widget.song.previewUrl == null ||
+                              widget.song.previewUrl!.isEmpty) {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    'No preview available for ${widget.song.name}',
+                                  ),
+                                  backgroundColor: Colors.orange,
+                                ),
+                              );
+                            }
+                            return;
+                          }
+
+                          final success = await audioPlayerService.playSong(
+                            widget.song,
                           );
+
+                          if (mounted) {
+                            if (success) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Playing ${widget.song.name}'),
+                                  backgroundColor: Colors.green,
+                                  duration: const Duration(seconds: 2),
+                                ),
+                              );
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    'Failed to play ${widget.song.name}',
+                                  ),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            }
+                          }
                         },
-                        icon: const Icon(
-                          Icons.play_circle_filled,
+                        icon: Icon(
+                          widget.song.previewUrl != null &&
+                                  widget.song.previewUrl!.isNotEmpty
+                              ? Icons.play_circle_filled
+                              : Icons.block,
                           color: Colors.white,
                         ),
-                        label: const Text('LISTEN TO SONG'),
+                        label: Text(
+                          widget.song.previewUrl != null &&
+                                  widget.song.previewUrl!.isNotEmpty
+                              ? 'LISTEN TO SONG'
+                              : 'NO PREVIEW AVAILABLE',
+                        ),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.purple,
+                          backgroundColor:
+                              widget.song.previewUrl != null &&
+                                      widget.song.previewUrl!.isNotEmpty
+                                  ? Colors.purple
+                                  : Colors.grey,
                           foregroundColor: Colors.white,
                           minimumSize: const Size(double.infinity, 48),
                         ),

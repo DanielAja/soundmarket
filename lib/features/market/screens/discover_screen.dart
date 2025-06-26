@@ -3,14 +3,19 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../shared/providers/user_data_provider.dart';
 import '../../../shared/models/song.dart';
 import '../../../shared/services/music_data_api_service.dart';
 import '../../../shared/services/search_state_service.dart';
+import '../../../shared/services/country_detection_service.dart';
+import '../../../shared/services/stream_analytics_service.dart';
+import '../../../shared/services/audio_player_service.dart';
 import '../../../shared/widgets/search_bar_with_suggestions.dart';
 import 'top_songs_list_screen.dart';
 import 'search_results_screen.dart';
 import '../../../core/theme/app_spacing.dart';
+import '../../../shared/utils/formatters.dart';
 
 class DiscoverScreen extends StatefulWidget {
   const DiscoverScreen({super.key});
@@ -25,7 +30,10 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   final Map<String, AnimationController> _priceAnimationControllers = {};
   final Map<String, Animation<double>> _priceAnimations = {};
   late final MusicDataApiService _musicDataApi;
+  late final StreamAnalyticsService _streamAnalytics;
+  late final AudioPlayerService _audioPlayerService;
   String _selectedGenre = 'pop'; // Set Pop as the default genre
+  String? _currentCountry;
 
   // Flag to limit how often we make API calls
   static bool _apiDataLoaded = false;
@@ -34,7 +42,12 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   void initState() {
     super.initState();
     _musicDataApi = MusicDataApiService();
+    _streamAnalytics = StreamAnalyticsService();
+    _audioPlayerService = AudioPlayerService();
     _musicDataApi.setDiscoverTabActive(true);
+
+    // Initialize services and get user's country
+    _initializeServices();
 
     // Use the static flag to prevent multiple API calls when navigating back to this screen
     if (!_apiDataLoaded) {
@@ -77,25 +90,39 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     }
   }
 
+  Future<void> _initializeServices() async {
+    try {
+      await _streamAnalytics.initialize();
+      _currentCountry = await CountryDetectionService.getUserCountry();
+    } catch (e) {
+      // If country detection fails, use default
+      _currentCountry = 'US';
+    }
+  }
+
   // Load data for each section with delays between API calls to prevent rate limiting
   void _loadNewReleasesData() {
     if (_cachedNewSongs == null && !_loadingNewReleases) {
       _loadingNewReleases = true;
       _musicDataApi
-          .getNewReleases(limit: 10)
+          .getNewReleases(limit: 20, market: _currentCountry)
           .then((newReleases) {
             if (mounted) {
               setState(() {
-                _cachedNewSongs = newReleases;
-                _loadingNewReleases = false;
-
                 if (newReleases.isNotEmpty) {
+                  // Take first 10 for display
+                  _cachedNewSongs = newReleases.take(10).toList();
+
                   final userDataProvider = Provider.of<UserDataProvider>(
                     context,
                     listen: false,
                   );
-                  userDataProvider.addSongsToPool(newReleases);
+                  userDataProvider.addSongsToPool(_cachedNewSongs!);
+                } else {
+                  _cachedNewSongs = [];
                 }
+
+                _loadingNewReleases = false;
 
                 // Load next section after a delay
                 Future.delayed(Duration(seconds: 2), _loadTopMoversData);
@@ -152,57 +179,35 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     if ((_cachedTopSongs == null || _cachedTopSongs!.isEmpty) &&
         !_loadingTopSongs) {
       _loadingTopSongs = true;
-      // Get the most popular songs across all genres for the Top Songs section
-      // Explicitly exclude songs with title "Price tag" which seem to appear erroneously
+      // Get country-specific top tracks for the Top Songs section
       _musicDataApi
-          .searchSongs(
-            "tag:popular year:2023-2024 NOT title:\"Price tag\"",
-            limit: 10,
-          ) // More specific query to avoid the Price tag songs
+          .getTopTracksForCountry(
+            limit: 50, // Get top 50 for more variety, we'll show first 10
+            market: _currentCountry,
+          )
           .then((topTracks) {
             if (mounted) {
               setState(() {
-                // Only update if we got valid data and filter out any "Price tag" songs that might have slipped through
                 if (topTracks.isNotEmpty) {
-                  // Check if we have any "Price tag" songs in the results
-                  final priceTagSongs =
-                      topTracks
-                          .where(
-                            (song) => song.name.toLowerCase() == "price tag",
-                          )
-                          .toList();
+                  // Take only the first 10 for display, sorted by popularity (price as proxy)
+                  final sortedTracks =
+                      topTracks..sort(
+                        (a, b) => b.currentPrice.compareTo(a.currentPrice),
+                      );
+                  _cachedTopSongs = sortedTracks.take(10).toList();
 
-                  if (priceTagSongs.isNotEmpty) {
-                    print(
-                      'WARNING: Found ${priceTagSongs.length} "Price tag" songs in search results',
-                    );
+                  // Record stream data for analytics
+                  for (final song in _cachedTopSongs!) {
+                    _streamAnalytics.recordStreamData(song);
                   }
 
-                  // Filter out any "Price tag" songs that might have slipped through the query
-                  final filteredTracks =
-                      topTracks
-                          .where(
-                            (song) => song.name.toLowerCase() != "price tag",
-                          )
-                          .toList();
-
-                  // Only use the results if we still have songs after filtering
-                  if (filteredTracks.isNotEmpty) {
-                    _cachedTopSongs = filteredTracks;
-
-                    // Add songs to pool
-                    final userDataProvider = Provider.of<UserDataProvider>(
-                      context,
-                      listen: false,
-                    );
-                    userDataProvider.addSongsToPool(filteredTracks);
-                  } else if (_cachedTopSongs == null) {
-                    // If filtering removed all songs and we have no cached data, create empty list
-                    _cachedTopSongs = [];
-                  }
-                } else if (_cachedTopSongs == null) {
-                  // If no data returned and we have no cached data, create an empty list
-                  // but not null, so we'll show placeholders instead of loading indicators
+                  // Add songs to pool
+                  final userDataProvider = Provider.of<UserDataProvider>(
+                    context,
+                    listen: false,
+                  );
+                  userDataProvider.addSongsToPool(_cachedTopSongs!);
+                } else {
                   _cachedTopSongs = [];
                 }
 
@@ -238,19 +243,41 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     if (_cachedTopMovers == null && !_loadingTopMovers) {
       _loadingTopMovers = true;
       _musicDataApi
-          .searchSongs("genre:hip-hop year:2023-2024", limit: 10)
-          .then((hipHopTracks) {
+          .getTrendingTracks(limit: 20, market: _currentCountry)
+          .then((trendingTracks) {
             if (mounted) {
               setState(() {
-                _cachedTopMovers = hipHopTracks;
+                if (trendingTracks.isNotEmpty) {
+                  // Filter for actual trending tracks using analytics
+                  final movers = <Song>[];
+                  for (final song in trendingTracks) {
+                    _streamAnalytics.recordStreamData(song);
+                    if (_streamAnalytics.isTrending(song.id)) {
+                      movers.add(song);
+                    }
+                  }
+
+                  // If we don't have enough trending tracks, add the most recent ones
+                  if (movers.length < 10) {
+                    final remaining = trendingTracks
+                        .where((song) => !movers.contains(song))
+                        .take(10 - movers.length);
+                    movers.addAll(remaining);
+                  }
+
+                  _cachedTopMovers = movers.take(10).toList();
+                } else {
+                  _cachedTopMovers = [];
+                }
+
                 _loadingTopMovers = false;
 
-                if (hipHopTracks.isNotEmpty) {
+                if (_cachedTopMovers!.isNotEmpty) {
                   final userDataProvider = Provider.of<UserDataProvider>(
                     context,
                     listen: false,
                   );
-                  userDataProvider.addSongsToPool(hipHopTracks);
+                  userDataProvider.addSongsToPool(_cachedTopMovers!);
                 }
 
                 // Load final section after a delay
@@ -329,6 +356,32 @@ class _DiscoverScreenState extends State<DiscoverScreen>
             const Text('Sound Market'),
           ],
         ),
+        actions: [
+          if (_currentCountry != null)
+            Padding(
+              padding: const EdgeInsets.only(right: 16.0),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    CountryDetectionService.getCountryDisplayInfo(
+                          _currentCountry!,
+                        )['flag'] ??
+                        '🌍',
+                    style: const TextStyle(fontSize: 16),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    _currentCountry!,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
       ),
       body: Consumer<UserDataProvider>(
         builder: (context, userDataProvider, child) {
@@ -702,7 +755,8 @@ class _DiscoverScreenState extends State<DiscoverScreen>
         ),
         const SizedBox(height: AppSpacing.m), // Use AppSpacing.m
         SizedBox(
-          height: 260.0, // Height for the horizontal list container
+          height:
+              300.0, // Increased height to accommodate larger cards and stacked price info
           child:
               _loadingTopMovers
                   ? Center(
@@ -1112,14 +1166,14 @@ class _DiscoverScreenState extends State<DiscoverScreen>
         clipBehavior:
             Clip.antiAlias, // Add this to clip the image to the card's shape
         child: SizedBox(
-          width: 120.0,
+          width: 140.0, // Increased from 120.0 to accommodate larger prices
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               SizedBox(
                 // Use SizedBox to constrain the image size
-                height: 120.0, // Increased from 90.0
-                width: 120.0, // Increased from 90.0
+                height: 140.0, // Increased to match card width
+                width: 140.0, // Increased to match card width
                 child:
                     song.albumArtUrl != null && song.albumArtUrl!.isNotEmpty
                         ? CachedNetworkImage(
@@ -1190,48 +1244,47 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                           ? AnimatedBuilder(
                             animation: _priceAnimations[song.id]!,
                             builder: (context, child) {
-                              return Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Flexible(
-                                    child: Text(
-                                      '\$${_priceAnimations[song.id]!.value.toStringAsFixed(2)}',
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16.0,
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
+                                  Text(
+                                    _priceAnimations[song.id]!.value >= 100
+                                        ? Formatters.compactCurrency(
+                                          _priceAnimations[song.id]!.value,
+                                        )
+                                        : '\$${_priceAnimations[song.id]!.value.toStringAsFixed(2)}',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16.0,
                                     ),
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                   if (showPriceChange && song.previousPrice > 0)
-                                    Flexible(
-                                      child: Padding(
-                                        padding: const EdgeInsets.only(
-                                          left: AppSpacing.xs,
+                                    Padding(
+                                      padding: const EdgeInsets.only(
+                                        top: AppSpacing.xxs,
+                                      ),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: AppSpacing.xs,
+                                          vertical: AppSpacing.xxs,
                                         ),
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: AppSpacing.xs,
-                                            vertical: AppSpacing.xxs,
+                                        decoration: BoxDecoration(
+                                          color: priceChangeColor.withAlpha(
+                                            (255 * 0.2).round(),
                                           ),
-                                          decoration: BoxDecoration(
-                                            color: priceChangeColor.withAlpha(
-                                              (255 * 0.2).round(),
-                                            ),
-                                            borderRadius: BorderRadius.circular(
-                                              AppSpacing.xs,
-                                            ),
+                                          borderRadius: BorderRadius.circular(
+                                            AppSpacing.xs,
                                           ),
-                                          child: Text(
-                                            '${priceChangePercent >= 0 ? '+' : ''}${priceChangePercent.toStringAsFixed(1)}%',
-                                            style: TextStyle(
-                                              color: priceChangeColor,
-                                              fontSize: 12.0,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                            overflow: TextOverflow.ellipsis,
+                                        ),
+                                        child: Text(
+                                          '${priceChangePercent >= 0 ? '+' : ''}${priceChangePercent.toStringAsFixed(1)}%',
+                                          style: TextStyle(
+                                            color: priceChangeColor,
+                                            fontSize: 12.0,
+                                            fontWeight: FontWeight.bold,
                                           ),
+                                          overflow: TextOverflow.ellipsis,
                                         ),
                                       ),
                                     ),
@@ -1239,47 +1292,47 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                               );
                             },
                           )
-                          : Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          : Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Flexible(
-                                child: Text(
-                                  '\$${song.currentPrice.toStringAsFixed(2)}',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16.0,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
+                              Text(
+                                song.currentPrice >= 100
+                                    ? Formatters.compactCurrency(
+                                      song.currentPrice,
+                                    )
+                                    : '\$${song.currentPrice.toStringAsFixed(2)}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16.0,
                                 ),
+                                overflow: TextOverflow.ellipsis,
                               ),
                               if (showPriceChange && song.previousPrice > 0)
-                                Flexible(
-                                  child: Padding(
-                                    padding: const EdgeInsets.only(
-                                      left: AppSpacing.xs,
+                                Padding(
+                                  padding: const EdgeInsets.only(
+                                    top: AppSpacing.xxs,
+                                  ),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: AppSpacing.xs,
+                                      vertical: AppSpacing.xxs,
                                     ),
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: AppSpacing.xs,
-                                        vertical: AppSpacing.xxs,
+                                    decoration: BoxDecoration(
+                                      color: priceChangeColor.withAlpha(
+                                        (255 * 0.2).round(),
                                       ),
-                                      decoration: BoxDecoration(
-                                        color: priceChangeColor.withAlpha(
-                                          (255 * 0.2).round(),
-                                        ),
-                                        borderRadius: BorderRadius.circular(
-                                          AppSpacing.xs,
-                                        ),
+                                      borderRadius: BorderRadius.circular(
+                                        AppSpacing.xs,
                                       ),
-                                      child: Text(
-                                        '${priceChangePercent >= 0 ? '+' : ''}${priceChangePercent.toStringAsFixed(1)}%',
-                                        style: TextStyle(
-                                          color: priceChangeColor,
-                                          fontSize: 12.0,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                        overflow: TextOverflow.ellipsis,
+                                    ),
+                                    child: Text(
+                                      '${priceChangePercent >= 0 ? '+' : ''}${priceChangePercent.toStringAsFixed(1)}%',
+                                      style: TextStyle(
+                                        color: priceChangeColor,
+                                        fontSize: 12.0,
+                                        fontWeight: FontWeight.bold,
                                       ),
+                                      overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
                                 ),
@@ -1409,6 +1462,124 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                 'Previous Price: \$${song.previousPrice.toStringAsFixed(2)}',
               ),
               const SizedBox(height: AppSpacing.l), // Use AppSpacing.l
+              // Preview/Spotify section
+              StreamBuilder<bool>(
+                stream: _audioPlayerService.loadingStateStream,
+                builder: (context, loadingSnapshot) {
+                  return StreamBuilder<Song?>(
+                    stream: _audioPlayerService.currentSongStream,
+                    builder: (context, currentSongSnapshot) {
+                      final isLoading = loadingSnapshot.data ?? false;
+                      final currentSong = currentSongSnapshot.data;
+                      final isPlaying = currentSong?.id == song.id;
+
+                      if (song.previewUrl != null &&
+                          song.previewUrl!.isNotEmpty) {
+                        // Show preview button if preview URL is available
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            ElevatedButton.icon(
+                              onPressed:
+                                  isLoading
+                                      ? null
+                                      : () async {
+                                        if (isPlaying) {
+                                          await _audioPlayerService.stop();
+                                        } else {
+                                          await _audioPlayerService.playSong(
+                                            song,
+                                          );
+                                        }
+                                      },
+                              icon:
+                                  isLoading && isPlaying
+                                      ? const SizedBox(
+                                        width: 16,
+                                        height: 16,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                      : Icon(
+                                        isPlaying
+                                            ? Icons.stop
+                                            : Icons.play_arrow,
+                                      ),
+                              label: Text(
+                                isPlaying ? 'Stop Preview' : 'Play Preview',
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.blue,
+                              ),
+                            ),
+                            const SizedBox(height: AppSpacing.s),
+                          ],
+                        );
+                      } else if (song.spotifyExternalUrl != null &&
+                          song.spotifyExternalUrl!.isNotEmpty) {
+                        // Show Spotify button if no preview but Spotify URL available
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            ElevatedButton.icon(
+                              onPressed: () async {
+                                final uri = Uri.parse(song.spotifyExternalUrl!);
+                                if (await canLaunchUrl(uri)) {
+                                  await launchUrl(
+                                    uri,
+                                    mode: LaunchMode.externalApplication,
+                                  );
+                                } else {
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Could not open Spotify'),
+                                        backgroundColor: Colors.red,
+                                      ),
+                                    );
+                                  }
+                                }
+                              },
+                              icon: const Icon(Icons.open_in_new),
+                              label: const Text('Listen on Spotify'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(
+                                  0xFF1ED760,
+                                ), // Spotify green
+                              ),
+                            ),
+                            const SizedBox(height: AppSpacing.s),
+                          ],
+                        );
+                      } else {
+                        // No preview or Spotify URL available
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(AppSpacing.s),
+                              decoration: BoxDecoration(
+                                color: Colors.grey[800],
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Row(
+                                children: [
+                                  Icon(Icons.info_outline, size: 16),
+                                  SizedBox(width: AppSpacing.s),
+                                  Text('No preview available'),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: AppSpacing.s),
+                          ],
+                        );
+                      }
+                    },
+                  );
+                },
+              ),
+
               if (ownsSong)
                 Text(
                   'You own: $quantityOwned ${quantityOwned == 1 ? 'share' : 'shares'}',
