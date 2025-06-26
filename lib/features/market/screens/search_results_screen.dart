@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../../shared/models/song.dart'; // Corrected path
 import '../../../shared/providers/user_data_provider.dart'; // Corrected path
 import '../../../shared/services/search_state_service.dart';
@@ -263,19 +264,18 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
           song.albumArtUrl != null
               ? ClipRRect(
                 borderRadius: BorderRadius.circular(4.0),
-                child: Image.network(
-                  song.albumArtUrl!,
+                child: CachedNetworkImage(
+                  imageUrl: song.albumArtUrl!,
                   width: 50.0,
                   height: 50.0,
                   fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Container(
-                      width: 50.0,
-                      height: 50.0,
-                      color: Colors.grey[700],
-                      child: const Icon(Icons.music_note, size: 25.0),
-                    );
-                  },
+                  errorWidget:
+                      (context, url, error) => Container(
+                        width: 50.0,
+                        height: 50.0,
+                        color: Colors.grey[700],
+                        child: const Icon(Icons.music_note, size: 25.0),
+                      ),
                 ),
               )
               : Container(
@@ -374,13 +374,13 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                     backgroundColor: Colors.grey[800],
                     backgroundImage:
                         song.albumArtUrl != null
-                            ? NetworkImage(song.albumArtUrl!)
+                            ? CachedNetworkImageProvider(song.albumArtUrl!)
                             : null,
+                    radius: 30.0,
                     child:
                         song.albumArtUrl == null
                             ? const Icon(Icons.music_note)
                             : null,
-                    radius: 30.0,
                   ),
                   const SizedBox(width: 16.0),
                   Expanded(

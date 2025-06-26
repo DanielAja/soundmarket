@@ -2,6 +2,7 @@ import 'dart:math';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../../shared/providers/user_data_provider.dart';
 import '../../../shared/models/song.dart';
 import '../../../shared/services/music_data_api_service.dart';
@@ -1121,37 +1122,26 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                 width: 120.0, // Increased from 90.0
                 child:
                     song.albumArtUrl != null && song.albumArtUrl!.isNotEmpty
-                        ? Image.network(
-                          song.albumArtUrl!,
+                        ? CachedNetworkImage(
+                          imageUrl: song.albumArtUrl!,
                           fit: BoxFit.cover,
-                          loadingBuilder: (context, child, loadingProgress) {
-                            if (loadingProgress == null) return child;
-                            return Center(
-                              child: CircularProgressIndicator(
-                                value:
-                                    loadingProgress.expectedTotalBytes != null
-                                        ? loadingProgress
-                                                .cumulativeBytesLoaded /
-                                            loadingProgress.expectedTotalBytes!
-                                        : null,
-                                strokeWidth:
-                                    AppSpacing.xxs, // Use AppSpacing.xxs
-                              ),
-                            );
-                          },
-                          errorBuilder: (context, error, stackTrace) {
-                            // Fallback to placeholder icon on error
-                            return Container(
-                              color: Colors.grey[800],
-                              child: Center(
-                                child: Icon(
-                                  Icons.music_note,
-                                  size: 40.0,
-                                  color: Colors.grey[600],
+                          placeholder:
+                              (context, url) => Center(
+                                child: CircularProgressIndicator(
+                                  strokeWidth: AppSpacing.xxs,
                                 ),
                               ),
-                            );
-                          },
+                          errorWidget:
+                              (context, url, error) => Container(
+                                color: Colors.grey[800],
+                                child: Center(
+                                  child: Icon(
+                                    Icons.music_note,
+                                    size: 40.0,
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
+                              ),
                         )
                         : Container(
                           // Fallback for null/empty URL
@@ -1346,7 +1336,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                     backgroundColor: Colors.grey[800],
                     backgroundImage:
                         song.albumArtUrl != null
-                            ? NetworkImage(song.albumArtUrl!)
+                            ? CachedNetworkImageProvider(song.albumArtUrl!)
                             : null,
                     child:
                         song.albumArtUrl == null

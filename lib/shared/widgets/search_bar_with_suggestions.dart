@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../models/song.dart'; // Corrected path
 import '../providers/user_data_provider.dart'; // Corrected path
 
@@ -219,19 +220,27 @@ class _SearchBarWithSuggestionsState extends State<SearchBarWithSuggestions> {
                 song.albumArtUrl != null
                     ? ClipRRect(
                       borderRadius: BorderRadius.circular(4.0),
-                      child: Image.network(
-                        song.albumArtUrl!,
+                      child: CachedNetworkImage(
+                        imageUrl: song.albumArtUrl!,
                         width: 40.0,
                         height: 40.0,
                         fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            width: 40.0,
-                            height: 40.0,
-                            color: Colors.grey[700],
-                            child: const Icon(Icons.music_note, size: 20.0),
-                          );
-                        },
+                        placeholder:
+                            (context, url) => Container(
+                              width: 40.0,
+                              height: 40.0,
+                              color: Colors.grey[700],
+                              child: const CircularProgressIndicator(
+                                strokeWidth: 2.0,
+                              ),
+                            ),
+                        errorWidget:
+                            (context, url, error) => Container(
+                              width: 40.0,
+                              height: 40.0,
+                              color: Colors.grey[700],
+                              child: const Icon(Icons.music_note, size: 20.0),
+                            ),
                       ),
                     )
                     : Container(

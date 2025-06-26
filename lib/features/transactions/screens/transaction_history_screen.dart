@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../../shared/providers/user_data_provider.dart'; // Corrected path
 import '../../../shared/models/transaction.dart'; // Corrected path
 
@@ -216,7 +217,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
                   backgroundColor: Colors.grey[800],
                   backgroundImage:
                       transaction.albumArtUrl != null
-                          ? NetworkImage(transaction.albumArtUrl!)
+                          ? CachedNetworkImageProvider(transaction.albumArtUrl!)
                           : null,
                   child:
                       transaction.albumArtUrl == null

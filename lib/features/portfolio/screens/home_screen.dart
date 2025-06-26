@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // For HapticFeedback
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:math';
 import 'dart:async'; // Import Timer (Moved to top)
 import '../../../shared/providers/user_data_provider.dart'; // Corrected path
@@ -114,30 +115,20 @@ class _PortfolioItemDetailsSheetContentState
                       maxWidth: MediaQuery.of(context).size.width * 0.9,
                       maxHeight: MediaQuery.of(context).size.height * 0.6,
                     ),
-                    child: Image.network(
-                      albumArtUrl,
+                    child: CachedNetworkImage(
+                      imageUrl: albumArtUrl,
                       fit: BoxFit.contain,
-                      loadingBuilder: (context, child, loadingProgress) {
-                        if (loadingProgress == null) return child;
-                        return Container(
-                          width: MediaQuery.of(context).size.width * 0.9,
-                          height: MediaQuery.of(context).size.width * 0.9,
-                          color: Colors.grey[900],
-                          child: Center(
-                            child: CircularProgressIndicator(
-                              value:
-                                  loadingProgress.expectedTotalBytes != null &&
-                                          loadingProgress.expectedTotalBytes! >
-                                              0
-                                      ? loadingProgress.cumulativeBytesLoaded /
-                                          loadingProgress.expectedTotalBytes!
-                                      : null,
+                      placeholder:
+                          (context, url) => Container(
+                            width: MediaQuery.of(context).size.width * 0.9,
+                            height: MediaQuery.of(context).size.width * 0.9,
+                            color: Colors.grey[900],
+                            child: const Center(
+                              child: CircularProgressIndicator(),
                             ),
                           ),
-                        );
-                      },
-                      errorBuilder:
-                          (context, error, stackTrace) => Container(
+                      errorWidget:
+                          (context, url, error) => Container(
                             width: MediaQuery.of(context).size.width * 0.9,
                             height: MediaQuery.of(context).size.width * 0.9,
                             color: Colors.grey[900],
@@ -300,7 +291,9 @@ class _PortfolioItemDetailsSheetContentState
                               backgroundColor: Colors.grey[800],
                               backgroundImage:
                                   widget.item.albumArtUrl != null
-                                      ? NetworkImage(widget.item.albumArtUrl!)
+                                      ? CachedNetworkImageProvider(
+                                        widget.item.albumArtUrl!,
+                                      )
                                       : null,
                               child:
                                   widget.item.albumArtUrl == null
@@ -975,21 +968,26 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     DateTime startDate;
     final endDate = now; // End date is always now
 
-    // Determine start date based on time filter
+    // Determine start date based on time filter with more precise calculations
     switch (timeFilter) {
       case '1D':
-        startDate = DateTime(now.year, now.month, now.day); // Midnight today
+        // Start from beginning of current day
+        startDate = DateTime(now.year, now.month, now.day);
         break;
       case '1W':
+        // Start from exactly 7 days ago
         startDate = now.subtract(const Duration(days: 7));
         break;
       case '1M':
+        // Start from exactly 30 days ago
         startDate = now.subtract(const Duration(days: 30));
         break;
       case '3M':
+        // Start from exactly 90 days ago
         startDate = now.subtract(const Duration(days: 90));
         break;
       case '1Y':
+        // Start from exactly 365 days ago
         startDate = now.subtract(const Duration(days: 365));
         break;
       case 'All':
@@ -1009,13 +1007,31 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         endDate,
       );
 
+      // Filter and validate the data
+      final filteredData =
+          newChartData
+              .where(
+                (snapshot) =>
+                    snapshot.timestamp.isAfter(
+                      startDate.subtract(const Duration(minutes: 1)),
+                    ) &&
+                    snapshot.timestamp.isBefore(
+                      endDate.add(const Duration(minutes: 1)),
+                    ) &&
+                    snapshot.value >= 0, // Ensure valid portfolio values
+              )
+              .toList();
+
+      // Sort by timestamp to ensure proper order
+      filteredData.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+
       // Ensure widget is still mounted before updating state
       if (mounted) {
         // Use post frame callback to avoid calling setState during build/layout phases
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
             setState(() {
-              _chartData = newChartData;
+              _chartData = filteredData;
               _isChartLoading = false; // Loading finished
             });
           }
@@ -1130,7 +1146,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final currentPortfolioValue = userDataProvider.totalPortfolioValue;
     // Use null-aware operator with default value for cashBalance
     final cashBalance = userDataProvider.userProfile?.cashBalance ?? 0.0;
-    final totalBalance = userDataProvider.totalBalance;
 
     // Calculate gain/loss based on the *selected time range* using currentChartData
     double rangeGainLoss = 0.0;
@@ -1214,34 +1229,69 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           // Stream count icon/indicator for real-time updates with pulse animation
                         ],
                       ),
-                      // Corrected: Removed the duplicate AnimatedSwitcher
-                      AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 500),
-                        transitionBuilder: (
-                          Widget child,
-                          Animation<double> animation,
-                        ) {
-                          return FadeTransition(
-                            opacity: animation,
-                            child: SlideTransition(
-                              position: Tween<Offset>(
-                                begin: const Offset(0.0, 0.5),
-                                end: Offset.zero,
-                              ).animate(animation),
-                              child: child,
+                      // Portfolio value with real-time updates
+                      StreamBuilder<List<Song>>(
+                        stream:
+                            Provider.of<UserDataProvider>(
+                              context,
+                              listen: false,
+                            ).songUpdatesStream,
+                        initialData: const [],
+                        builder: (context, snapshot) {
+                          double displayValue = currentPortfolioValue;
+
+                          // Update portfolio value with latest song prices
+                          if (snapshot.hasData &&
+                              snapshot.data!.isNotEmpty &&
+                              userDataProvider.portfolio.isNotEmpty) {
+                            // Get all available songs for calculation
+                            final allSongs = [
+                              ...snapshot.data!,
+                              ...userDataProvider.allSongs,
+                            ];
+
+                            // Remove duplicates based on song ID
+                            final uniqueSongs = <String, Song>{};
+                            for (final song in allSongs) {
+                              uniqueSongs[song.id] = song;
+                            }
+
+                            displayValue = userDataProvider
+                                .calculatePortfolioValue(
+                                  uniqueSongs.values.toList(),
+                                  userDataProvider.portfolio,
+                                );
+                          }
+
+                          return AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 500),
+                            transitionBuilder: (
+                              Widget child,
+                              Animation<double> animation,
+                            ) {
+                              return FadeTransition(
+                                opacity: animation,
+                                child: SlideTransition(
+                                  position: Tween<Offset>(
+                                    begin: const Offset(0.0, 0.5),
+                                    end: Offset.zero,
+                                  ).animate(animation),
+                                  child: child,
+                                ),
+                              );
+                            },
+                            child: Text(
+                              '\$${displayValue.toStringAsFixed(2)}',
+                              key: ValueKey<String>(
+                                displayValue.toStringAsFixed(2),
+                              ),
+                              style: const TextStyle(
+                                fontSize: 24.0,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           );
                         },
-                        child: Text(
-                          '\$${currentPortfolioValue.toStringAsFixed(2)}', // Use currentPortfolioValue
-                          key: ValueKey<String>(
-                            currentPortfolioValue.toStringAsFixed(2),
-                          ), // Use currentPortfolioValue
-                          style: const TextStyle(
-                            fontSize: 24.0,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
                       ),
                       const SizedBox(
                         height: AppSpacing.xs,
@@ -1263,30 +1313,49 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                               rangeGainLossPercent;
                           bool updatedIsPositiveGain = isPositiveGain;
 
-                          // If we have fresh data and at least one portfolio snapshot
+                          // If we have fresh song data and portfolio items
                           if (snapshot.hasData &&
                               snapshot.data!.isNotEmpty &&
-                              currentChartData.isNotEmpty) {
-                            // Get the latest portfolio value by recalculating based on updated song prices
+                              userDataProvider.portfolio.isNotEmpty) {
+                            // Get all available songs for calculation
+                            final allSongs = [
+                              ...snapshot.data!,
+                              ...userDataProvider.allSongs,
+                            ];
+
+                            // Remove duplicates based on song ID
+                            final uniqueSongs = <String, Song>{};
+                            for (final song in allSongs) {
+                              uniqueSongs[song.id] = song;
+                            }
+
+                            // Calculate portfolio value with updated prices
                             updatedCurrentPortfolioValue = userDataProvider
                                 .calculatePortfolioValue(
-                                  snapshot.data!, // Use updated song prices
-                                  userDataProvider
-                                      .portfolio, // Use existing portfolio items
+                                  uniqueSongs.values.toList(),
+                                  userDataProvider.portfolio,
                                 );
 
-                            // Recalculate gain/loss with the updated portfolio value
-                            final initialValue = currentChartData.first.value;
-                            if (initialValue.abs() > 0.001) {
-                              updatedRangeGainLoss =
-                                  updatedCurrentPortfolioValue - initialValue;
-                              updatedRangeGainLossPercent =
-                                  (updatedRangeGainLoss / initialValue) * 100;
-                            } else if (updatedCurrentPortfolioValue > 0) {
-                              updatedRangeGainLoss =
-                                  updatedCurrentPortfolioValue;
-                              updatedRangeGainLossPercent = double.infinity;
+                            // Recalculate gain/loss based on chart data if available
+                            if (currentChartData.isNotEmpty) {
+                              final initialValue = currentChartData.first.value;
+                              if (initialValue.abs() > 0.001) {
+                                updatedRangeGainLoss =
+                                    updatedCurrentPortfolioValue - initialValue;
+                                updatedRangeGainLossPercent =
+                                    (updatedRangeGainLoss / initialValue) * 100;
+                              } else if (updatedCurrentPortfolioValue > 0) {
+                                updatedRangeGainLoss =
+                                    updatedCurrentPortfolioValue;
+                                updatedRangeGainLossPercent =
+                                    100.0; // Show 100% instead of infinity
+                              }
+                            } else {
+                              // If no chart data, show current value without comparison
+                              updatedRangeGainLoss = 0.0;
+                              updatedRangeGainLossPercent = 0.0;
                             }
+
                             updatedIsPositiveGain = updatedRangeGainLoss >= 0;
                           }
 
@@ -1310,7 +1379,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                 const SizedBox(width: AppSpacing.xs),
                                 Expanded(
                                   child: Text(
-                                    '${updatedIsPositiveGain ? "+" : ""}${updatedRangeGainLoss.toStringAsFixed(2)} (${updatedIsPositiveGain ? "+" : ""}${updatedRangeGainLossPercent.isFinite ? updatedRangeGainLossPercent.toStringAsFixed(2) + "%" : "0.00%"}) $rangeLabel',
+                                    '${updatedIsPositiveGain ? "+" : ""}${updatedRangeGainLoss.toStringAsFixed(2)} (${updatedIsPositiveGain ? "+" : ""}${updatedRangeGainLossPercent.isFinite ? updatedRangeGainLossPercent.toStringAsFixed(2) : "0.00"}%) $rangeLabel',
                                     style: TextStyle(
                                       color:
                                           updatedIsPositiveGain
@@ -1383,32 +1452,72 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   'Total Balance',
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 500),
-                  transitionBuilder: (
-                    Widget child,
-                    Animation<double> animation,
-                  ) {
-                    return FadeTransition(
-                      opacity: animation,
-                      child: SlideTransition(
-                        position: Tween<Offset>(
-                          begin: const Offset(0.0, 0.5),
-                          end: Offset.zero,
-                        ).animate(animation),
-                        child: child,
+                StreamBuilder<List<Song>>(
+                  stream:
+                      Provider.of<UserDataProvider>(
+                        context,
+                        listen: false,
+                      ).songUpdatesStream,
+                  initialData: const [],
+                  builder: (context, snapshot) {
+                    double displayPortfolioValue = currentPortfolioValue;
+
+                    // Update portfolio value with latest song prices
+                    if (snapshot.hasData &&
+                        snapshot.data!.isNotEmpty &&
+                        userDataProvider.portfolio.isNotEmpty) {
+                      // Get all available songs for calculation
+                      final allSongs = [
+                        ...snapshot.data!,
+                        ...userDataProvider.allSongs,
+                      ];
+
+                      // Remove duplicates based on song ID
+                      final uniqueSongs = <String, Song>{};
+                      for (final song in allSongs) {
+                        uniqueSongs[song.id] = song;
+                      }
+
+                      displayPortfolioValue = userDataProvider
+                          .calculatePortfolioValue(
+                            uniqueSongs.values.toList(),
+                            userDataProvider.portfolio,
+                          );
+                    }
+
+                    final displayTotalBalance =
+                        cashBalance + displayPortfolioValue;
+
+                    return AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 500),
+                      transitionBuilder: (
+                        Widget child,
+                        Animation<double> animation,
+                      ) {
+                        return FadeTransition(
+                          opacity: animation,
+                          child: SlideTransition(
+                            position: Tween<Offset>(
+                              begin: const Offset(0.0, 0.5),
+                              end: Offset.zero,
+                            ).animate(animation),
+                            child: child,
+                          ),
+                        );
+                      },
+                      child: Text(
+                        '\$${displayTotalBalance.toStringAsFixed(2)}',
+                        key: ValueKey<String>(
+                          displayTotalBalance.toStringAsFixed(2),
+                        ),
+                        style: TextStyle(
+                          fontSize: 18.0,
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
                       ),
                     );
                   },
-                  child: Text(
-                    '\$${totalBalance.toStringAsFixed(2)}',
-                    key: ValueKey<String>(totalBalance.toStringAsFixed(2)),
-                    style: TextStyle(
-                      fontSize: 18.0,
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                  ),
                 ),
               ],
             ),
@@ -1426,11 +1535,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   ) {
     if (snapshots.isEmpty) {
       // If no history for the range, show a flat line at the current value
-      final startX = 0.0;
-      final endX = 1.0;
       return [
-        FlSpot(startX, currentPortfolioValue),
-        FlSpot(endX, currentPortfolioValue),
+        FlSpot(0.0, currentPortfolioValue),
+        FlSpot(1.0, currentPortfolioValue),
       ];
     }
 
@@ -1461,10 +1568,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final spots = <FlSpot>[];
     if (processedSnapshots.isEmpty) {
       return [
-        FlSpot(0, currentPortfolioValue),
-        FlSpot(1, currentPortfolioValue),
+        FlSpot(0.0, currentPortfolioValue),
+        FlSpot(1.0, currentPortfolioValue),
       ]; // Fallback
     }
+
+    // Sort snapshots by timestamp to ensure proper order
+    processedSnapshots.sort((a, b) => a.timestamp.compareTo(b.timestamp));
 
     final firstTimestamp = processedSnapshots.first.timestamp;
     final lastTimestamp = processedSnapshots.last.timestamp;
@@ -1472,49 +1582,40 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         lastTimestamp.difference(firstTimestamp).inMilliseconds;
 
     // If duration is 0 (only one data point), handle it specially
-    if (totalDuration == 0) {
+    if (totalDuration == 0 || processedSnapshots.length == 1) {
       return [
-        FlSpot(0, processedSnapshots.first.value),
-        FlSpot(1, currentPortfolioValue),
+        FlSpot(0.0, processedSnapshots.first.value),
+        FlSpot(1.0, currentPortfolioValue),
       ];
     }
 
-    // Create normalized spots
+    // Create normalized spots from processed snapshots
     for (int i = 0; i < processedSnapshots.length; i++) {
       final snapshot = processedSnapshots[i];
       // Normalize x value to range 0.0-1.0 for better scaling
       final double xValue =
-          (snapshot.timestamp.difference(firstTimestamp).inMilliseconds) /
-          totalDuration;
-      spots.add(FlSpot(xValue, snapshot.value));
+          totalDuration > 0
+              ? (snapshot.timestamp.difference(firstTimestamp).inMilliseconds) /
+                  totalDuration
+              : i / (processedSnapshots.length - 1);
+      spots.add(FlSpot(xValue.clamp(0.0, 1.0), snapshot.value));
     }
 
-    // Add current value as last point if needed
-    final now = DateTime.now();
-    if (now.isAfter(lastTimestamp)) {
-      // Only add if current time is after last snapshot
-      final double currentXValue;
-      if (now.difference(lastTimestamp).inMinutes < 10) {
-        // If last point is very recent, place current value just a bit after
-        currentXValue = 1.0;
-      } else {
-        // Otherwise normalize based on actual time difference
-        currentXValue =
-            (now.difference(firstTimestamp).inMilliseconds) / totalDuration;
-      }
-      // Only add if it doesn't create a duplicate x value
-      if (spots.isEmpty || currentXValue > spots.last.x) {
-        spots.add(FlSpot(currentXValue.clamp(0, 1), currentPortfolioValue));
-      }
-    }
+    // Always add current value as the final point at x = 1.0
+    // Remove any existing point at x = 1.0 first to avoid duplicates
+    spots.removeWhere((spot) => (spot.x - 1.0).abs() < 0.001);
+    spots.add(FlSpot(1.0, currentPortfolioValue));
 
-    // Ensure we have at least two points
+    // Ensure we have at least two points and they're properly ordered
     if (spots.isEmpty) {
-      spots.add(FlSpot(0, currentPortfolioValue));
-      spots.add(FlSpot(1, currentPortfolioValue));
+      spots.add(FlSpot(0.0, currentPortfolioValue));
+      spots.add(FlSpot(1.0, currentPortfolioValue));
     } else if (spots.length == 1) {
-      spots.add(FlSpot(1, spots.first.y));
+      spots.add(FlSpot(1.0, currentPortfolioValue));
     }
+
+    // Sort spots by x value to ensure proper ordering
+    spots.sort((a, b) => a.x.compareTo(b.x));
 
     return spots;
   }
@@ -1788,11 +1889,24 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           // Recalculate with latest prices if available
                           if (snapshot.hasData &&
                               snapshot.data!.isNotEmpty &&
-                              spots.isNotEmpty) {
+                              spots.isNotEmpty &&
+                              userDataProvider.portfolio.isNotEmpty) {
+                            // Get all available songs for calculation
+                            final allSongs = [
+                              ...snapshot.data!,
+                              ...userDataProvider.allSongs,
+                            ];
+
+                            // Remove duplicates based on song ID
+                            final uniqueSongs = <String, Song>{};
+                            for (final song in allSongs) {
+                              uniqueSongs[song.id] = song;
+                            }
+
                             // Get updated portfolio value based on latest song prices
                             final updatedEndValue = userDataProvider
                                 .calculatePortfolioValue(
-                                  snapshot.data!,
+                                  uniqueSongs.values.toList(),
                                   userDataProvider.portfolio,
                                 );
 
@@ -1805,7 +1919,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                               updatedPercentageChange =
                                   ((updatedEndValue / startValue) - 1) * 100;
                             } else if (updatedEndValue > startValue) {
-                              updatedPercentageChange = double.infinity;
+                              updatedPercentageChange =
+                                  100.0; // Cap at 100% instead of infinity
                             } else {
                               updatedPercentageChange = 0.0;
                             }
@@ -1817,7 +1932,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           return AnimatedSwitcher(
                             duration: const Duration(milliseconds: 300),
                             child: Text(
-                              '${updatedIsPositive ? "+" : ""}${updatedPercentageChange.isFinite ? updatedPercentageChange.toStringAsFixed(2) + "%" : "0.00%"}',
+                              '${updatedIsPositive ? "+" : ""}${updatedPercentageChange.isFinite ? updatedPercentageChange.toStringAsFixed(2) : "0.00"}%',
                               key: ValueKey<String>(
                                 updatedPercentageChange.toStringAsFixed(2),
                               ),
@@ -2183,46 +2298,57 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
     final timestamp = firstTimestamp.add(offset);
 
-    // Format based on time filter
+    // Format based on time filter with improved precision
     switch (_selectedTimeFilter) {
       case '1D':
-        // For 1 day, show hour
-        if (normalizedValue == 0.0) return '${timestamp.hour}:00';
-        if (normalizedValue == 0.5)
-          return '${timestamp.hour}:${timestamp.minute.toString().padLeft(2, '0')}';
+        // For 1 day, show hour with better formatting
+        if (normalizedValue == 0.0) {
+          return '${timestamp.hour.toString().padLeft(2, '0')}:00';
+        }
+        if (normalizedValue == 0.5) {
+          return '${timestamp.hour.toString().padLeft(2, '0')}:${timestamp.minute.toString().padLeft(2, '0')}';
+        }
         if (normalizedValue == 1.0) return 'Now';
         return '';
 
       case '1W':
-        // For 1 week, show weekday
+        // For 1 week, show weekday with better formatting
         if (normalizedValue == 0.0) return _getWeekdayName(timestamp.weekday);
         if (normalizedValue == 0.5) return _getWeekdayName(timestamp.weekday);
-        if (normalizedValue == 1.0) return 'Today';
+        if (normalizedValue == 1.0) return 'Now';
         return '';
 
       case '1M':
-        // For 1 month, show day of month
-        if (normalizedValue == 0.0)
+        // For 1 month, show date with better formatting
+        if (normalizedValue == 0.0) {
           return '${timestamp.month}/${timestamp.day}';
-        if (normalizedValue == 0.5)
+        }
+        if (normalizedValue == 0.5) {
           return '${timestamp.month}/${timestamp.day}';
+        }
         if (normalizedValue == 1.0) return 'Now';
         return '';
 
       case '3M':
-        // For 3 months, show month abbreviation
-        if (normalizedValue == 0.0) return _getMonthAbbr(timestamp.month);
-        if (normalizedValue == 0.5) return _getMonthAbbr(timestamp.month);
+        // For 3 months, show month abbreviation with day
+        if (normalizedValue == 0.0) {
+          return '${_getMonthAbbr(timestamp.month)} ${timestamp.day}';
+        }
+        if (normalizedValue == 0.5) {
+          return '${_getMonthAbbr(timestamp.month)} ${timestamp.day}';
+        }
         if (normalizedValue == 1.0) return 'Now';
         return '';
 
       case '1Y':
       case 'All':
-        // For year or all time, show month/year
-        if (normalizedValue == 0.0)
+        // For year or all time, show month/year with better formatting
+        if (normalizedValue == 0.0) {
           return '${_getMonthAbbr(timestamp.month)}/${timestamp.year.toString().substring(2)}';
-        if (normalizedValue == 0.5)
+        }
+        if (normalizedValue == 0.5) {
           return '${_getMonthAbbr(timestamp.month)}/${timestamp.year.toString().substring(2)}';
+        }
         if (normalizedValue == 1.0) return 'Now';
         return '';
 
@@ -2391,122 +2517,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         );
       },
       // Removed whenComplete disposal as it's handled by _PortfolioItemDetailsSheetContent's State
-    );
-  }
-
-  // Show full album art in a dialog
-  void _showFullAlbumArt(
-    BuildContext context,
-    String albumArtUrl,
-    String songName,
-    String artistName,
-  ) {
-    showDialog(
-      context: context,
-      builder:
-          (context) => Dialog(
-            backgroundColor: Colors.transparent,
-            insetPadding: const EdgeInsets.all(AppSpacing.l),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ClipRRect(
-                  // Album Art
-                  borderRadius: BorderRadius.circular(12),
-                  child: Container(
-                    constraints: BoxConstraints(
-                      maxWidth: MediaQuery.of(context).size.width * 0.9,
-                      maxHeight: MediaQuery.of(context).size.height * 0.6,
-                    ),
-                    child: Image.network(
-                      albumArtUrl,
-                      fit: BoxFit.contain,
-                      loadingBuilder: (context, child, loadingProgress) {
-                        if (loadingProgress == null) return child;
-                        return Container(
-                          width: MediaQuery.of(context).size.width * 0.9,
-                          height: MediaQuery.of(context).size.width * 0.9,
-                          color: Colors.grey[900],
-                          child: Center(
-                            child: CircularProgressIndicator(
-                              // **FIXED: Added null check and > 0 check for expectedTotalBytes**
-                              value:
-                                  loadingProgress.expectedTotalBytes != null &&
-                                          loadingProgress.expectedTotalBytes! >
-                                              0
-                                      ? loadingProgress.cumulativeBytesLoaded /
-                                          loadingProgress.expectedTotalBytes!
-                                      : null,
-                            ),
-                          ),
-                        );
-                      },
-                      errorBuilder:
-                          (context, error, stackTrace) => Container(
-                            width: MediaQuery.of(context).size.width * 0.9,
-                            height: MediaQuery.of(context).size.width * 0.9,
-                            color: Colors.grey[900],
-                            child: const Center(
-                              child: Icon(
-                                Icons.error_outline,
-                                size: 50,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
-                    ),
-                  ),
-                ),
-                Container(
-                  // Song Info
-                  padding: const EdgeInsets.all(AppSpacing.l),
-                  margin: const EdgeInsets.only(top: AppSpacing.l),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withAlpha(180),
-                    borderRadius: BorderRadius.circular(12),
-                  ), // Adjusted alpha
-                  child: Column(
-                    children: [
-                      Text(
-                        songName,
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: AppSpacing.xs),
-                      Text(
-                        artistName,
-                        style: TextStyle(fontSize: 16, color: Colors.grey[300]),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                  ),
-                ),
-                Padding(
-                  // Close Button
-                  padding: const EdgeInsets.only(top: AppSpacing.l),
-                  child: ElevatedButton(
-                    onPressed: () => Navigator.pop(context),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.grey[800],
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 12,
-                      ),
-                    ),
-                    child: const Text('CLOSE'),
-                  ),
-                ),
-              ],
-            ),
-          ),
     );
   }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../../shared/models/song.dart'; // Corrected path
 import '../../../shared/providers/user_data_provider.dart'; // Corrected path
 
@@ -74,12 +75,12 @@ class TopSongsListScreen extends StatelessWidget {
                       ),
                       child:
                           song.albumArtUrl != null
-                              ? Image.network(
-                                song.albumArtUrl!,
+                              ? CachedNetworkImage(
+                                imageUrl: song.albumArtUrl!,
                                 fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return const Icon(Icons.music_note);
-                                },
+                                errorWidget:
+                                    (context, url, error) =>
+                                        const Icon(Icons.music_note),
                               )
                               : const Icon(Icons.music_note),
                     ),
@@ -154,13 +155,13 @@ class TopSongsListScreen extends StatelessWidget {
                     backgroundColor: Colors.grey[800],
                     backgroundImage:
                         song.albumArtUrl != null
-                            ? NetworkImage(song.albumArtUrl!)
+                            ? CachedNetworkImageProvider(song.albumArtUrl!)
                             : null,
+                    radius: 30.0,
                     child:
                         song.albumArtUrl == null
                             ? const Icon(Icons.music_note)
                             : null,
-                    radius: 30.0,
                   ),
                   const SizedBox(width: 16.0),
                   Expanded(

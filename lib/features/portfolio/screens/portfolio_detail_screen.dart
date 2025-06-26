@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../../shared/models/portfolio_item.dart'; // Corrected path
 import '../../../shared/models/song.dart'; // Corrected path
 import '../../../shared/providers/user_data_provider.dart'; // Corrected path
@@ -286,7 +287,9 @@ class _PortfolioDetailScreenState extends State<PortfolioDetailScreen> {
                       image:
                           item.albumArtUrl != null
                               ? DecorationImage(
-                                image: NetworkImage(item.albumArtUrl!),
+                                image: CachedNetworkImageProvider(
+                                  item.albumArtUrl!,
+                                ),
                                 fit: BoxFit.cover,
                               )
                               : null,
